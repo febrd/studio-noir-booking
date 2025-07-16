@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/Layout/Header';
 import { Sidebar } from '@/components/Layout/Sidebar';
 import { StatsCards } from '@/components/Dashboard/StatsCards';
@@ -9,6 +10,7 @@ import { Plus, Calendar, TrendingUp } from 'lucide-react';
 import studioHero from '@/assets/studio-hero.jpg';
 
 const Index = () => {
+  const { userProfile } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const toggleSidebar = () => {
@@ -40,7 +42,7 @@ const Index = () => {
                   Studio Noir
                 </h1>
                 <p className="text-xl text-gray-200 mb-6 text-elegant">
-                  Professional booking management system for modern photography studios
+                  Selamat datang, {userProfile?.name}! Kelola studio foto profesional Anda.
                 </p>
                 <div className="flex gap-4">
                   <Button className="bg-white text-black hover:bg-gray-100 hover-scale">

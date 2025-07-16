@@ -19,15 +19,8 @@ interface SidebarProps {
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
-  {
-    name: 'Payment Gateway',
-    href: '/payment-gateway',
-    icon: CreditCard,
-    children: [
-      { name: 'Providers', href: '/payment-gateway/providers' },
-      { name: 'Settings', href: '/payment-gateway/settings' },
-    ],
-  },
+  { name: 'Payment Gateway', href: '/payment-gateway', icon: CreditCard },
+  { name: 'Users', href: '/admin/users', icon: Users },
   {
     name: 'Studio Management',
     href: '/studio',
@@ -48,7 +41,7 @@ const navigation = [
       { name: 'Reports', href: '/transactions/reports' },
     ],
   },
-  { name: 'Customers', href: '/customers', icon: Users },
+  { name: 'Customers', href: '/customers', icon: Calendar },
 ];
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {

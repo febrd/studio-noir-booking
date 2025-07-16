@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { Bell, Settings, User, Menu } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { Bell, Settings, User, Menu, LogOut, Crown, Shield, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -14,6 +16,17 @@ interface HeaderProps {
 }
 
 export const Header = ({ onMenuToggle, isSidebarOpen }: HeaderProps) => {
+  const { userProfile, signOut } = useAuth();
+
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'owner': return <Crown className="h-4 w-4" />;
+      case 'admin': return <Shield className="h-4 w-4" />;
+      case 'keuangan': return <CreditCard className="h-4 w-4" />;
+      default: return <User className="h-4 w-4" />;
+    }
+  };
+
   return (
     <header className="h-16 border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-50">
       <div className="flex items-center justify-between h-full px-6">
@@ -49,14 +62,29 @@ export const Header = ({ onMenuToggle, isSidebarOpen }: HeaderProps) => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="hover-scale">
-                <User className="h-5 w-5" />
+              <Button variant="ghost" className="flex items-center space-x-2 px-3 hover-scale">
+                {getRoleIcon(userProfile?.role || 'pelanggan')}
+                <span className="hidden md:inline">{userProfile?.name}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
-              <DropdownMenuItem>Logout</DropdownMenuItem>
+              <DropdownMenuLabel className="flex items-center space-x-2">
+                {getRoleIcon(userProfile?.role || 'pelanggan')}
+                <div className="flex flex-col">
+                  <span>{userProfile?.name}</span>
+                  <span className="text-xs text-muted-foreground capitalize">{userProfile?.role}</span>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Pengaturan</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={signOut} className="text-destructive">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Keluar</span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

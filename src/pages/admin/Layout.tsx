@@ -1,13 +1,17 @@
-import { Routes, Route } from 'react-router-dom';
+import { useState } from 'react';
 import { Header } from '@/components/Layout/Header';
 import { Sidebar } from '@/components/Layout/Sidebar';
-import PaymentProviders from '@/pages/admin/PaymentProviders';
-import { useState } from 'react';
 
-const PaymentGateway = () => {
+interface AdminLayoutProps {
+  children: React.ReactNode;
+}
+
+export const AdminLayout = ({ children }: AdminLayoutProps) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -17,13 +21,9 @@ const PaymentGateway = () => {
         <Header onMenuToggle={toggleSidebar} isSidebarOpen={isSidebarOpen} />
         
         <main className="p-6">
-          <Routes>
-            <Route index element={<PaymentProviders />} />
-          </Routes>
+          {children}
         </main>
       </div>
     </div>
   );
 };
-
-export default PaymentGateway;
