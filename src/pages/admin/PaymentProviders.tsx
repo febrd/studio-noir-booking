@@ -1,377 +1,215 @@
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Tables } from '@/integrations/supabase/types';
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Plus, Edit, Trash2, Settings, Eye, EyeOff } from 'lucide-react';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, CreditCard, TestTube } from 'lucide-react';
-
-type PaymentProvider = Tables<'payment_providers'>;
 
 const PaymentProviders = () => {
-  const [providers, setProviders] = useState<PaymentProvider[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingProvider, setEditingProvider] = useState<PaymentProvider | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    client_id: '',
-    client_secret: '',
-    server_key: '',
-    environment: 'sandbox' as 'sandbox' | 'production',
-    status: 'active' as 'active' | 'inactive'
-  });
+  const { userProfile } = useJWTAuth();
+  const [showSecrets, setShowSecrets] = useState<{[key: string]: boolean}>({});
 
-  const fetchProviders = async () => {
-    try {
+  const { data: providers, isLoading, refetch } = useQuery({
+    queryKey: ['payment-providers'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('payment_providers')
         .select('*')
         .order('created_at', { ascending: false });
-
+      
       if (error) throw error;
-      setProviders(data || []);
-    } catch (error: any) {
-      toast.error('Gagal memuat data payment provider: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
+      return data;
+    },
+  });
+
+  const toggleSecretVisibility = (providerId: string) => {
+    setShowSecrets(prev => ({
+      ...prev,
+      [providerId]: !prev[providerId]
+    }));
   };
 
-  useEffect(() => {
-    fetchProviders();
-  }, []);
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      client_id: '',
-      client_secret: '',
-      server_key: '',
-      environment: 'sandbox',
-      status: 'active'
-    });
-    setEditingProvider(null);
+  const maskSecret = (secret: string | null) => {
+    if (!secret) return 'Tidak diset';
+    return secret.replace(/./g, '*');
   };
 
-  const openDialog = (provider?: PaymentProvider) => {
-    if (provider) {
-      setEditingProvider(provider);
-      setFormData({
-        name: provider.name,
-        client_id: provider.client_id || '',
-        client_secret: provider.client_secret || '',
-        server_key: provider.server_key || '',
-        environment: provider.environment,
-        status: provider.status
-      });
-    } else {
-      resetForm();
-    }
-    setDialogOpen(true);
-  };
-
-  const closeDialog = () => {
-    setDialogOpen(false);
-    resetForm();
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.name) {
-      toast.error('Nama provider harus diisi');
-      return;
-    }
-
-    try {
-      if (editingProvider) {
+  const handleDeleteProvider = async (providerId: string) => {
+    if (confirm('Apakah Anda yakin ingin menghapus provider ini?')) {
+      try {
         const { error } = await supabase
           .from('payment_providers')
-          .update({
-            name: formData.name,
-            client_id: formData.client_id || null,
-            client_secret: formData.client_secret || null,
-            server_key: formData.server_key || null,
-            environment: formData.environment,
-            status: formData.status
-          })
-          .eq('id', editingProvider.id);
+          .delete()
+          .eq('id', providerId);
 
         if (error) throw error;
-        toast.success('Payment provider berhasil diperbarui');
-      } else {
-        const { error } = await supabase
-          .from('payment_providers')
-          .insert({
-            name: formData.name,
-            client_id: formData.client_id || null,
-            client_secret: formData.client_secret || null,
-            server_key: formData.server_key || null,
-            environment: formData.environment,
-            status: formData.status
-          });
 
-        if (error) throw error;
-        toast.success('Payment provider berhasil ditambahkan');
+        toast.success('Provider berhasil dihapus');
+        refetch();
+      } catch (error) {
+        console.error('Error deleting provider:', error);
+        toast.error('Gagal menghapus provider');
       }
-
-      fetchProviders();
-      closeDialog();
-    } catch (error: any) {
-      toast.error('Gagal menyimpan payment provider: ' + error.message);
     }
   };
 
-  const handleDelete = async (provider: PaymentProvider) => {
-    try {
-      const { error } = await supabase
-        .from('payment_providers')
-        .delete()
-        .eq('id', provider.id);
+  // Check if current user can manage payment providers
+  const canManageProviders = userProfile?.role && ['owner', 'admin', 'keuangan'].includes(userProfile.role);
 
-      if (error) throw error;
-      toast.success('Payment provider berhasil dihapus');
-      fetchProviders();
-    } catch (error: any) {
-      toast.error('Gagal menghapus payment provider: ' + error.message);
-    }
-  };
-
-  const getEnvironmentIcon = (environment: string) => {
-    return environment === 'production' ? <CreditCard className="h-4 w-4" /> : <TestTube className="h-4 w-4" />;
-  };
-
-  const getEnvironmentColor = (environment: string) => {
-    return environment === 'production' 
-      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-      : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-  };
-
-  const getStatusColor = (status: string) => {
-    return status === 'active'
-      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-  };
+  if (!canManageProviders) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-2">Akses Ditolak</h2>
+          <p className="text-muted-foreground">Anda tidak memiliki izin untuk mengakses halaman ini.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-elegant">Payment Gateway</h1>
-          <p className="text-muted-foreground">Kelola provider pembayaran</p>
+          <h2 className="text-2xl font-bold tracking-tight">Payment Providers</h2>
+          <p className="text-muted-foreground">
+            Kelola penyedia layanan pembayaran
+          </p>
         </div>
-
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => openDialog()} className="hover-lift">
-              <Plus className="h-4 w-4 mr-2" />
-              Tambah Provider
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <form onSubmit={handleSubmit}>
-              <DialogHeader>
-                <DialogTitle>
-                  {editingProvider ? 'Edit Payment Provider' : 'Tambah Payment Provider'}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingProvider 
-                    ? 'Perbarui konfigurasi payment provider' 
-                    : 'Tambahkan payment provider baru'
-                  }
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nama Provider *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Midtrans, Xendit, dll"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="client_id">Client ID</Label>
-                  <Input
-                    id="client_id"
-                    value={formData.client_id}
-                    onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
-                    placeholder="Client ID dari provider"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="client_secret">Client Secret</Label>
-                  <Input
-                    id="client_secret"
-                    type="password"
-                    value={formData.client_secret}
-                    onChange={(e) => setFormData({ ...formData, client_secret: e.target.value })}
-                    placeholder="Client Secret dari provider"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="server_key">Server Key</Label>
-                  <Input
-                    id="server_key"
-                    type="password"
-                    value={formData.server_key}
-                    onChange={(e) => setFormData({ ...formData, server_key: e.target.value })}
-                    placeholder="Server Key dari provider"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="environment">Environment</Label>
-                  <Select value={formData.environment} onValueChange={(value: any) => setFormData({ ...formData, environment: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih environment" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sandbox">
-                        <div className="flex items-center">
-                          <TestTube className="h-4 w-4 mr-2" />
-                          Sandbox (Testing)
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="production">
-                        <div className="flex items-center">
-                          <CreditCard className="h-4 w-4 mr-2" />
-                          Production (Live)
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select value={formData.status} onValueChange={(value: any) => setFormData({ ...formData, status: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={closeDialog}>
-                  Batal
-                </Button>
-                <Button type="submit">
-                  {editingProvider ? 'Perbarui' : 'Tambah'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        
+        <Button>
+          <Plus className="mr-2 h-4 w-4" />
+          Tambah Provider
+        </Button>
       </div>
 
-      <Card className="glass-elegant">
-        <CardHeader>
-          <CardTitle>Daftar Payment Provider</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nama Provider</TableHead>
-                <TableHead>Environment</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Dibuat</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
-                    Memuat data...
-                  </TableCell>
-                </TableRow>
-              ) : providers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
-                    Belum ada payment provider
-                  </TableCell>
-                </TableRow>
-              ) : (
-                providers.map((provider) => (
-                  <TableRow key={provider.id}>
-                    <TableCell className="font-medium">{provider.name}</TableCell>
-                    <TableCell>
-                      <Badge className={getEnvironmentColor(provider.environment)}>
-                        <div className="flex items-center">
-                          {getEnvironmentIcon(provider.environment)}
-                          <span className="ml-1 capitalize">{provider.environment}</span>
-                        </div>
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(provider.status)}>
-                        <span className="capitalize">{provider.status}</span>
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(provider.created_at).toLocaleDateString('id-ID')}
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openDialog(provider)}
-                        className="hover-lift"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm" className="hover-lift">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Hapus Payment Provider</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Apakah Anda yakin ingin menghapus provider "{provider.name}"?
-                              Tindakan ini tidak dapat dibatalkan.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Batal</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(provider)}>
-                              Hapus
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4">
+        {isLoading ? (
+          <Card>
+            <CardContent className="p-6">
+              <p>Memuat provider...</p>
+            </CardContent>
+          </Card>
+        ) : providers && providers.length > 0 ? (
+          providers.map((provider) => (
+            <Card key={provider.id} className="glass-elegant">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Settings className="h-5 w-5" />
+                      {provider.name}
+                    </CardTitle>
+                    <CardDescription>
+                      Environment: {provider.environment} | Status: {provider.status}
+                    </CardDescription>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Badge 
+                      variant={provider.status === 'active' ? 'default' : 'secondary'}
+                      className={provider.status === 'active' ? 'bg-green-100 text-green-800' : ''}
+                    >
+                      {provider.status}
+                    </Badge>
+                    <Badge variant="outline">
+                      {provider.environment}
+                    </Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {provider.client_id && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-medium text-muted-foreground">Client ID</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleSecretVisibility(`${provider.id}-client`)}
+                        >
+                          {showSecrets[`${provider.id}-client`] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                        </Button>
+                      </div>
+                      <p className="font-mono text-xs bg-muted p-2 rounded">
+                        {showSecrets[`${provider.id}-client`] ? provider.client_id : maskSecret(provider.client_id)}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {provider.client_secret && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-medium text-muted-foreground">Client Secret</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleSecretVisibility(`${provider.id}-secret`)}
+                        >
+                          {showSecrets[`${provider.id}-secret`] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                        </Button>
+                      </div>
+                      <p className="font-mono text-xs bg-muted p-2 rounded">
+                        {showSecrets[`${provider.id}-secret`] ? provider.client_secret : maskSecret(provider.client_secret)}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {provider.server_key && (
+                    <div className="md:col-span-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-medium text-muted-foreground">Server Key</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleSecretVisibility(`${provider.id}-server`)}
+                        >
+                          {showSecrets[`${provider.id}-server`] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                        </Button>
+                      </div>
+                      <p className="font-mono text-xs bg-muted p-2 rounded">
+                        {showSecrets[`${provider.id}-server`] ? provider.server_key : maskSecret(provider.server_key)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex justify-end space-x-2 pt-4 border-t">
+                  <Button variant="outline" size="sm">
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleDeleteProvider(provider.id)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Hapus
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <Card>
+            <CardContent className="p-6 text-center">
+              <p className="text-muted-foreground mb-4">Belum ada payment provider yang dikonfigurasi</p>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Tambah Provider Pertama
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 };

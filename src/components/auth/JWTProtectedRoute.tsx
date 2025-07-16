@@ -20,7 +20,7 @@ export const JWTProtectedRoute = ({ children, allowedRoles = ['owner', 'admin', 
   }
 
   if (!isAuthenticated || !userProfile) {
-    return <Navigate to="/jwt-auth" replace />;
+    return <Navigate to="/auth" replace />;
   }
 
   if (!allowedRoles.includes(userProfile.role)) {

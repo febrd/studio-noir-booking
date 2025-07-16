@@ -1,16 +1,35 @@
 
 import { Routes, Route } from 'react-router-dom';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 import PaymentProviders from '@/pages/admin/PaymentProviders';
 
 const PaymentGateway = () => {
+  const { userProfile } = useJWTAuth();
+
+  // Check if current user can access payment gateway
+  const canAccessPaymentGateway = userProfile?.role && ['owner', 'admin', 'keuangan'].includes(userProfile.role);
+
+  if (!canAccessPaymentGateway) {
+    return (
+      <ModernLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-2">Akses Ditolak</h2>
+            <p className="text-muted-foreground">Anda tidak memiliki izin untuk mengakses Payment Gateway.</p>
+          </div>
+        </div>
+      </ModernLayout>
+    );
+  }
+
   return (
     <ModernLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
           <p className="text-muted-foreground">
-            Manage payment providers and gateway settings
+            Kelola penyedia pembayaran dan pengaturan gateway
           </p>
         </div>
         
