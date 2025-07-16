@@ -1,42 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
+/* Monochrome Photo Studio Design System */
 @layer base {
   :root {
+    /* Pure monochrome palette */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 0 0% 0%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 0 0% 0%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 0 0% 0%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary: Pure black */
+    --primary: 0 0% 0%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary: Light grey */
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 0%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted: Medium grey */
+    --muted: 0 0% 95%;
+    --muted-foreground: 0 0% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent: Dark grey */
+    --accent: 0 0% 10%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 0 0% 90%;
+    --input: 0 0% 95%;
+    --ring: 0 0% 0%;
 
-    --radius: 0.5rem;
+    --radius: 8px;
+
+    /* Custom studio variables */
+    --glass-bg: 0 0% 100% / 0.8;
+    --glass-border: 0 0% 0% / 0.1;
+    --shadow-soft: 0 4px 20px 0 hsl(0 0% 0% / 0.1);
+    --shadow-elegant: 0 8px 32px 0 hsl(0 0% 0% / 0.12);
+    --gradient-subtle: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(0 0% 98%) 100%);
+    --gradient-dramatic: linear-gradient(135deg, hsl(0 0% 0%) 0%, hsl(0 0% 20%) 100%);
+    
+    /* Animation variables */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-elegant: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 
     --sidebar-background: 0 0% 98%;
 
@@ -100,6 +116,45 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-inter antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+}
+
+@layer components {
+  /* Glass morphism effects */
+  .glass-card {
+    @apply backdrop-blur-sm border border-border/20;
+    background: hsl(var(--glass-bg));
+    box-shadow: var(--shadow-soft);
+  }
+
+  .glass-elegant {
+    @apply backdrop-blur-md border border-border/10;
+    background: hsl(var(--glass-bg));
+    box-shadow: var(--shadow-elegant);
+  }
+
+  /* Smooth transitions */
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+
+  .transition-elegant {
+    transition: var(--transition-elegant);
+  }
+
+  /* Hover effects */
+  .hover-lift {
+    @apply transition-smooth hover:shadow-lg hover:-translate-y-1;
+  }
+
+  .hover-scale {
+    @apply transition-smooth hover:scale-105;
+  }
+
+  /* Typography */
+  .text-elegant {
+    @apply tracking-tight leading-relaxed;
   }
 }
