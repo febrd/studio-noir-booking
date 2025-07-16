@@ -1,28 +1,24 @@
+
 import { Routes, Route } from 'react-router-dom';
-import { Header } from '@/components/Layout/Header';
-import { Sidebar } from '@/components/Layout/Sidebar';
+import { ModernLayout } from '@/components/Layout/ModernLayout';
 import PaymentProviders from '@/pages/admin/PaymentProviders';
-import { useState } from 'react';
 
 const PaymentGateway = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-  const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
-
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-      
-      <div className="lg:ml-64">
-        <Header onMenuToggle={toggleSidebar} isSidebarOpen={isSidebarOpen} />
+    <ModernLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
+          <p className="text-muted-foreground">
+            Manage payment providers and gateway settings
+          </p>
+        </div>
         
-        <main className="p-6">
-          <Routes>
-            <Route index element={<PaymentProviders />} />
-          </Routes>
-        </main>
+        <Routes>
+          <Route index element={<PaymentProviders />} />
+        </Routes>
       </div>
-    </div>
+    </ModernLayout>
   );
 };
 

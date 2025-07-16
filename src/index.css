@@ -1,3 +1,4 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
@@ -55,19 +56,12 @@
     --transition-elegant: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -119,6 +113,17 @@
     @apply bg-background text-foreground font-inter antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
+
+  /* Mobile optimizations */
+  @media (max-width: 768px) {
+    body {
+      @apply text-sm;
+    }
+    
+    .container {
+      @apply px-4;
+    }
+  }
 }
 
 @layer components {
@@ -156,5 +161,17 @@
   /* Typography */
   .text-elegant {
     @apply tracking-tight leading-relaxed;
+  }
+
+  /* Mobile navigation safe area */
+  .mobile-safe-area {
+    @apply pb-16 md:pb-0;
+  }
+}
+
+/* Ensure mobile navigation doesn't overlap content */
+@media (max-width: 767px) {
+  main {
+    padding-bottom: 5rem !important;
   }
 }
