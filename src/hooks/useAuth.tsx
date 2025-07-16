@@ -1,5 +1,4 @@
 
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -75,10 +74,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       console.log('Attempting to sign in with:', email);
       
-      // Use Supabase Auth - it automatically handles password comparison with hashed passwords
+      // Clear any existing session first
+      await supabase.auth.signOut();
+      
+      // Use Supabase Auth signInWithPassword - this handles password hashing automatically
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: email.trim(),
+        password: password
       });
 
       if (error) {
@@ -103,8 +105,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       // Create auth user with Supabase (automatically hashes password)
       const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
+        email: email.trim(),
+        password: password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
@@ -119,17 +121,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { error };
       }
 
-      // If auth user created successfully, create user record in our table (without password)
+      // If auth user created successfully, create user record in our table
       if (data.user) {
         console.log('Auth user created, now creating user record...');
         
-        // Create user record in our users table (password is handled by Supabase Auth)
+        // Create user record in our users table
         const { error: userError } = await supabase
           .from('users')
           .insert({
             id: data.user.id, // Use the auth user ID
-            email,
-            name,
+            email: email.trim(),
+            name: name,
             role: 'pelanggan'
           });
 
@@ -156,6 +158,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(null);
       window.location.href = '/auth';
     } catch (error) {
+      console.error('Sign out error:', error);
       // Continue even if this fails
       window.location.href = '/auth';
     }
@@ -181,4 +184,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

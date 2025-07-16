@@ -1,0 +1,99 @@
+
+import { useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+interface LoginFormProps {
+  onError: (error: string) => void;
+}
+
+export const LoginForm = ({ onError }: LoginFormProps) => {
+  const { signIn } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!loginForm.email || !loginForm.password) {
+      onError('Email dan password harus diisi');
+      return;
+    }
+
+    setIsSubmitting(true);
+    onError(''); // Clear previous errors
+
+    try {
+      const { error } = await signIn(loginForm.email, loginForm.password);
+      if (error) {
+        onError(error.message || 'Login gagal. Periksa email dan password Anda.');
+      } else {
+        // Success will be handled by auth state change
+        window.location.href = '/';
+      }
+    } catch (err) {
+      onError('Terjadi kesalahan yang tidak terduga');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleLogin} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="login-email">Email</Label>
+        <Input
+          id="login-email"
+          type="email"
+          value={loginForm.email}
+          onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+          placeholder="email@contoh.com"
+          disabled={isSubmitting}
+          autoComplete="email"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="login-password">Password</Label>
+        <Input
+          id="login-password"
+          type="password"
+          value={loginForm.password}
+          onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+          placeholder="••••••••"
+          disabled={isSubmitting}
+          autoComplete="current-password"
+        />
+      </div>
+      
+      {/* Sample users info */}
+      <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
+        <p className="font-medium mb-1">Akun Demo (password: password123):</p>
+        <ul className="space-y-1 text-xs">
+          <li>• owner@studionoir.com (Owner)</li>
+          <li>• admin@studionoir.com (Admin)</li>
+          <li>• keuangan@studionoir.com (Keuangan)</li>
+          <li>• pelanggan@studionoir.com (Pelanggan)</li>
+        </ul>
+      </div>
+      
+      <Button 
+        type="submit" 
+        className="w-full"
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Memproses...
+          </>
+        ) : (
+          'Masuk'
+        )}
+      </Button>
+    </form>
+  );
+};

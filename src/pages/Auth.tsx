@@ -1,83 +1,38 @@
+
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { LoginForm } from '@/components/auth/LoginForm';
+import { RegisterForm } from '@/components/auth/RegisterForm';
+import { createSampleUsers } from '@/utils/createSampleUsers';
 
 const Auth = () => {
-  const { userProfile, signIn, signUp, loading } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { userProfile, loading } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  
-  // Form states
-  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
-  const [registerForm, setRegisterForm] = useState({ 
-    email: '', 
-    password: '', 
-    confirmPassword: '', 
-    name: '' 
-  });
+  const [success, setSuccess] = useState<string | null>(null);
+  const [isCreatingSamples, setIsCreatingSamples] = useState(false);
 
   // Redirect if already authenticated
   if (userProfile) {
     return <Navigate to="/" replace />;
   }
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!loginForm.email || !loginForm.password) {
-      setError('Email dan password harus diisi');
-      return;
-    }
-
-    setIsSubmitting(true);
+  const handleCreateSampleUsers = async () => {
+    setIsCreatingSamples(true);
     setError(null);
-
-    try {
-      const { error } = await signIn(loginForm.email, loginForm.password);
-      if (error) {
-        setError(error.message || 'Login gagal. Periksa email dan password Anda.');
-      } else {
-        window.location.href = '/';
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+    setSuccess(null);
     
-    if (!registerForm.email || !registerForm.password || !registerForm.name) {
-      setError('Semua field harus diisi');
-      return;
-    }
-
-    if (registerForm.password !== registerForm.confirmPassword) {
-      setError('Password dan konfirmasi password tidak sama');
-      return;
-    }
-
-    if (registerForm.password.length < 6) {
-      setError('Password minimal 6 karakter');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-
     try {
-      const { error } = await signUp(registerForm.email, registerForm.password, registerForm.name);
-      if (error) {
-        setError(error.message || 'Registrasi gagal. Coba lagi.');
-      }
+      await createSampleUsers();
+      setSuccess('Sample users berhasil dibuat! Anda dapat login dengan akun demo.');
+    } catch (err) {
+      setError('Gagal membuat sample users');
     } finally {
-      setIsSubmitting(false);
+      setIsCreatingSamples(false);
     }
   };
 
@@ -118,110 +73,39 @@ const Auth = () => {
                 </Alert>
               )}
 
+              {success && (
+                <Alert className="mt-4 border-green-200 bg-green-50 text-green-800">
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>{success}</AlertDescription>
+                </Alert>
+              )}
+
               <TabsContent value="login">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input
-                      id="login-email"
-                      type="email"
-                      value={loginForm.email}
-                      onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                      placeholder="email@contoh.com"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      value={loginForm.password}
-                      onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                      placeholder="••••••••"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Memproses...
-                      </>
-                    ) : (
-                      'Masuk'
-                    )}
-                  </Button>
-                </form>
+                <LoginForm onError={setError} />
               </TabsContent>
 
               <TabsContent value="register">
-                <form onSubmit={handleRegister} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="register-name">Nama Lengkap</Label>
-                    <Input
-                      id="register-name"
-                      type="text"
-                      value={registerForm.name}
-                      onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
-                      placeholder="Nama lengkap Anda"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-email">Email</Label>
-                    <Input
-                      id="register-email"
-                      type="email"
-                      value={registerForm.email}
-                      onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                      placeholder="email@contoh.com"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-password">Password</Label>
-                    <Input
-                      id="register-password"
-                      type="password"
-                      value={registerForm.password}
-                      onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                      placeholder="••••••••"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-confirm-password">Konfirmasi Password</Label>
-                    <Input
-                      id="register-confirm-password"
-                      type="password"
-                      value={registerForm.confirmPassword}
-                      onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
-                      placeholder="••••••••"
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Mendaftar...
-                      </>
-                    ) : (
-                      'Daftar Sebagai Pelanggan'
-                    )}
-                  </Button>
-                </form>
+                <RegisterForm onError={setError} onSuccess={setSuccess} />
               </TabsContent>
             </Tabs>
+
+            {/* Developer utility - Create sample users */}
+            <div className="mt-6 pt-4 border-t">
+              <button
+                onClick={handleCreateSampleUsers}
+                disabled={isCreatingSamples}
+                className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                {isCreatingSamples ? (
+                  <>
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin inline" />
+                    Membuat sample users...
+                  </>
+                ) : (
+                  'Buat Sample Users (Dev)'
+                )}
+              </button>
+            </div>
           </CardContent>
         </Card>
       </div>
