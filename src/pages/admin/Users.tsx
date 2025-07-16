@@ -138,7 +138,7 @@ const Users = () => {
         toast.success('Pengguna berhasil diperbarui');
       } else {
         // Create new user with hashed password
-        const { data: hashedPassword, error: hashError } = await supabase.rpc('hash_password', {
+        const { data: hashedPassword, error: hashError } = await supabase.rpc('hash_password' as any, {
           password: formData.password
         });
 

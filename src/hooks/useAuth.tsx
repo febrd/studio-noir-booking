@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Attempting to sign in with:', email);
       
       // Call RPC function to verify password and get user
-      const { data, error } = await supabase.rpc('authenticate_user', {
+      const { data, error } = await supabase.rpc('authenticate_user' as any, {
         user_email: email.trim(),
         user_password: password
       });
@@ -50,11 +50,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { error: { message: 'Email atau password salah' } };
       }
 
-      if (!data || data.length === 0) {
+      if (!data || (Array.isArray(data) && data.length === 0)) {
         return { error: { message: 'Email atau password salah' } };
       }
 
-      const user = data[0];
+      const user = Array.isArray(data) ? data[0] : data;
       console.log('Sign in successful:', user.email);
       
       // Store user in localStorage and state
@@ -87,7 +87,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // Hash password and create user
-      const { data: hashedPassword, error: hashError } = await supabase.rpc('hash_password', {
+      const { data: hashedPassword, error: hashError } = await supabase.rpc('hash_password' as any, {
         password: password
       });
 
