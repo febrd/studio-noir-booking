@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               const { data: profile, error } = await supabase
                 .from('users')
                 .select('*')
-                .eq('email', session.user.email)
+                .eq('id', session.user.id)  // Use auth user ID instead of email
                 .single();
               
               if (error) {
@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       console.log('Attempting to sign in with:', email);
       
-      // Directly try to sign in with Supabase Auth
+      // Use Supabase Auth directly - it handles password hashing
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       console.log('Attempting to sign up:', email);
       
-      // First create auth user
+      // Create auth user with Supabase (handles password hashing automatically)
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -118,17 +118,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { error };
       }
 
-      // If auth user created successfully, create user record
+      // If auth user created successfully, create user record in our table
       if (data.user) {
         console.log('Auth user created, now creating user record...');
         
-        // Create user record in our users table
+        // Create user record in our users table (without storing password)
         const { error: userError } = await supabase
           .from('users')
           .insert({
             id: data.user.id, // Use the auth user ID
             email,
-            password: password, // In production, this should be handled differently
+            password: 'hashed_by_supabase_auth', // Placeholder - real password is in auth.users
             name,
             role: 'pelanggan'
           });
