@@ -3,11 +3,12 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, Settings, Eye, EyeOff } from 'lucide-react';
+import { Edit, Trash2, Settings, Eye, EyeOff } from 'lucide-react';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { AddPaymentProviderForm } from '@/components/PaymentGateway/AddPaymentProviderForm';
 
 const PaymentProviders = () => {
   const { userProfile } = useJWTAuth();
@@ -81,10 +82,7 @@ const PaymentProviders = () => {
           </p>
         </div>
         
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Tambah Provider
-        </Button>
+        <AddPaymentProviderForm onSuccess={refetch} />
       </div>
 
       <div className="grid gap-4">
@@ -202,10 +200,7 @@ const PaymentProviders = () => {
           <Card>
             <CardContent className="p-6 text-center">
               <p className="text-muted-foreground mb-4">Belum ada payment provider yang dikonfigurasi</p>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Tambah Provider Pertama
-              </Button>
+              <AddPaymentProviderForm onSuccess={refetch} />
             </CardContent>
           </Card>
         )}

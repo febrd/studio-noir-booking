@@ -3,11 +3,12 @@ import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Crown, Shield, CreditCard, User, UserPlus, Edit, Trash2 } from 'lucide-react';
+import { Crown, Shield, CreditCard, User, Edit, Trash2 } from 'lucide-react';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { AddUserForm } from '@/components/admin/AddUserForm';
 
 const Users = () => {
   const { userProfile } = useJWTAuth();
@@ -31,15 +32,6 @@ const Users = () => {
       case 'admin': return <Shield className="h-4 w-4" />;
       case 'keuangan': return <CreditCard className="h-4 w-4" />;
       default: return <User className="h-4 w-4" />;
-    }
-  };
-
-  const getRoleBadgeVariant = (role: string) => {
-    switch (role) {
-      case 'owner': return 'default';
-      case 'admin': return 'secondary';
-      case 'keuangan': return 'outline';
-      default: return 'outline';
     }
   };
 
@@ -91,10 +83,7 @@ const Users = () => {
           </div>
           
           {canManageUsers && (
-            <Button>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Tambah Pengguna
-            </Button>
+            <AddUserForm onSuccess={refetch} />
           )}
         </div>
 

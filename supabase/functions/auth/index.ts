@@ -41,10 +41,10 @@ serve(async (req) => {
         )
       }
 
-      // Call the register_user function
+      // Call the register_user function with CORRECT parameter order
       const { data, error } = await supabase.rpc('register_user', {
-        user_name: name,
-        user_email: email,
+        user_name: name,     // Name goes to name field
+        user_email: email,   // Email goes to email field
         user_password: password,
         user_role: role
       })
