@@ -14,6 +14,9 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Auth function called with method:', req.method)
+    console.log('Request URL:', req.url)
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -21,13 +24,17 @@ serve(async (req) => {
 
     const url = new URL(req.url)
     const path = url.pathname.split('/').pop()
+    
+    console.log('Path:', path)
 
     if (req.method === 'POST' && path === 'register') {
-      const { name, email, password, role = 'pelanggan' } = await req.json()
+      const body = await req.json()
+      const { name, email, password, role = 'pelanggan' } = body
 
-      console.log('Registration attempt:', { name, email, role })
+      console.log('Registration attempt for:', email, 'with role:', role)
 
       if (!name || !email || !password) {
+        console.log('Missing required fields')
         return new Response(
           JSON.stringify({ success: false, error: 'Semua field harus diisi' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -43,26 +50,28 @@ serve(async (req) => {
       })
 
       if (error) {
-        console.error('Register error:', error)
+        console.error('Register RPC error:', error)
         return new Response(
-          JSON.stringify({ success: false, error: error.message || 'Terjadi kesalahan server' }),
+          JSON.stringify({ success: false, error: error.message || 'Gagal mendaftarkan pengguna' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
-      console.log('Registration successful:', data)
+      console.log('Registration successful for:', email)
       return new Response(
-        JSON.stringify(data),
+        JSON.stringify({ success: true, user: data }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     if (req.method === 'POST' && path === 'login') {
-      const { email, password } = await req.json()
+      const body = await req.json()
+      const { email, password } = body
 
-      console.log('Login attempt:', { email })
+      console.log('Login attempt for:', email)
 
       if (!email || !password) {
+        console.log('Missing email or password')
         return new Response(
           JSON.stringify({ success: false, error: 'Email dan password harus diisi' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -76,20 +85,29 @@ serve(async (req) => {
       })
 
       if (error) {
-        console.error('Login error:', error)
+        console.error('Login RPC error:', error)
         return new Response(
           JSON.stringify({ success: false, error: error.message || 'Email atau password salah' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
-      console.log('Login successful:', data)
+      if (!data || data.length === 0) {
+        console.log('No user found or invalid credentials')
+        return new Response(
+          JSON.stringify({ success: false, error: 'Email atau password salah' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      console.log('Login successful for:', email)
       return new Response(
-        JSON.stringify(data),
+        JSON.stringify({ success: true, user: data }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    console.log('Endpoint not found:', path)
     return new Response(
       JSON.stringify({ success: false, error: 'Endpoint tidak ditemukan' }),
       { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
