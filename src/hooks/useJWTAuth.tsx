@@ -10,12 +10,17 @@ interface UserProfile {
   role: 'owner' | 'admin' | 'keuangan' | 'pelanggan';
 }
 
+interface AuthResult {
+  success: boolean;
+  error?: string;
+}
+
 interface JWTAuthContextType {
   userProfile: UserProfile | null;
   loading: boolean;
   isAuthenticated: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, name: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<AuthResult>;
+  signUp: (email: string, password: string, name: string) => Promise<AuthResult>;
   signOut: () => void;
 }
 
@@ -50,7 +55,7 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<AuthResult> => {
     try {
       console.log('JWT Auth: Attempting sign in with email:', email);
       
@@ -61,13 +66,14 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error('JWT Auth sign in error:', error);
-        return { error };
+        return { success: false, error: error.message || 'Login gagal' };
       }
 
-      const result = data as { success: boolean; error?: string; user?: UserProfile };
+      // Safely cast the data with proper type checking
+      const result = data as any;
       
-      if (!result.success) {
-        return { error: { message: result.error || 'Login gagal' } };
+      if (!result || typeof result !== 'object' || !result.success) {
+        return { success: false, error: result?.error || 'Login gagal' };
       }
 
       if (result.user) {
@@ -86,16 +92,17 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
         }
         
         toast.success('Login berhasil!');
+        return { success: true };
       }
 
-      return { error: null };
+      return { success: false, error: 'Data user tidak ditemukan' };
     } catch (error) {
       console.error('Unexpected JWT sign in error:', error);
-      return { error };
+      return { success: false, error: 'Terjadi kesalahan sistem' };
     }
   };
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (email: string, password: string, name: string): Promise<AuthResult> => {
     try {
       const { data, error } = await supabase.rpc('register_user', {
         user_name: name,
@@ -106,20 +113,21 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error('JWT Auth signup error:', error);
-        return { error };
+        return { success: false, error: error.message || 'Registrasi gagal' };
       }
 
-      const result = data as { success: boolean; error?: string; user?: UserProfile };
+      // Safely cast the data with proper type checking
+      const result = data as any;
       
-      if (!result.success) {
-        return { error: { message: result.error || 'Registrasi gagal' } };
+      if (!result || typeof result !== 'object' || !result.success) {
+        return { success: false, error: result?.error || 'Registrasi gagal' };
       }
 
       toast.success('Registrasi berhasil! Silakan login dengan akun baru Anda.');
-      return { error: null };
+      return { success: true };
     } catch (error) {
       console.error('Unexpected JWT signup error:', error);
-      return { error };
+      return { success: false, error: 'Terjadi kesalahan sistem' };
     }
   };
 
