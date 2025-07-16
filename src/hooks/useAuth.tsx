@@ -1,4 +1,5 @@
 
+
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,13 +34,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user profile
+          // Fetch user profile using auth user ID
           setTimeout(async () => {
             try {
               const { data: profile, error } = await supabase
                 .from('users')
                 .select('*')
-                .eq('id', session.user.id)  // Use auth user ID instead of email
+                .eq('id', session.user.id)
                 .single();
               
               if (error) {
@@ -74,7 +75,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       console.log('Attempting to sign in with:', email);
       
-      // Use Supabase Auth directly - it handles password hashing
+      // Use Supabase Auth - it automatically handles password comparison with hashed passwords
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -100,7 +101,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       console.log('Attempting to sign up:', email);
       
-      // Create auth user with Supabase (handles password hashing automatically)
+      // Create auth user with Supabase (automatically hashes password)
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -118,17 +119,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return { error };
       }
 
-      // If auth user created successfully, create user record in our table
+      // If auth user created successfully, create user record in our table (without password)
       if (data.user) {
         console.log('Auth user created, now creating user record...');
         
-        // Create user record in our users table (without storing password)
+        // Create user record in our users table (password is handled by Supabase Auth)
         const { error: userError } = await supabase
           .from('users')
           .insert({
             id: data.user.id, // Use the auth user ID
             email,
-            password: 'hashed_by_supabase_auth', // Placeholder - real password is in auth.users
             name,
             role: 'pelanggan'
           });
@@ -181,3 +181,4 @@ export const useAuth = () => {
   }
   return context;
 };
+

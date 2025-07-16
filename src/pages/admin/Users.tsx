@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from './Layout';
@@ -124,36 +125,48 @@ const Users = () => {
 
     try {
       if (editingUser) {
-        // Update user
-        const updateData: any = {
-          name: formData.name,
-          email: formData.email,
-          role: formData.role
-        };
-
-        if (formData.password) {
-          updateData.password = formData.password;
-        }
-
+        // Update user - only update the users table, password changes should be done separately
         const { error } = await supabase
           .from('users')
-          .update(updateData)
+          .update({
+            name: formData.name,
+            email: formData.email,
+            role: formData.role
+          })
           .eq('id', editingUser.id);
 
         if (error) throw error;
         toast.success('Pengguna berhasil diperbarui');
       } else {
-        // Create new user
-        const { error } = await supabase
-          .from('users')
-          .insert({
-            name: formData.name,
-            email: formData.email,
-            password: formData.password,
-            role: formData.role
-          });
+        // Create new user through Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              name: formData.name,
+              user_role: formData.role
+            }
+          }
+        });
 
-        if (error) throw error;
+        if (authError) throw authError;
+
+        if (authData.user) {
+          // Create user record in our users table
+          const { error: userError } = await supabase
+            .from('users')
+            .insert({
+              id: authData.user.id,
+              email: formData.email,
+              name: formData.name,
+              role: formData.role
+            });
+
+          if (userError) throw userError;
+        }
+
         toast.success('Pengguna berhasil ditambahkan');
       }
 
@@ -245,18 +258,18 @@ const Users = () => {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password">
-                    Password {editingUser && '(kosongkan jika tidak diubah)'}
-                  </Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="••••••••"
-                  />
-                </div>
+                {!editingUser && (
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="role">Role</Label>
