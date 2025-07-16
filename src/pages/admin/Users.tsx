@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from './Layout';
@@ -16,7 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, User, Shield, CreditCard, Crown } from 'lucide-react';
 
-type UserData = Tables<'users'>;
+// Create a type for user data without password for security
+type UserData = Omit<Tables<'users'>, 'password'>;
 
 const Users = () => {
   const { userProfile } = useAuth();
@@ -57,6 +57,7 @@ const Users = () => {
 
   const fetchUsers = async () => {
     try {
+      // Exclude password field for security reasons
       const { data, error } = await supabase
         .from('users')
         .select('id, email, name, role, created_at, updated_at')
