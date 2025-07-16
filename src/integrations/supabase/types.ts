@@ -14,16 +14,372 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      additional_services: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          price: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      booking_additional_services: {
+        Row: {
+          additional_service_id: string
+          booking_id: string
+          id: string
+          quantity: number
+        }
+        Insert: {
+          additional_service_id: string
+          booking_id: string
+          id?: string
+          quantity?: number
+        }
+        Update: {
+          additional_service_id?: string
+          booking_id?: string
+          id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_additional_services_additional_service_id_fkey"
+            columns: ["additional_service_id"]
+            isOneToOne: false
+            referencedRelation: "additional_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_additional_services_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booking_sessions: {
+        Row: {
+          additional_time_minutes: number | null
+          booking_id: string
+          created_at: string
+          end_time: string
+          id: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          additional_time_minutes?: number | null
+          booking_id: string
+          created_at?: string
+          end_time: string
+          id?: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          additional_time_minutes?: number | null
+          booking_id?: string
+          created_at?: string
+          end_time?: string
+          id?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_sessions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bookings: {
+        Row: {
+          created_at: string
+          id: string
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          status: Database["public"]["Enums"]["booking_status"]
+          studio_package_id: string
+          total_amount: number | null
+          type: Database["public"]["Enums"]["booking_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          status?: Database["public"]["Enums"]["booking_status"]
+          studio_package_id: string
+          total_amount?: number | null
+          type?: Database["public"]["Enums"]["booking_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          status?: Database["public"]["Enums"]["booking_status"]
+          studio_package_id?: string
+          total_amount?: number | null
+          type?: Database["public"]["Enums"]["booking_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_studio_package_id_fkey"
+            columns: ["studio_package_id"]
+            isOneToOne: false
+            referencedRelation: "studio_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_providers: {
+        Row: {
+          client_id: string | null
+          client_secret: string | null
+          created_at: string
+          environment: Database["public"]["Enums"]["payment_environment"]
+          id: string
+          name: string
+          server_key: string | null
+          status: Database["public"]["Enums"]["provider_status"]
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string
+          environment?: Database["public"]["Enums"]["payment_environment"]
+          id?: string
+          name: string
+          server_key?: string | null
+          status?: Database["public"]["Enums"]["provider_status"]
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          client_secret?: string | null
+          created_at?: string
+          environment?: Database["public"]["Enums"]["payment_environment"]
+          id?: string
+          name?: string
+          server_key?: string | null
+          status?: Database["public"]["Enums"]["provider_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      studio_packages: {
+        Row: {
+          base_time_minutes: number
+          created_at: string
+          description: string | null
+          id: string
+          price: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          base_time_minutes: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          price: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          base_time_minutes?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          price?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transaction_logs: {
+        Row: {
+          changed_by_user_id: string
+          from_status: Database["public"]["Enums"]["transaction_status"] | null
+          id: string
+          note: string | null
+          timestamp: string
+          to_status: Database["public"]["Enums"]["transaction_status"]
+          transaction_id: string
+        }
+        Insert: {
+          changed_by_user_id: string
+          from_status?: Database["public"]["Enums"]["transaction_status"] | null
+          id?: string
+          note?: string | null
+          timestamp?: string
+          to_status: Database["public"]["Enums"]["transaction_status"]
+          transaction_id: string
+        }
+        Update: {
+          changed_by_user_id?: string
+          from_status?: Database["public"]["Enums"]["transaction_status"] | null
+          id?: string
+          note?: string | null
+          timestamp?: string
+          to_status?: Database["public"]["Enums"]["transaction_status"]
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_logs_changed_by_user_id_fkey"
+            columns: ["changed_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_logs_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          amount: number
+          booking_id: string
+          created_at: string
+          id: string
+          payment_provider_id: string | null
+          payment_type: Database["public"]["Enums"]["payment_type"]
+          status: Database["public"]["Enums"]["transaction_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          booking_id: string
+          created_at?: string
+          id?: string
+          payment_provider_id?: string | null
+          payment_type: Database["public"]["Enums"]["payment_type"]
+          status?: Database["public"]["Enums"]["transaction_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string
+          created_at?: string
+          id?: string
+          payment_provider_id?: string | null
+          payment_type?: Database["public"]["Enums"]["payment_type"]
+          status?: Database["public"]["Enums"]["transaction_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_payment_provider_id_fkey"
+            columns: ["payment_provider_id"]
+            isOneToOne: false
+            referencedRelation: "payment_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          password: string
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          password: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          password?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      calculate_booking_total: {
+        Args: { booking_id_param: string }
+        Returns: number
+      }
     }
     Enums: {
-      [_ in never]: never
+      booking_status: "pending" | "confirmed" | "completed" | "cancelled"
+      booking_type: "self_photo" | "regular"
+      payment_environment: "sandbox" | "production"
+      payment_method: "online" | "offline"
+      payment_type: "online" | "offline"
+      provider_status: "active" | "inactive"
+      transaction_status:
+        | "paid"
+        | "unpaid"
+        | "expired"
+        | "pending"
+        | "settlement"
+        | "failed"
+      user_role: "owner" | "admin" | "keuangan" | "pelanggan"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +506,22 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      booking_status: ["pending", "confirmed", "completed", "cancelled"],
+      booking_type: ["self_photo", "regular"],
+      payment_environment: ["sandbox", "production"],
+      payment_method: ["online", "offline"],
+      payment_type: ["online", "offline"],
+      provider_status: ["active", "inactive"],
+      transaction_status: [
+        "paid",
+        "unpaid",
+        "expired",
+        "pending",
+        "settlement",
+        "failed",
+      ],
+      user_role: ["owner", "admin", "keuangan", "pelanggan"],
+    },
   },
 } as const
