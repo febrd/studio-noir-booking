@@ -43,14 +43,24 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
     onError(''); // Clear previous errors
 
     try {
+      console.log('Starting registration process...');
       const { error } = await signUp(registerForm.email, registerForm.password, registerForm.name);
+      
       if (error) {
+        console.error('Registration failed:', error);
         onError(error.message || 'Registrasi gagal. Coba lagi.');
       } else {
-        onSuccess('Registrasi berhasil! Silakan login dengan akun baru Anda.');
+        console.log('Registration successful');
+        onSuccess('Registrasi berhasil! Anda akan diarahkan ke dashboard...');
         setRegisterForm({ email: '', password: '', confirmPassword: '', name: '' });
+        
+        // Redirect to main page after successful registration
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1500);
       }
     } catch (err) {
+      console.error('Unexpected registration error:', err);
       onError('Terjadi kesalahan yang tidak terduga');
     } finally {
       setIsSubmitting(false);

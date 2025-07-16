@@ -1,34 +1,40 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Tables } from '@/integrations/supabase/types';
 
-type UserProfile = Tables<'users'>;
+type UserProfile = {
+  id: string;
+  name: string;
+  email: string;
+  role: 'owner' | 'admin' | 'keuangan' | 'pelanggan';
+};
 
 interface AuthContextType {
   userProfile: UserProfile | null;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, name: string) => Promise<{ error: any }>;
-  signOut: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ error?: any }>;
+  signUp: (email: string, password: string, name: string) => Promise<{ error?: any }>;
+  signOut: () => void;
   loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const SUPABASE_URL = "https://dduhjdzhxlwuuzidrzzi.supabase.co";
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Initialize auth state from localStorage
   useEffect(() => {
-    // Check if user is already logged in
-    const storedUser = localStorage.getItem('studio_noir_user');
+    const storedUser = localStorage.getItem('auth_user_profile');
+    
     if (storedUser) {
       try {
         const user = JSON.parse(storedUser);
         setUserProfile(user);
       } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('studio_noir_user');
+        console.error('Error parsing stored auth data:', error);
+        localStorage.removeItem('auth_user_profile');
       }
     }
     setLoading(false);
@@ -36,34 +42,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('Attempting to sign in:', email);
       setLoading(true);
-      console.log('Attempting to sign in with:', email);
       
-      // Call RPC function to verify password and get user
-      const { data, error } = await supabase.rpc('authenticate_user' as any, {
-        user_email: email.trim(),
-        user_password: password
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
       });
 
-      if (error) {
-        console.error('Sign in error:', error);
-        return { error: { message: 'Email atau password salah' } };
-      }
-
-      if (!data || (Array.isArray(data) && data.length === 0)) {
-        return { error: { message: 'Email atau password salah' } };
-      }
-
-      const user = Array.isArray(data) ? data[0] : data;
-      console.log('Sign in successful:', user.email);
+      const result = await response.json();
+      console.log('Login response:', result);
       
-      // Store user in localStorage and state
-      localStorage.setItem('studio_noir_user', JSON.stringify(user));
-      setUserProfile(user);
-      
-      return { error: null };
-    } catch (err) {
-      console.error('Unexpected error in signIn:', err);
+      if (result.success) {
+        const userProfileData = {
+          id: result.user.id,
+          name: result.user.name,
+          email: result.user.email,
+          role: result.user.role
+        };
+        
+        setUserProfile(userProfileData);
+        localStorage.setItem('auth_user_profile', JSON.stringify(userProfileData));
+        
+        return { error: null };
+      } else {
+        return { error: { message: result.error || 'Login gagal' } };
+      }
+    } catch (error) {
+      console.error('Sign in error:', error);
       return { error: { message: 'Terjadi kesalahan yang tidak terduga' } };
     } finally {
       setLoading(false);
@@ -72,66 +81,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signUp = async (email: string, password: string, name: string) => {
     try {
-      setLoading(true);
       console.log('Attempting to sign up:', email);
+      setLoading(true);
       
-      // Check if user already exists
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('email')
-        .eq('email', email.trim())
-        .single();
-
-      if (existingUser) {
-        return { error: { message: 'Email sudah terdaftar' } };
-      }
-
-      // Hash password and create user
-      const { data: hashedPassword, error: hashError } = await supabase.rpc('hash_password' as any, {
-        password: password
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, name, role: 'pelanggan' }),
       });
 
-      if (hashError) {
-        console.error('Error hashing password:', hashError);
-        return { error: { message: 'Gagal memproses password' } };
+      const result = await response.json();
+      console.log('Register response:', result);
+      
+      if (result.success) {
+        const userProfileData = {
+          id: result.user.id,
+          name: result.user.name,
+          email: result.user.email,
+          role: result.user.role
+        };
+        
+        setUserProfile(userProfileData);
+        localStorage.setItem('auth_user_profile', JSON.stringify(userProfileData));
+        
+        return { error: null };
+      } else {
+        return { error: { message: result.error || 'Registrasi gagal' } };
       }
-
-      // Create user record
-      const { data: newUser, error: insertError } = await supabase
-        .from('users')
-        .insert({
-          email: email.trim(),
-          name: name,
-          role: 'pelanggan',
-          password: hashedPassword
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error('Error creating user:', insertError);
-        return { error: { message: 'Gagal membuat akun. Coba lagi.' } };
-      }
-
-      console.log('Sign up successful:', newUser.email);
-      return { error: null };
-    } catch (err) {
-      console.error('Unexpected error in signUp:', err);
+    } catch (error) {
+      console.error('Sign up error:', error);
       return { error: { message: 'Terjadi kesalahan yang tidak terduga' } };
     } finally {
       setLoading(false);
     }
   };
 
-  const signOut = async () => {
-    try {
-      localStorage.removeItem('studio_noir_user');
-      setUserProfile(null);
-      window.location.href = '/auth';
-    } catch (error) {
-      console.error('Sign out error:', error);
-      window.location.href = '/auth';
-    }
+  const signOut = () => {
+    setUserProfile(null);
+    localStorage.removeItem('auth_user_profile');
   };
 
   const value = {

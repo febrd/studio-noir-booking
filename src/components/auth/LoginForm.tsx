@@ -27,14 +27,19 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
     onError(''); // Clear previous errors
 
     try {
+      console.log('Starting login process...');
       const { error } = await signIn(loginForm.email, loginForm.password);
+      
       if (error) {
+        console.error('Login failed:', error);
         onError(error.message || 'Login gagal. Periksa email dan password Anda.');
       } else {
+        console.log('Login successful');
         // Success will redirect to main page
         window.location.href = '/';
       }
     } catch (err) {
+      console.error('Unexpected login error:', err);
       onError('Terjadi kesalahan yang tidak terduga');
     } finally {
       setIsSubmitting(false);
