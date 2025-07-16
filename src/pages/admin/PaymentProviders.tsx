@@ -1,6 +1,6 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { AdminLayout } from './Layout';
 import { Tables } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, CreditCard, Settings, TestTube } from 'lucide-react';
+import { Plus, Edit, Trash2, CreditCard, TestTube } from 'lucide-react';
 
 type PaymentProvider = Tables<'payment_providers'>;
 
@@ -94,7 +94,6 @@ const PaymentProviders = () => {
 
     try {
       if (editingProvider) {
-        // Update provider
         const { error } = await supabase
           .from('payment_providers')
           .update({
@@ -110,7 +109,6 @@ const PaymentProviders = () => {
         if (error) throw error;
         toast.success('Payment provider berhasil diperbarui');
       } else {
-        // Create new provider
         const { error } = await supabase
           .from('payment_providers')
           .insert({
@@ -165,8 +163,7 @@ const PaymentProviders = () => {
   };
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-elegant">Payment Gateway</h1>
@@ -375,8 +372,7 @@ const PaymentProviders = () => {
           </Table>
         </CardContent>
       </Card>
-      </div>
-    </AdminLayout>
+    </div>
   );
 };
 
