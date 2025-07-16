@@ -5,25 +5,54 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Edit, Trash2, Settings, Eye, EyeOff } from 'lucide-react';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AddPaymentProviderForm } from '@/components/PaymentGateway/AddPaymentProviderForm';
+import { EditPaymentProviderForm } from '@/components/PaymentGateway/EditPaymentProviderForm';
 
 const PaymentProviders = () => {
   const { userProfile } = useJWTAuth();
+  const queryClient = useQueryClient();
   const [showSecrets, setShowSecrets] = useState<{[key: string]: boolean}>({});
+  const [editingProvider, setEditingProvider] = useState<any>(null);
 
   const { data: providers, isLoading, refetch } = useQuery({
     queryKey: ['payment-providers'],
     queryFn: async () => {
+      console.log('Fetching payment providers...');
       const { data, error } = await supabase
         .from('payment_providers')
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      console.log('Payment providers data:', data);
+      console.log('Payment providers error:', error);
+      
+      if (error) {
+        console.error('Error fetching payment providers:', error);
+        throw error;
+      }
       return data;
+    },
+  });
+
+  const deleteProviderMutation = useMutation({
+    mutationFn: async (providerId: string) => {
+      const { error } = await supabase
+        .from('payment_providers')
+        .delete()
+        .eq('id', providerId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Provider berhasil dihapus');
+      queryClient.invalidateQueries({ queryKey: ['payment-providers'] });
+    },
+    onError: (error: any) => {
+      console.error('Error deleting provider:', error);
+      toast.error('Gagal menghapus provider: ' + error.message);
     },
   });
 
@@ -41,21 +70,12 @@ const PaymentProviders = () => {
 
   const handleDeleteProvider = async (providerId: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus provider ini?')) {
-      try {
-        const { error } = await supabase
-          .from('payment_providers')
-          .delete()
-          .eq('id', providerId);
-
-        if (error) throw error;
-
-        toast.success('Provider berhasil dihapus');
-        refetch();
-      } catch (error) {
-        console.error('Error deleting provider:', error);
-        toast.error('Gagal menghapus provider');
-      }
+      deleteProviderMutation.mutate(providerId);
     }
+  };
+
+  const handleEditProvider = (provider: any) => {
+    setEditingProvider(provider);
   };
 
   // Check if current user can manage payment providers
@@ -76,13 +96,16 @@ const PaymentProviders = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Payment Providers</h2>
+          <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
           <p className="text-muted-foreground">
             Kelola penyedia layanan pembayaran
           </p>
         </div>
         
-        <AddPaymentProviderForm onSuccess={refetch} />
+        <AddPaymentProviderForm onSuccess={() => {
+          refetch();
+          queryClient.invalidateQueries({ queryKey: ['payment-providers'] });
+        }} />
       </div>
 
       <div className="grid gap-4">
@@ -179,7 +202,11 @@ const PaymentProviders = () => {
                 </div>
                 
                 <div className="flex justify-end space-x-2 pt-4 border-t">
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleEditProvider(provider)}
+                  >
                     <Edit className="h-4 w-4 mr-1" />
                     Edit
                   </Button>
@@ -188,6 +215,7 @@ const PaymentProviders = () => {
                     size="sm"
                     onClick={() => handleDeleteProvider(provider.id)}
                     className="text-destructive hover:text-destructive"
+                    disabled={deleteProviderMutation.isPending}
                   >
                     <Trash2 className="h-4 w-4 mr-1" />
                     Hapus
@@ -200,11 +228,27 @@ const PaymentProviders = () => {
           <Card>
             <CardContent className="p-6 text-center">
               <p className="text-muted-foreground mb-4">Belum ada payment provider yang dikonfigurasi</p>
-              <AddPaymentProviderForm onSuccess={refetch} />
+              <AddPaymentProviderForm onSuccess={() => {
+                refetch();
+                queryClient.invalidateQueries({ queryKey: ['payment-providers'] });
+              }} />
             </CardContent>
           </Card>
         )}
       </div>
+
+      {editingProvider && (
+        <EditPaymentProviderForm 
+          provider={editingProvider}
+          open={!!editingProvider}
+          onOpenChange={(open) => !open && setEditingProvider(null)}
+          onSuccess={() => {
+            setEditingProvider(null);
+            refetch();
+            queryClient.invalidateQueries({ queryKey: ['payment-providers'] });
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -1,21 +1,22 @@
 
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useMutation } from '@tanstack/react-query';
 
-interface AddPaymentProviderFormProps {
+interface EditPaymentProviderFormProps {
+  provider: any;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }
 
-export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProps) => {
-  const [open, setOpen] = useState(false);
+export const EditPaymentProviderForm = ({ provider, open, onOpenChange, onSuccess }: EditPaymentProviderFormProps) => {
   const [formData, setFormData] = useState({
     name: '',
     client_id: '',
@@ -25,12 +26,24 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
     status: 'active' as 'active' | 'inactive'
   });
 
-  const addProviderMutation = useMutation({
+  useEffect(() => {
+    if (provider) {
+      setFormData({
+        name: provider.name || '',
+        client_id: provider.client_id || '',
+        client_secret: provider.client_secret || '',
+        server_key: provider.server_key || '',
+        environment: provider.environment || 'sandbox',
+        status: provider.status || 'active'
+      });
+    }
+  }, [provider]);
+
+  const updateProviderMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      console.log('Adding payment provider:', data);
-      const { data: result, error } = await supabase
+      const { error } = await supabase
         .from('payment_providers')
-        .insert({
+        .update({
           name: data.name,
           client_id: data.client_id || null,
           client_secret: data.client_secret || null,
@@ -38,31 +51,17 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
           environment: data.environment,
           status: data.status
         })
-        .select()
-        .single();
-
-      console.log('Insert result:', result);
-      console.log('Insert error:', error);
+        .eq('id', provider.id);
 
       if (error) throw error;
-      return result;
     },
     onSuccess: () => {
-      toast.success('Payment provider berhasil ditambahkan');
-      setFormData({
-        name: '',
-        client_id: '',
-        client_secret: '',
-        server_key: '',
-        environment: 'sandbox',
-        status: 'active'
-      });
-      setOpen(false);
+      toast.success('Payment provider berhasil diperbarui');
       onSuccess();
     },
     onError: (error: any) => {
-      console.error('Error adding payment provider:', error);
-      toast.error('Gagal menambahkan payment provider: ' + error.message);
+      console.error('Error updating payment provider:', error);
+      toast.error('Gagal memperbarui payment provider: ' + error.message);
     },
   });
 
@@ -74,20 +73,14 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
       return;
     }
 
-    addProviderMutation.mutate(formData);
+    updateProviderMutation.mutate(formData);
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Tambah Provider
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Tambah Payment Provider</DialogTitle>
+          <DialogTitle>Edit Payment Provider</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -172,11 +165,11 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
           </div>
 
           <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Batal
             </Button>
-            <Button type="submit" disabled={addProviderMutation.isPending}>
-              {addProviderMutation.isPending ? 'Menyimpan...' : 'Simpan'}
+            <Button type="submit" disabled={updateProviderMutation.isPending}>
+              {updateProviderMutation.isPending ? 'Menyimpan...' : 'Simpan'}
             </Button>
           </div>
         </form>

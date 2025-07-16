@@ -25,18 +25,9 @@ const PaymentGateway = () => {
 
   return (
     <ModernLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
-          <p className="text-muted-foreground">
-            Kelola penyedia pembayaran dan pengaturan gateway
-          </p>
-        </div>
-        
-        <Routes>
-          <Route index element={<PaymentProviders />} />
-        </Routes>
-      </div>
+      <Routes>
+        <Route index element={<PaymentProviders />} />
+      </Routes>
     </ModernLayout>
   );
 };

@@ -5,24 +5,54 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Crown, Shield, CreditCard, User, Edit, Trash2 } from 'lucide-react';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AddUserForm } from '@/components/admin/AddUserForm';
+import { EditUserForm } from '@/components/admin/EditUserForm';
+import { useState } from 'react';
 
 const Users = () => {
   const { userProfile } = useJWTAuth();
+  const queryClient = useQueryClient();
+  const [editingUser, setEditingUser] = useState<any>(null);
 
   const { data: users, isLoading, refetch } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
+      console.log('Fetching users...');
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      console.log('Users data:', data);
+      console.log('Users error:', error);
+      
+      if (error) {
+        console.error('Error fetching users:', error);
+        throw error;
+      }
       return data;
+    },
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Pengguna berhasil dihapus');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error: any) => {
+      console.error('Error deleting user:', error);
+      toast.error('Gagal menghapus pengguna: ' + error.message);
     },
   });
 
@@ -51,21 +81,12 @@ const Users = () => {
     }
 
     if (confirm('Apakah Anda yakin ingin menghapus pengguna ini?')) {
-      try {
-        const { error } = await supabase
-          .from('users')
-          .delete()
-          .eq('id', userId);
-
-        if (error) throw error;
-
-        toast.success('Pengguna berhasil dihapus');
-        refetch();
-      } catch (error) {
-        console.error('Error deleting user:', error);
-        toast.error('Gagal menghapus pengguna');
-      }
+      deleteUserMutation.mutate(userId);
     }
+  };
+
+  const handleEditUser = (user: any) => {
+    setEditingUser(user);
   };
 
   // Check if current user can manage users
@@ -83,7 +104,10 @@ const Users = () => {
           </div>
           
           {canManageUsers && (
-            <AddUserForm onSuccess={refetch} />
+            <AddUserForm onSuccess={() => {
+              refetch();
+              queryClient.invalidateQueries({ queryKey: ['users'] });
+            }} />
           )}
         </div>
 
@@ -94,8 +118,8 @@ const Users = () => {
                 <p>Memuat pengguna...</p>
               </CardContent>
             </Card>
-          ) : (
-            users?.map((user) => (
+          ) : users && users.length > 0 ? (
+            users.map((user) => (
               <Card key={user.id} className="glass-elegant">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -116,7 +140,11 @@ const Users = () => {
                     
                     {canManageUsers && (
                       <div className="flex space-x-2">
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleEditUser(user)}
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
                         {user.role !== 'owner' && (
@@ -125,6 +153,7 @@ const Users = () => {
                             size="sm"
                             onClick={() => handleDeleteUser(user.id, user.role)}
                             className="text-destructive hover:text-destructive"
+                            disabled={deleteUserMutation.isPending}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -155,8 +184,33 @@ const Users = () => {
                 </CardContent>
               </Card>
             ))
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <p className="text-muted-foreground mb-4">Belum ada pengguna yang terdaftar</p>
+                {canManageUsers && (
+                  <AddUserForm onSuccess={() => {
+                    refetch();
+                    queryClient.invalidateQueries({ queryKey: ['users'] });
+                  }} />
+                )}
+              </CardContent>
+            </Card>
           )}
         </div>
+
+        {editingUser && (
+          <EditUserForm 
+            user={editingUser}
+            open={!!editingUser}
+            onOpenChange={(open) => !open && setEditingUser(null)}
+            onSuccess={() => {
+              setEditingUser(null);
+              refetch();
+              queryClient.invalidateQueries({ queryKey: ['users'] });
+            }}
+          />
+        )}
       </div>
     </ModernLayout>
   );
