@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Attempting to sign in with:', email);
       
       // Call RPC function to verify password and get user
-      const { data, error } = await supabase.rpc('authenticate_user' as any, {
+      const { data, error } = await supabase.rpc('authenticate_user', {
         user_email: email.trim(),
         user_password: password
       });
@@ -87,7 +87,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // Hash password and create user
-      const { data: hashedPassword, error: hashError } = await supabase.rpc('hash_password' as any, {
+      const { data: hashedPassword, error: hashError } = await supabase.rpc('hash_password', {
         password: password
       });
 

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from './Layout';
@@ -138,7 +139,7 @@ const Users = () => {
         toast.success('Pengguna berhasil diperbarui');
       } else {
         // Create new user with hashed password
-        const { data: hashedPassword, error: hashError } = await supabase.rpc('hash_password' as any, {
+        const { data: hashedPassword, error: hashError } = await supabase.rpc('hash_password', {
           password: formData.password
         });
 
