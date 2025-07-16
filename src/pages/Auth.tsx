@@ -8,33 +8,16 @@ import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { RegisterForm } from '@/components/auth/RegisterForm';
-import { createSampleUsers } from '@/utils/createSampleUsers';
 
 const Auth = () => {
   const { userProfile, loading } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [isCreatingSamples, setIsCreatingSamples] = useState(false);
 
   // Redirect if already authenticated
   if (userProfile) {
     return <Navigate to="/" replace />;
   }
-
-  const handleCreateSampleUsers = async () => {
-    setIsCreatingSamples(true);
-    setError(null);
-    setSuccess(null);
-    
-    try {
-      await createSampleUsers();
-      setSuccess('Sample users berhasil dibuat! Anda dapat login dengan akun demo.');
-    } catch (err) {
-      setError('Gagal membuat sample users');
-    } finally {
-      setIsCreatingSamples(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -88,24 +71,6 @@ const Auth = () => {
                 <RegisterForm onError={setError} onSuccess={setSuccess} />
               </TabsContent>
             </Tabs>
-
-            {/* Developer utility - Create sample users */}
-            <div className="mt-6 pt-4 border-t">
-              <button
-                onClick={handleCreateSampleUsers}
-                disabled={isCreatingSamples}
-                className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-              >
-                {isCreatingSamples ? (
-                  <>
-                    <Loader2 className="mr-1 h-3 w-3 animate-spin inline" />
-                    Membuat sample users...
-                  </>
-                ) : (
-                  'Buat Sample Users (Dev)'
-                )}
-              </button>
-            </div>
           </CardContent>
         </Card>
       </div>

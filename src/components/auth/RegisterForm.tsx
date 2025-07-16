@@ -47,7 +47,7 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
       if (error) {
         onError(error.message || 'Registrasi gagal. Coba lagi.');
       } else {
-        onSuccess('Registrasi berhasil! Silakan cek email untuk konfirmasi atau langsung login.');
+        onSuccess('Registrasi berhasil! Silakan login dengan akun baru Anda.');
         setRegisterForm({ email: '', password: '', confirmPassword: '', name: '' });
       }
     } catch (err) {

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminLayout } from './Layout';
@@ -59,7 +58,7 @@ const Users = () => {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select('id, email, name, role, created_at, updated_at')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -125,7 +124,7 @@ const Users = () => {
 
     try {
       if (editingUser) {
-        // Update user - only update the users table, password changes should be done separately
+        // Update user - only update basic info, password changes require separate flow
         const { error } = await supabase
           .from('users')
           .update({
@@ -138,35 +137,23 @@ const Users = () => {
         if (error) throw error;
         toast.success('Pengguna berhasil diperbarui');
       } else {
-        // Create new user through Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-            data: {
-              name: formData.name,
-              user_role: formData.role
-            }
-          }
+        // Create new user with hashed password
+        const { data: hashedPassword, error: hashError } = await supabase.rpc('hash_password', {
+          password: formData.password
         });
 
-        if (authError) throw authError;
+        if (hashError) throw hashError;
 
-        if (authData.user) {
-          // Create user record in our users table
-          const { error: userError } = await supabase
-            .from('users')
-            .insert({
-              id: authData.user.id,
-              email: formData.email,
-              name: formData.name,
-              role: formData.role
-            });
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert({
+            email: formData.email,
+            name: formData.name,
+            role: formData.role,
+            password: hashedPassword
+          });
 
-          if (userError) throw userError;
-        }
-
+        if (insertError) throw insertError;
         toast.success('Pengguna berhasil ditambahkan');
       }
 

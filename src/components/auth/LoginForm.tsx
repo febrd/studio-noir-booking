@@ -4,8 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, Loader2 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2 } from 'lucide-react';
 
 interface LoginFormProps {
   onError: (error: string) => void;
@@ -32,7 +31,7 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
       if (error) {
         onError(error.message || 'Login gagal. Periksa email dan password Anda.');
       } else {
-        // Success will be handled by auth state change
+        // Success will redirect to main page
         window.location.href = '/';
       }
     } catch (err) {
