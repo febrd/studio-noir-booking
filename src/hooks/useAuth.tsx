@@ -53,11 +53,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         body: JSON.stringify({ email, password }),
       });
 
-      if (!response.ok) {
-        console.error('Response not OK:', response.status, response.statusText);
-        return { error: { message: `Server error: ${response.status}` } };
-      }
-
       const result = await response.json();
       console.log('Login response:', result);
       
@@ -96,11 +91,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         },
         body: JSON.stringify({ email, password, name, role: 'pelanggan' }),
       });
-
-      if (!response.ok) {
-        console.error('Response not OK:', response.status, response.statusText);
-        return { error: { message: `Server error: ${response.status}` } };
-      }
 
       const result = await response.json();
       console.log('Register response:', result);

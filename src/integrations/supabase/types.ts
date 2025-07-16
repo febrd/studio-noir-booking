@@ -368,6 +368,19 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      login_user: {
+        Args: { user_email: string; user_password: string }
+        Returns: Json
+      }
+      register_user: {
+        Args: {
+          user_name: string
+          user_email: string
+          user_password: string
+          user_role?: Database["public"]["Enums"]["user_role"]
+        }
+        Returns: Json
+      }
     }
     Enums: {
       booking_status: "pending" | "confirmed" | "completed" | "cancelled"

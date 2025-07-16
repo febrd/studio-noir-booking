@@ -41,7 +41,7 @@ serve(async (req) => {
         )
       }
 
-      // Call the register_user function that handles password hashing
+      // Call the register_user function
       const { data, error } = await supabase.rpc('register_user', {
         user_name: name,
         user_email: email,
@@ -57,9 +57,9 @@ serve(async (req) => {
         )
       }
 
-      console.log('Registration successful for:', email)
+      console.log('Registration successful:', data)
       return new Response(
-        JSON.stringify({ success: true, user: data }),
+        JSON.stringify(data),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -78,7 +78,7 @@ serve(async (req) => {
         )
       }
 
-      // Call the login_user function that handles password verification
+      // Call the login_user function
       const { data, error } = await supabase.rpc('login_user', {
         user_email: email,
         user_password: password
@@ -92,17 +92,9 @@ serve(async (req) => {
         )
       }
 
-      if (!data || data.length === 0) {
-        console.log('No user found or invalid credentials')
-        return new Response(
-          JSON.stringify({ success: false, error: 'Email atau password salah' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      console.log('Login successful for:', email)
+      console.log('Login successful:', data)
       return new Response(
-        JSON.stringify({ success: true, user: data }),
+        JSON.stringify(data),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
