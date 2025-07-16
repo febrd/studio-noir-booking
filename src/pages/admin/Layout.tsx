@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Header } from '@/components/Layout/Header';
 import { Sidebar } from '@/components/Layout/Sidebar';
@@ -6,6 +7,7 @@ interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
+// This layout is deprecated - use ModernLayout instead
 export const AdminLayout = ({ children }: AdminLayoutProps) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 

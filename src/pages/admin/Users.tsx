@@ -3,11 +3,14 @@ import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, Users as UsersIcon, Crown, Shield, CreditCard, User } from 'lucide-react';
+import { Crown, Shield, CreditCard, User, UserPlus } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 const Users = () => {
+  const { userProfile } = useAuth();
+
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
@@ -42,67 +45,47 @@ const Users = () => {
   return (
     <ModernLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Users Management</h1>
             <p className="text-muted-foreground">
               Manage system users and their roles
             </p>
           </div>
+          
           <Button>
-            <Plus className="mr-2 h-4 w-4" />
+            <UserPlus className="mr-2 h-4 w-4" />
             Add User
           </Button>
         </div>
 
         <div className="grid gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UsersIcon className="h-5 w-5" />
-                All Users
-              </CardTitle>
-              <CardDescription>
-                Total users: {users?.length || 0}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-3">
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-16 bg-muted rounded-lg animate-pulse" />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {users?.map((user) => (
-                    <div
-                      key={user.id}
-                      className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          {getRoleIcon(user.role)}
-                        </div>
-                        <div>
-                          <p className="font-medium">{user.name}</p>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={getRoleBadgeVariant(user.role)}>
-                          {user.role}
-                        </Badge>
-                        <Button variant="ghost" size="sm">
-                          Edit
-                        </Button>
-                      </div>
+          {isLoading ? (
+            <Card>
+              <CardContent className="p-6">
+                <p>Loading users...</p>
+              </CardContent>
+            </Card>
+          ) : (
+            users?.map((user) => (
+              <Card key={user.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        {getRoleIcon(user.role)}
+                        {user.name}
+                      </CardTitle>
+                      <CardDescription>{user.email}</CardDescription>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    <Badge variant={getRoleBadgeVariant(user.role)}>
+                      {user.role}
+                    </Badge>
+                  </div>
+                </CardHeader>
+              </Card>
+            ))
+          )}
         </div>
       </div>
     </ModernLayout>

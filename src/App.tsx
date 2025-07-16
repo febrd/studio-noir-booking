@@ -29,11 +29,12 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              {/* Supabase Auth Routes */}
+              {/* Public Routes */}
               <Route path="/auth" element={<Auth />} />
-              
-              {/* JWT Auth Routes */}
               <Route path="/jwt-auth" element={<JWTAuth />} />
+              <Route path="/unauthorized" element={<Unauthorized />} />
+              
+              {/* JWT Protected Routes */}
               <Route 
                 path="/jwt-dashboard" 
                 element={
@@ -42,8 +43,14 @@ const App = () => (
                   </JWTProtectedRoute>
                 } 
               />
-              
-              <Route path="/unauthorized" element={<Unauthorized />} />
+              <Route 
+                path="/jwt-admin/users" 
+                element={
+                  <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
+                    <Users />
+                  </JWTProtectedRoute>
+                } 
+              />
               
               {/* Protected Routes with Supabase Auth */}
               <Route 
@@ -71,17 +78,7 @@ const App = () => (
                 } 
               />
               
-              {/* JWT Protected Routes */}
-              <Route 
-                path="/jwt-admin/users" 
-                element={
-                  <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                    <Users />
-                  </JWTProtectedRoute>
-                } 
-              />
-              
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              {/* Catch-all route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
