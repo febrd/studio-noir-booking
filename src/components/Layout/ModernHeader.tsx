@@ -1,5 +1,5 @@
 
-import { useAuth } from '@/hooks/useAuth';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { Bell, Settings, User, Crown, Shield, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,7 +14,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 export function ModernHeader() {
-  const { userProfile, signOut } = useAuth();
+  const { userProfile, signOut } = useJWTAuth();
 
   const getRoleIcon = (role: string) => {
     switch (role) {
