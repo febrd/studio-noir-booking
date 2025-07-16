@@ -74,59 +74,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       console.log('Attempting to sign in with:', email);
       
-      // First, check if user exists in our users table
-      const { data: userRecord, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .single();
-
-      if (userError || !userRecord) {
-        console.error('User not found in users table:', userError);
-        return { error: { message: 'Email atau password salah' } };
-      }
-
-      console.log('User found:', userRecord.email, userRecord.role);
-
-      // Try to sign in with Supabase Auth
+      // Directly try to sign in with Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        console.error('Supabase auth error:', error);
-        
-        // If auth user doesn't exist, create it
-        if (error.message.includes('Invalid login credentials')) {
-          console.log('Creating auth user for existing user record...');
-          const { error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: `${window.location.origin}/`,
-              data: {
-                name: userRecord.name,
-                user_role: userRecord.role
-              }
-            }
-          });
-          
-          if (signUpError) {
-            console.error('Error creating auth user:', signUpError);
-            return { error: signUpError };
-          }
-          
-          // Try signing in again
-          const { error: retryError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-          
-          return { error: retryError };
-        }
-        
-        return { error };
+        console.error('Sign in error:', error);
+        return { error: { message: 'Email atau password salah' } };
       }
 
       console.log('Sign in successful:', data.user?.email);
@@ -144,27 +100,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       console.log('Attempting to sign up:', email);
       
-      // First create user in our users table
-      const { data: newUser, error: userError } = await supabase
-        .from('users')
-        .insert({
-          email,
-          password: password, // This will be hashed by trigger if we had one
-          name,
-          role: 'pelanggan'
-        })
-        .select()
-        .single();
-
-      if (userError) {
-        console.error('Error creating user record:', userError);
-        return { error: userError };
-      }
-
-      console.log('User record created:', newUser);
-
-      // Then create auth user
-      const { error } = await supabase.auth.signUp({
+      // First create auth user
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -178,8 +115,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (error) {
         console.error('Error creating auth user:', error);
-        // If auth creation fails, remove the user record
-        await supabase.from('users').delete().eq('id', newUser.id);
+        return { error };
+      }
+
+      // If auth user created successfully, create user record
+      if (data.user) {
+        console.log('Auth user created, now creating user record...');
+        
+        // Create user record in our users table
+        const { error: userError } = await supabase
+          .from('users')
+          .insert({
+            id: data.user.id, // Use the auth user ID
+            email,
+            password: password, // In production, this should be handled differently
+            name,
+            role: 'pelanggan'
+          });
+
+        if (userError) {
+          console.error('Error creating user record:', userError);
+          // Don't return error here, auth user is created successfully
+        }
       }
 
       return { error };
