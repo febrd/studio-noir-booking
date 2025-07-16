@@ -1,160 +1,25 @@
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
-type UserProfile = {
+interface UserProfile {
   id: string;
   name: string;
   email: string;
   role: 'owner' | 'admin' | 'keuangan' | 'pelanggan';
-};
+}
 
 interface JWTAuthContextType {
   userProfile: UserProfile | null;
-  token: string | null;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signUp: (name: string, email: string, password: string, role?: string) => Promise<{ success: boolean; error?: string }>;
-  signOut: () => void;
   loading: boolean;
   isAuthenticated: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, name: string) => Promise<{ error: any }>;
+  signOut: () => void;
 }
 
 const JWTAuthContext = createContext<JWTAuthContextType | undefined>(undefined);
-
-const SUPABASE_URL = "https://dduhjdzhxlwuuzidrzzi.supabase.co";
-
-export const JWTAuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Initialize auth state from localStorage
-  useEffect(() => {
-    const storedToken = localStorage.getItem('jwt_token');
-    const storedUser = localStorage.getItem('user_profile');
-    
-    if (storedToken && storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        setToken(storedToken);
-        setUserProfile(user);
-        // Verify token is still valid
-        verifyToken(storedToken);
-      } catch (error) {
-        console.error('Error parsing stored auth data:', error);
-        localStorage.removeItem('jwt_token');
-        localStorage.removeItem('user_profile');
-      }
-    }
-    setLoading(false);
-  }, []);
-
-  const verifyToken = async (authToken: string) => {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/auth/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-        },
-      });
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        // Token expired or invalid
-        signOut();
-      } else {
-        // Update user profile with fresh data
-        setUserProfile(result.user);
-        localStorage.setItem('user_profile', JSON.stringify(result.user));
-      }
-    } catch (error) {
-      console.error('Token verification error:', error);
-      signOut();
-    }
-  };
-
-  const signIn = async (email: string, password: string) => {
-    try {
-      setLoading(true);
-      
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        setToken(result.token);
-        setUserProfile(result.user);
-        localStorage.setItem('jwt_token', result.token);
-        localStorage.setItem('user_profile', JSON.stringify(result.user));
-        return { success: true };
-      } else {
-        return { success: false, error: result.error };
-      }
-    } catch (error) {
-      console.error('Sign in error:', error);
-      return { success: false, error: 'Terjadi kesalahan yang tidak terduga' };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signUp = async (name: string, email: string, password: string, role: string = 'pelanggan') => {
-    try {
-      setLoading(true);
-      
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, email, password, role }),
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        setToken(result.token);
-        setUserProfile(result.user);
-        localStorage.setItem('jwt_token', result.token);
-        localStorage.setItem('user_profile', JSON.stringify(result.user));
-        return { success: true };
-      } else {
-        return { success: false, error: result.error };
-      }
-    } catch (error) {
-      console.error('Sign up error:', error);
-      return { success: false, error: 'Terjadi kesalahan yang tidak terduga' };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signOut = () => {
-    setToken(null);
-    setUserProfile(null);
-    localStorage.removeItem('jwt_token');
-    localStorage.removeItem('user_profile');
-  };
-
-  const value = {
-    userProfile,
-    token,
-    signIn,
-    signUp,
-    signOut,
-    loading,
-    isAuthenticated: !!userProfile && !!token,
-  };
-
-  return <JWTAuthContext.Provider value={value}>{children}</JWTAuthContext.Provider>;
-};
 
 export const useJWTAuth = () => {
   const context = useContext(JWTAuthContext);
@@ -162,4 +27,125 @@ export const useJWTAuth = () => {
     throw new Error('useJWTAuth must be used within a JWTAuthProvider');
   }
   return context;
+};
+
+export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    // Check for stored JWT session
+    const storedUser = localStorage.getItem('jwt_user');
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        setUserProfile(parsed);
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Error parsing stored user:', error);
+        localStorage.removeItem('jwt_user');
+      }
+    }
+    setLoading(false);
+  }, []);
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      console.log('JWT Auth: Attempting sign in with email:', email);
+      
+      const { data, error } = await supabase.rpc('login_user', {
+        user_email: email,
+        user_password: password
+      });
+
+      if (error) {
+        console.error('JWT Auth sign in error:', error);
+        return { error };
+      }
+
+      const result = data as { success: boolean; error?: string; user?: UserProfile };
+      
+      if (!result.success) {
+        return { error: { message: result.error || 'Login gagal' } };
+      }
+
+      if (result.user) {
+        setUserProfile(result.user);
+        setIsAuthenticated(true);
+        localStorage.setItem('jwt_user', JSON.stringify(result.user));
+        
+        // Also update Supabase auth session with role info
+        try {
+          await supabase.auth.signInWithPassword({ email, password });
+          await supabase.auth.updateUser({
+            data: { user_role: result.user.role }
+          });
+        } catch (authError) {
+          console.warn('Failed to sync with Supabase auth:', authError);
+        }
+        
+        toast.success('Login berhasil!');
+      }
+
+      return { error: null };
+    } catch (error) {
+      console.error('Unexpected JWT sign in error:', error);
+      return { error };
+    }
+  };
+
+  const signUp = async (email: string, password: string, name: string) => {
+    try {
+      const { data, error } = await supabase.rpc('register_user', {
+        user_name: name,
+        user_email: email,
+        user_password: password,
+        user_role: 'pelanggan'
+      });
+
+      if (error) {
+        console.error('JWT Auth signup error:', error);
+        return { error };
+      }
+
+      const result = data as { success: boolean; error?: string; user?: UserProfile };
+      
+      if (!result.success) {
+        return { error: { message: result.error || 'Registrasi gagal' } };
+      }
+
+      toast.success('Registrasi berhasil! Silakan login dengan akun baru Anda.');
+      return { error: null };
+    } catch (error) {
+      console.error('Unexpected JWT signup error:', error);
+      return { error };
+    }
+  };
+
+  const signOut = () => {
+    setUserProfile(null);
+    setIsAuthenticated(false);
+    localStorage.removeItem('jwt_user');
+    
+    // Also sign out from Supabase auth
+    supabase.auth.signOut().catch(console.warn);
+    
+    toast.success('Logout berhasil!');
+  };
+
+  return (
+    <JWTAuthContext.Provider
+      value={{
+        userProfile,
+        loading,
+        isAuthenticated,
+        signIn,
+        signUp,
+        signOut,
+      }}
+    >
+      {children}
+    </JWTAuthContext.Provider>
+  );
 };
