@@ -1,17 +1,7 @@
 
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-  Home,
-  CreditCard,
-  Package,
-  Calendar,
-  Receipt,
-  Users,
-  ChevronDown,
-  Settings,
-  Building2,
-} from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -26,35 +16,11 @@ import {
 } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: Home },
-  { name: 'Payment Gateway', href: '/payment-gateway', icon: CreditCard },
-  { name: 'Users', href: '/admin/users', icon: Users },
-  {
-    name: 'Studio Management',
-    href: '/studio',
-    icon: Building2,
-    children: [
-      { name: 'Packages', href: '/studio/packages' },
-      { name: 'Additional Services', href: '/studio/services' },
-      { name: 'Bookings', href: '/studio/bookings' },
-    ],
-  },
-  {
-    name: 'Transactions',
-    href: '/transactions',
-    icon: Receipt,
-    children: [
-      { name: 'Online Bookings', href: '/transactions/online' },
-      { name: 'Offline Bookings', href: '/transactions/offline' },
-      { name: 'Reports', href: '/transactions/reports' },
-    ],
-  },
-  { name: 'Customers', href: '/customers', icon: Calendar },
-];
+import { useJWTAuth } from '@/hooks/useJWTAuth';
+import { getAccessibleNavigation } from '@/config/navigation';
 
 export function AppSidebar() {
+  const { userProfile } = useJWTAuth();
   const location = useLocation();
   const { state } = useSidebar();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
@@ -73,6 +39,9 @@ export function AppSidebar() {
     }
     return location.pathname.startsWith(href);
   };
+
+  // Get navigation items based on user role
+  const navigation = getAccessibleNavigation(userProfile?.role || 'pelanggan');
 
   return (
     <Sidebar variant="sidebar" className="border-r">
@@ -97,7 +66,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {navigation.map((item) => (
                 <SidebarMenuItem key={item.name}>
-                  {item.children ? (
+                  {item.children && item.children.length > 0 ? (
                     <Collapsible
                       open={expandedItems.includes(item.name)}
                       onOpenChange={() => toggleExpanded(item.name)}

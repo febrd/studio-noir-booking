@@ -1,17 +1,11 @@
 
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, CreditCard, Users, Building2, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const mobileNavItems = [
-  { name: 'Dashboard', href: '/', icon: Home },
-  { name: 'Payment', href: '/payment-gateway', icon: CreditCard },
-  { name: 'Users', href: '/admin/users', icon: Users },
-  { name: 'Studio', href: '/studio', icon: Building2 },
-  { name: 'Customers', href: '/customers', icon: Calendar },
-];
+import { useJWTAuth } from '@/hooks/useJWTAuth';
+import { getAccessibleNavigation } from '@/config/navigation';
 
 export function MobileNavigation() {
+  const { userProfile } = useJWTAuth();
   const location = useLocation();
 
   const isActive = (href: string) => {
@@ -21,10 +15,15 @@ export function MobileNavigation() {
     return location.pathname.startsWith(href);
   };
 
+  // Get navigation items based on user role (only show main items on mobile)
+  const navigation = getAccessibleNavigation(userProfile?.role || 'pelanggan')
+    .filter(item => !item.children || item.children.length === 0)
+    .slice(0, 5); // Limit to 5 items for mobile
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border md:hidden">
       <nav className="flex items-center justify-around py-2">
-        {mobileNavItems.map((item) => (
+        {navigation.map((item) => (
           <NavLink
             key={item.href}
             to={item.href}
