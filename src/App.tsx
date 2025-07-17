@@ -1,4 +1,5 @@
 
+import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,67 +15,76 @@ import Users from "./pages/admin/Users";
 import PaymentProviders from "./pages/admin/PaymentProviders";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+    },
+  },
+});
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <JWTAuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/auth" element={<JWTAuth />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
-            
-            {/* Main Dashboard - Default Route */}
-            <Route 
-              path="/" 
-              element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan', 'pelanggan']}>
-                  <JWTDashboard />
-                </JWTProtectedRoute>
-              } 
-            />
-            
-            {/* Admin Routes */}
-            <Route 
-              path="/admin/users" 
-              element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <Users />
-                </JWTProtectedRoute>
-              } 
-            />
-            
-            {/* Payment Gateway Routes */}
-            <Route 
-              path="/payment-gateway/*" 
-              element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
-                  <PaymentGateway />
-                </JWTProtectedRoute>
-              } 
-            />
-            
-            {/* Payment Providers */}
-            <Route 
-              path="/admin/payment-providers" 
-              element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
-                  <PaymentProviders />
-                </JWTProtectedRoute>
-              } 
-            />
-            
-            {/* Catch-all route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </JWTAuthProvider>
-  </QueryClientProvider>
-);
+const App: React.FC = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <JWTAuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/auth" element={<JWTAuth />} />
+              <Route path="/unauthorized" element={<Unauthorized />} />
+              
+              {/* Main Dashboard - Default Route */}
+              <Route 
+                path="/" 
+                element={
+                  <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan', 'pelanggan']}>
+                    <JWTDashboard />
+                  </JWTProtectedRoute>
+                } 
+              />
+              
+              {/* Admin Routes */}
+              <Route 
+                path="/admin/users" 
+                element={
+                  <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
+                    <Users />
+                  </JWTProtectedRoute>
+                } 
+              />
+              
+              {/* Payment Gateway Routes */}
+              <Route 
+                path="/payment-gateway/*" 
+                element={
+                  <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
+                    <PaymentGateway />
+                  </JWTProtectedRoute>
+                } 
+              />
+              
+              {/* Payment Providers */}
+              <Route 
+                path="/admin/payment-providers" 
+                element={
+                  <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
+                    <PaymentProviders />
+                  </JWTProtectedRoute>
+                } 
+              />
+              
+              {/* Catch-all route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </JWTAuthProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
