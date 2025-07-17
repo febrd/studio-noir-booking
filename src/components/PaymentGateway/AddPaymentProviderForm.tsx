@@ -28,13 +28,19 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
   const addProviderMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       console.log('Adding payment provider:', data);
+      
+      // Validate required fields
+      if (!data.name.trim()) {
+        throw new Error('Nama provider harus diisi');
+      }
+
       const { data: result, error } = await supabase
         .from('payment_providers')
         .insert({
-          name: data.name,
-          client_id: data.client_id || null,
-          client_secret: data.client_secret || null,
-          server_key: data.server_key || null,
+          name: data.name.trim(),
+          client_id: data.client_id.trim() || null,
+          client_secret: data.client_secret.trim() || null,
+          server_key: data.server_key.trim() || null,
           environment: data.environment,
           status: data.status
         })
@@ -68,17 +74,29 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.name) {
-      toast.error('Nama provider harus diisi');
-      return;
-    }
-
     addProviderMutation.mutate(formData);
   };
 
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      client_id: '',
+      client_secret: '',
+      server_key: '',
+      environment: 'sandbox',
+      status: 'active'
+    });
+  };
+
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen) {
+      resetForm();
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
@@ -91,7 +109,7 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Nama Provider</Label>
+            <Label htmlFor="name">Nama Provider *</Label>
             <Input
               id="name"
               value={formData.name}
@@ -171,11 +189,19 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
             />
           </div>
 
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setOpen(false)}
+              disabled={addProviderMutation.isPending}
+            >
               Batal
             </Button>
-            <Button type="submit" disabled={addProviderMutation.isPending}>
+            <Button 
+              type="submit" 
+              disabled={addProviderMutation.isPending}
+            >
               {addProviderMutation.isPending ? 'Menyimpan...' : 'Simpan'}
             </Button>
           </div>

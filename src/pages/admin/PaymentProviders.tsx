@@ -1,23 +1,33 @@
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Settings, Eye, EyeOff } from 'lucide-react';
-import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { AddPaymentProviderForm } from '@/components/PaymentGateway/AddPaymentProviderForm';
 import { EditPaymentProviderForm } from '@/components/PaymentGateway/EditPaymentProviderForm';
+import { PaymentProviderCard } from '@/components/PaymentGateway/PaymentProviderCard';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+interface PaymentProvider {
+  id: string;
+  name: string;
+  client_id: string | null;
+  client_secret: string | null;
+  server_key: string | null;
+  environment: 'sandbox' | 'production';
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
+}
 
 const PaymentProviders = () => {
-  const { userProfile } = useJWTAuth();
+  const [selectedProvider, setSelectedProvider] = useState<PaymentProvider | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const queryClient = useQueryClient();
-  const [showSecrets, setShowSecrets] = useState<{[key: string]: boolean}>({});
-  const [editingProvider, setEditingProvider] = useState<any>(null);
 
-  const { data: providers, isLoading, refetch } = useQuery({
+  const { data: providers, isLoading, error } = useQuery({
     queryKey: ['payment-providers'],
     queryFn: async () => {
       console.log('Fetching payment providers...');
@@ -25,231 +35,136 @@ const PaymentProviders = () => {
         .from('payment_providers')
         .select('*')
         .order('created_at', { ascending: false });
-      
-      console.log('Payment providers data:', data);
-      console.log('Payment providers error:', error);
-      
+
       if (error) {
         console.error('Error fetching payment providers:', error);
         throw error;
       }
-      return data;
+
+      console.log('Fetched payment providers:', data);
+      return data as PaymentProvider[];
     },
   });
 
   const deleteProviderMutation = useMutation({
-    mutationFn: async (providerId: string) => {
+    mutationFn: async (id: string) => {
+      console.log('Deleting payment provider:', id);
       const { error } = await supabase
         .from('payment_providers')
         .delete()
-        .eq('id', providerId);
+        .eq('id', id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Provider berhasil dihapus');
+      toast.success('Payment provider berhasil dihapus');
       queryClient.invalidateQueries({ queryKey: ['payment-providers'] });
     },
     onError: (error: any) => {
-      console.error('Error deleting provider:', error);
-      toast.error('Gagal menghapus provider: ' + error.message);
+      console.error('Error deleting payment provider:', error);
+      toast.error('Gagal menghapus payment provider: ' + error.message);
     },
   });
 
-  const toggleSecretVisibility = (providerId: string) => {
-    setShowSecrets(prev => ({
-      ...prev,
-      [providerId]: !prev[providerId]
-    }));
+  const handleEdit = (provider: PaymentProvider) => {
+    console.log('Editing provider:', provider);
+    setSelectedProvider(provider);
+    setIsEditModalOpen(true);
   };
 
-  const maskSecret = (secret: string | null) => {
-    if (!secret) return 'Tidak diset';
-    return secret.replace(/./g, '*');
+  const handleDelete = (id: string) => {
+    deleteProviderMutation.mutate(id);
   };
 
-  const handleDeleteProvider = async (providerId: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus provider ini?')) {
-      deleteProviderMutation.mutate(providerId);
-    }
+  const handleEditSuccess = () => {
+    setIsEditModalOpen(false);
+    setSelectedProvider(null);
+    queryClient.invalidateQueries({ queryKey: ['payment-providers'] });
   };
 
-  const handleEditProvider = (provider: any) => {
-    setEditingProvider(provider);
+  const handleAddSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['payment-providers'] });
   };
 
-  // Check if current user can manage payment providers
-  const canManageProviders = userProfile?.role && ['owner', 'admin', 'keuangan'].includes(userProfile.role);
-
-  if (!canManageProviders) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Akses Ditolak</h2>
-          <p className="text-muted-foreground">Anda tidak memiliki izin untuk mengakses halaman ini.</p>
+      <ModernLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Memuat payment providers...</span>
+          </div>
         </div>
-      </div>
+      </ModernLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <ModernLayout>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
+            <p className="text-muted-foreground">
+              Kelola provider pembayaran untuk sistem booking
+            </p>
+          </div>
+          
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Gagal memuat data payment providers: {error instanceof Error ? error.message : 'Unknown error'}
+            </AlertDescription>
+          </Alert>
+        </div>
+      </ModernLayout>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
-          <p className="text-muted-foreground">
-            Kelola penyedia layanan pembayaran
-          </p>
+    <ModernLayout>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
+            <p className="text-muted-foreground">
+              Kelola provider pembayaran untuk sistem booking
+            </p>
+          </div>
+          
+          <AddPaymentProviderForm onSuccess={handleAddSuccess} />
         </div>
-        
-        <AddPaymentProviderForm onSuccess={() => {
-          refetch();
-          queryClient.invalidateQueries({ queryKey: ['payment-providers'] });
-        }} />
-      </div>
 
-      <div className="grid gap-4">
-        {isLoading ? (
-          <Card>
-            <CardContent className="p-6">
-              <p>Memuat provider...</p>
-            </CardContent>
-          </Card>
-        ) : providers && providers.length > 0 ? (
-          providers.map((provider) => (
-            <Card key={provider.id} className="glass-elegant">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Settings className="h-5 w-5" />
-                      {provider.name}
-                    </CardTitle>
-                    <CardDescription>
-                      Environment: {provider.environment} | Status: {provider.status}
-                    </CardDescription>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <Badge 
-                      variant={provider.status === 'active' ? 'default' : 'secondary'}
-                      className={provider.status === 'active' ? 'bg-green-100 text-green-800' : ''}
-                    >
-                      {provider.status}
-                    </Badge>
-                    <Badge variant="outline">
-                      {provider.environment}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {provider.client_id && (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-medium text-muted-foreground">Client ID</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleSecretVisibility(`${provider.id}-client`)}
-                        >
-                          {showSecrets[`${provider.id}-client`] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                        </Button>
-                      </div>
-                      <p className="font-mono text-xs bg-muted p-2 rounded">
-                        {showSecrets[`${provider.id}-client`] ? provider.client_id : maskSecret(provider.client_id)}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {provider.client_secret && (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-medium text-muted-foreground">Client Secret</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleSecretVisibility(`${provider.id}-secret`)}
-                        >
-                          {showSecrets[`${provider.id}-secret`] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                        </Button>
-                      </div>
-                      <p className="font-mono text-xs bg-muted p-2 rounded">
-                        {showSecrets[`${provider.id}-secret`] ? provider.client_secret : maskSecret(provider.client_secret)}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {provider.server_key && (
-                    <div className="md:col-span-2">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-medium text-muted-foreground">Server Key</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleSecretVisibility(`${provider.id}-server`)}
-                        >
-                          {showSecrets[`${provider.id}-server`] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                        </Button>
-                      </div>
-                      <p className="font-mono text-xs bg-muted p-2 rounded">
-                        {showSecrets[`${provider.id}-server`] ? provider.server_key : maskSecret(provider.server_key)}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex justify-end space-x-2 pt-4 border-t">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleEditProvider(provider)}
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Edit
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleDeleteProvider(provider.id)}
-                    className="text-destructive hover:text-destructive"
-                    disabled={deleteProviderMutation.isPending}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Hapus
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+        {providers && providers.length === 0 ? (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-semibold mb-2">Belum ada payment provider</h3>
+            <p className="text-muted-foreground mb-4">
+              Tambahkan payment provider pertama Anda untuk mulai menerima pembayaran
+            </p>
+          </div>
         ) : (
-          <Card>
-            <CardContent className="p-6 text-center">
-              <p className="text-muted-foreground mb-4">Belum ada payment provider yang dikonfigurasi</p>
-              <AddPaymentProviderForm onSuccess={() => {
-                refetch();
-                queryClient.invalidateQueries({ queryKey: ['payment-providers'] });
-              }} />
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {providers?.map((provider) => (
+              <PaymentProviderCard
+                key={provider.id}
+                provider={provider}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        )}
+
+        {selectedProvider && (
+          <EditPaymentProviderForm
+            provider={selectedProvider}
+            open={isEditModalOpen}
+            onOpenChange={setIsEditModalOpen}
+            onSuccess={handleEditSuccess}
+          />
         )}
       </div>
-
-      {editingProvider && (
-        <EditPaymentProviderForm 
-          provider={editingProvider}
-          open={!!editingProvider}
-          onOpenChange={(open) => !open && setEditingProvider(null)}
-          onSuccess={() => {
-            setEditingProvider(null);
-            refetch();
-            queryClient.invalidateQueries({ queryKey: ['payment-providers'] });
-          }}
-        />
-      )}
-    </div>
+    </ModernLayout>
   );
 };
 

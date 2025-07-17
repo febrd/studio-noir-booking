@@ -24,11 +24,9 @@ const PaymentGateway = () => {
   }
 
   return (
-    <ModernLayout>
-      <Routes>
-        <Route index element={<PaymentProviders />} />
-      </Routes>
-    </ModernLayout>
+    <Routes>
+      <Route path="/*" element={<PaymentProviders />} />
+    </Routes>
   );
 };
 

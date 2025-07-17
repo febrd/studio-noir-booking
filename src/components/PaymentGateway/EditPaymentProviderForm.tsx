@@ -9,8 +9,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useMutation } from '@tanstack/react-query';
 
+interface PaymentProvider {
+  id: string;
+  name: string;
+  client_id: string | null;
+  client_secret: string | null;
+  server_key: string | null;
+  environment: 'sandbox' | 'production';
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
+}
+
 interface EditPaymentProviderFormProps {
-  provider: any;
+  provider: PaymentProvider;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
@@ -28,6 +40,7 @@ export const EditPaymentProviderForm = ({ provider, open, onOpenChange, onSucces
 
   useEffect(() => {
     if (provider) {
+      console.log('Setting form data for provider:', provider);
       setFormData({
         name: provider.name || '',
         client_id: provider.client_id || '',
@@ -41,19 +54,30 @@ export const EditPaymentProviderForm = ({ provider, open, onOpenChange, onSucces
 
   const updateProviderMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      console.log('Updating payment provider:', provider.id, data);
+      
+      // Validate required fields
+      if (!data.name.trim()) {
+        throw new Error('Nama provider harus diisi');
+      }
+
       const { error } = await supabase
         .from('payment_providers')
         .update({
-          name: data.name,
-          client_id: data.client_id || null,
-          client_secret: data.client_secret || null,
-          server_key: data.server_key || null,
+          name: data.name.trim(),
+          client_id: data.client_id.trim() || null,
+          client_secret: data.client_secret.trim() || null,
+          server_key: data.server_key.trim() || null,
           environment: data.environment,
-          status: data.status
+          status: data.status,
+          updated_at: new Date().toISOString()
         })
         .eq('id', provider.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Update error:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       toast.success('Payment provider berhasil diperbarui');
@@ -67,12 +91,6 @@ export const EditPaymentProviderForm = ({ provider, open, onOpenChange, onSucces
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.name) {
-      toast.error('Nama provider harus diisi');
-      return;
-    }
-
     updateProviderMutation.mutate(formData);
   };
 
@@ -84,7 +102,7 @@ export const EditPaymentProviderForm = ({ provider, open, onOpenChange, onSucces
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Nama Provider</Label>
+            <Label htmlFor="name">Nama Provider *</Label>
             <Input
               id="name"
               value={formData.name}
@@ -164,11 +182,19 @@ export const EditPaymentProviderForm = ({ provider, open, onOpenChange, onSucces
             />
           </div>
 
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              disabled={updateProviderMutation.isPending}
+            >
               Batal
             </Button>
-            <Button type="submit" disabled={updateProviderMutation.isPending}>
+            <Button 
+              type="submit" 
+              disabled={updateProviderMutation.isPending}
+            >
               {updateProviderMutation.isPending ? 'Menyimpan...' : 'Simpan'}
             </Button>
           </div>
