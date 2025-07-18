@@ -187,47 +187,44 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   // Create guest user mutation - FIXED: Use proper UUID generation
   const createGuestMutation = useMutation({
     mutationFn: async (userData: { name: string; email: string }) => {
-      // Generate random password
       const randomPassword = Math.random().toString(36).slice(-8);
-      
-      // Use proper UUID generation and add guest prefix to name
       const guestName = `guest_${userData.name}`;
-      
+  
       const { data, error } = await supabase
         .from('users')
         .insert([{
-          user_id: '',
           name: guestName,
           email: userData.email,
           role: 'pelanggan',
           password: randomPassword
         }])
-        .select()
+        .select('id, name') // cukup ambil kolom yang dibutuhkan
         .single();
-      
+  
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
-      setFormData(prev => ({ ...prev, user_id: data.id }));
-      toast.success(`Guest user created: ${data.name}`);
+    onSuccess: (user) => {
+      setFormData(prev => ({ ...prev, user_id: user.id })); // ✅ yang penting ini
+      toast.success(`Guest user created: ${user.name}`);
     },
     onError: (error) => {
       console.error('Error creating guest user:', error);
       toast.error('Gagal membuat user guest');
     }
-    
   });
+  
 
   // Create/Update booking mutation - FIXED: Better error handling
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
     
-      const tentativeUserId = data.id || '';
+      const tentativeUserId = data.user_id || '';
       const finalUserId = isValidUUID(tentativeUserId) ? tentativeUserId : null;
-
+      
       if (!finalUserId) {
-        console.log('User ID tidak valid atau kosong', finalUserId);
+        console.error('❌ User ID tidak valid atau kosong:', tentativeUserId);
+        throw new Error('User ID tidak valid atau kosong');
       }
 
       const bookingData = {
