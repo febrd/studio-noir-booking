@@ -5,33 +5,29 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Package, Clock } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import PackageForm from '@/components/studio/PackageForm';
+import PackageCategoryForm from '@/components/studio/PackageCategoryForm';
 
-const PackagesPage = () => {
+const PackageCategoriesPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [editingPackage, setEditingPackage] = useState<any>(null);
-  const [deletingPackage, setDeletingPackage] = useState<any>(null);
+  const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [deletingCategory, setDeletingCategory] = useState<any>(null);
   const queryClient = useQueryClient();
 
-  const { data: packages, isLoading } = useQuery({
-    queryKey: ['studio-packages'],
+  const { data: categories, isLoading } = useQuery({
+    queryKey: ['package-categories'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('studio_packages')
+        .from('package_categories')
         .select(`
           *,
           studios (
             id,
             name,
             type
-          ),
-          package_categories (
-            id,
-            name
           )
         `)
         .order('created_at', { ascending: false });
@@ -41,51 +37,44 @@ const PackagesPage = () => {
     }
   });
 
-  const deletePackageMutation = useMutation({
-    mutationFn: async (packageId: string) => {
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (categoryId: string) => {
       const { error } = await supabase
-        .from('studio_packages')
+        .from('package_categories')
         .delete()
-        .eq('id', packageId);
+        .eq('id', categoryId);
       
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['studio-packages'] });
-      toast.success('Paket berhasil dihapus');
-      setDeletingPackage(null);
+      queryClient.invalidateQueries({ queryKey: ['package-categories'] });
+      toast.success('Kategori berhasil dihapus');
+      setDeletingCategory(null);
     },
     onError: (error) => {
-      console.error('Error deleting package:', error);
-      toast.error('Gagal menghapus paket');
+      console.error('Error deleting category:', error);
+      toast.error('Gagal menghapus kategori');
     }
   });
 
   const handleCreateSuccess = () => {
     setIsCreateDialogOpen(false);
-    queryClient.invalidateQueries({ queryKey: ['studio-packages'] });
+    queryClient.invalidateQueries({ queryKey: ['package-categories'] });
   };
 
   const handleEditSuccess = () => {
-    setEditingPackage(null);
-    queryClient.invalidateQueries({ queryKey: ['studio-packages'] });
+    setEditingCategory(null);
+    queryClient.invalidateQueries({ queryKey: ['package-categories'] });
   };
 
-  const handleDelete = (pkg: any) => {
-    setDeletingPackage(pkg);
+  const handleDelete = (category: any) => {
+    setDeletingCategory(category);
   };
 
   const confirmDelete = () => {
-    if (deletingPackage) {
-      deletePackageMutation.mutate(deletingPackage.id);
+    if (deletingCategory) {
+      deleteCategoryMutation.mutate(deletingCategory.id);
     }
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR'
-    }).format(price);
   };
 
   if (isLoading) {
@@ -94,7 +83,7 @@ const PackagesPage = () => {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="mt-2 text-gray-600">Loading packages...</p>
+            <p className="mt-2 text-gray-600">Loading categories...</p>
           </div>
         </div>
       </div>
@@ -105,53 +94,54 @@ const PackagesPage = () => {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Studio Packages</h1>
-          <p className="text-gray-600">Kelola paket studio dan pricing</p>
+          <h1 className="text-2xl font-bold text-gray-900">Package Categories</h1>
+          <p className="text-gray-600">Kelola kategori paket untuk studio reguler</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
-              Tambah Paket
+              Tambah Kategori
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Tambah Paket Baru</DialogTitle>
+              <DialogTitle>Tambah Kategori Baru</DialogTitle>
             </DialogHeader>
-            <PackageForm onSuccess={handleCreateSuccess} />
+            <PackageCategoryForm onSuccess={handleCreateSuccess} />
           </DialogContent>
         </Dialog>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {packages?.map((pkg) => (
-          <Card key={pkg.id} className="hover:shadow-lg transition-shadow">
+        {categories?.map((category) => (
+          <Card key={category.id} className="hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                    <Package className="h-6 w-6 text-blue-600" />
+                  <div className="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center">
+                    <Package className="h-6 w-6 text-purple-600" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">{pkg.title}</CardTitle>
-                    <Badge variant="outline" className="mt-1">
-                      {pkg.studios?.name}
-                    </Badge>
+                    <CardTitle className="text-lg">{category.name}</CardTitle>
+                    <div className="flex items-center gap-1 mt-1">
+                      <Building2 className="h-3 w-3 text-gray-500" />
+                      <span className="text-sm text-gray-600">{category.studios?.name}</span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-1">
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => setEditingPackage(pkg)}
+                    onClick={() => setEditingCategory(category)}
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => handleDelete(pkg)}
+                    onClick={() => handleDelete(category)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -160,30 +150,16 @@ const PackagesPage = () => {
             </CardHeader>
             <CardContent className="pt-0">
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-lg font-bold text-green-600">
-                    {formatPrice(pkg.price)}
-                  </span>
-                  <div className="flex items-center gap-1 text-sm text-gray-600">
-                    <Clock className="h-4 w-4" />
-                    {pkg.base_time_minutes} menit
-                  </div>
-                </div>
-                {pkg.description && (
-                  <p className="text-sm text-gray-600">{pkg.description}</p>
+                {category.description && (
+                  <p className="text-sm text-gray-600">{category.description}</p>
                 )}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant={pkg.studios?.type === 'self_photo' ? 'default' : 'secondary'}>
-                    {pkg.studios?.type === 'self_photo' ? 'Self Photo' : 'Regular'}
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">
+                    Studio Reguler
                   </Badge>
-                  {pkg.package_categories && (
-                    <Badge variant="outline" className="text-purple-600 border-purple-200">
-                      {pkg.package_categories.name}
-                    </Badge>
-                  )}
                 </div>
                 <p className="text-xs text-gray-500">
-                  Dibuat: {new Date(pkg.created_at).toLocaleDateString('id-ID')}
+                  Dibuat: {new Date(category.created_at).toLocaleDateString('id-ID')}
                 </p>
               </div>
             </CardContent>
@@ -191,27 +167,27 @@ const PackagesPage = () => {
         ))}
       </div>
 
-      {packages?.length === 0 && (
+      {categories?.length === 0 && (
         <div className="text-center py-12">
           <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Belum ada paket</h3>
-          <p className="text-gray-600 mb-4">Mulai dengan menambahkan paket studio pertama Anda</p>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Belum ada kategori</h3>
+          <p className="text-gray-600 mb-4">Mulai dengan menambahkan kategori paket untuk studio reguler</p>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Tambah Paket
+            Tambah Kategori
           </Button>
         </div>
       )}
 
       {/* Edit Dialog */}
-      <Dialog open={!!editingPackage} onOpenChange={() => setEditingPackage(null)}>
+      <Dialog open={!!editingCategory} onOpenChange={() => setEditingCategory(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Paket</DialogTitle>
+            <DialogTitle>Edit Kategori</DialogTitle>
           </DialogHeader>
-          {editingPackage && (
-            <PackageForm 
-              package={editingPackage} 
+          {editingCategory && (
+            <PackageCategoryForm 
+              category={editingCategory} 
               onSuccess={handleEditSuccess} 
             />
           )}
@@ -219,13 +195,13 @@ const PackagesPage = () => {
       </Dialog>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deletingPackage} onOpenChange={() => setDeletingPackage(null)}>
+      <AlertDialog open={!!deletingCategory} onOpenChange={() => setDeletingCategory(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Paket</AlertDialogTitle>
+            <AlertDialogTitle>Hapus Kategori</AlertDialogTitle>
             <AlertDialogDescription>
-              Apakah Anda yakin ingin menghapus paket "{deletingPackage?.title}"? 
-              Tindakan ini tidak dapat dibatalkan.
+              Apakah Anda yakin ingin menghapus kategori "{deletingCategory?.name}"? 
+              Tindakan ini tidak dapat dibatalkan dan akan mempengaruhi paket yang terkait.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -243,4 +219,4 @@ const PackagesPage = () => {
   );
 };
 
-export default PackagesPage;
+export default PackageCategoriesPage;

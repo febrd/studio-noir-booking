@@ -7,7 +7,8 @@ import {
   Receipt, 
   Calendar,
   Settings,
-  Package
+  Package,
+  FolderOpen
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -47,6 +48,12 @@ export const navigationConfig: NavigationItem[] = [
         name: 'Studios',
         href: '/studio/studios',
         icon: Building2,
+        allowedRoles: ['owner', 'admin']
+      },
+      {
+        name: 'Package Categories',
+        href: '/studio/categories',
+        icon: FolderOpen,
         allowedRoles: ['owner', 'admin']
       },
       {

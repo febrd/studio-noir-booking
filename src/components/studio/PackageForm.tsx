@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -17,12 +17,14 @@ interface PackageFormProps {
 const PackageForm = ({ package: pkg, onSuccess }: PackageFormProps) => {
   const [formData, setFormData] = useState({
     studio_id: pkg?.studio_id || '',
+    category_id: pkg?.category_id || '',
     title: pkg?.title || '',
     description: pkg?.description || '',
     price: pkg?.price || '',
     base_time_minutes: pkg?.base_time_minutes || ''
   });
 
+  const [selectedStudioType, setSelectedStudioType] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: studios } = useQuery({
@@ -39,6 +41,37 @@ const PackageForm = ({ package: pkg, onSuccess }: PackageFormProps) => {
     }
   });
 
+  const { data: categories } = useQuery({
+    queryKey: ['package-categories-for-studio', formData.studio_id],
+    queryFn: async () => {
+      if (!formData.studio_id) return [];
+      
+      const { data, error } = await supabase
+        .from('package_categories')
+        .select('id, name, description')
+        .eq('studio_id', formData.studio_id)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!formData.studio_id && selectedStudioType === 'regular'
+  });
+
+  // Update selected studio type when studio_id changes
+  useEffect(() => {
+    if (formData.studio_id && studios) {
+      const selectedStudio = studios.find(studio => studio.id === formData.studio_id);
+      if (selectedStudio) {
+        setSelectedStudioType(selectedStudio.type);
+        // Reset category_id if switching to self_photo studio
+        if (selectedStudio.type === 'self_photo') {
+          setFormData(prev => ({ ...prev, category_id: '' }));
+        }
+      }
+    }
+  }, [formData.studio_id, studios]);
+
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       const { error } = await supabase
@@ -46,7 +79,8 @@ const PackageForm = ({ package: pkg, onSuccess }: PackageFormProps) => {
         .insert([{
           ...data,
           price: parseFloat(data.price),
-          base_time_minutes: parseInt(data.base_time_minutes)
+          base_time_minutes: parseInt(data.base_time_minutes),
+          category_id: data.category_id || null
         }]);
       
       if (error) throw error;
@@ -68,7 +102,8 @@ const PackageForm = ({ package: pkg, onSuccess }: PackageFormProps) => {
         .update({
           ...data,
           price: parseFloat(data.price),
-          base_time_minutes: parseInt(data.base_time_minutes)
+          base_time_minutes: parseInt(data.base_time_minutes),
+          category_id: data.category_id || null
         })
         .eq('id', pkg.id);
       
@@ -86,6 +121,13 @@ const PackageForm = ({ package: pkg, onSuccess }: PackageFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation for regular studios
+    if (selectedStudioType === 'regular' && !formData.category_id) {
+      toast.error('Kategori paket wajib dipilih untuk studio reguler');
+      return;
+    }
+    
     setIsSubmitting(true);
 
     try {
@@ -106,6 +148,9 @@ const PackageForm = ({ package: pkg, onSuccess }: PackageFormProps) => {
     }));
   };
 
+  const isFormValid = formData.studio_id && 
+    (selectedStudioType === 'self_photo' || (selectedStudioType === 'regular' && formData.category_id));
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
@@ -123,6 +168,29 @@ const PackageForm = ({ package: pkg, onSuccess }: PackageFormProps) => {
           </SelectContent>
         </Select>
       </div>
+
+      {selectedStudioType === 'regular' && (
+        <div className="space-y-2">
+          <Label htmlFor="category_id">Kategori Paket *</Label>
+          <Select value={formData.category_id} onValueChange={(value) => handleInputChange('category_id', value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Pilih kategori paket" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories?.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {categories?.length === 0 && formData.studio_id && (
+            <p className="text-sm text-amber-600">
+              Belum ada kategori untuk studio ini. Silakan buat kategori terlebih dahulu.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="title">Nama Paket *</Label>
@@ -175,7 +243,7 @@ const PackageForm = ({ package: pkg, onSuccess }: PackageFormProps) => {
       </div>
 
       <div className="flex gap-2 pt-4">
-        <Button type="submit" disabled={isSubmitting || !formData.studio_id} className="flex-1">
+        <Button type="submit" disabled={isSubmitting || !isFormValid} className="flex-1">
           {isSubmitting ? 'Menyimpan...' : pkg ? 'Perbarui' : 'Tambah'}
         </Button>
       </div>

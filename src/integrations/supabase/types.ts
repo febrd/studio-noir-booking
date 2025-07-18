@@ -173,6 +173,41 @@ export type Database = {
           },
         ]
       }
+      package_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          studio_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          studio_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          studio_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_categories_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_providers: {
         Row: {
           client_id: string | null
@@ -212,6 +247,7 @@ export type Database = {
       studio_packages: {
         Row: {
           base_time_minutes: number
+          category_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -222,6 +258,7 @@ export type Database = {
         }
         Insert: {
           base_time_minutes: number
+          category_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -232,6 +269,7 @@ export type Database = {
         }
         Update: {
           base_time_minutes?: number
+          category_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -241,6 +279,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "studio_packages_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "package_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "studio_packages_studio_id_fkey"
             columns: ["studio_id"]
