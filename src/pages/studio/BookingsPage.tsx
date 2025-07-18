@@ -11,6 +11,9 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BookingForm from '@/components/studio/BookingForm';
+import type { Database } from '@/integrations/supabase/types';
+
+type BookingStatus = Database['public']['Enums']['booking_status'];
 
 const BookingsPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -64,7 +67,7 @@ const BookingsPage = () => {
       }
 
       if (selectedStatus !== 'all') {
-        query = query.eq('status', selectedStatus);
+        query = query.eq('status', selectedStatus as BookingStatus);
       }
       
       const { data, error } = await query;
@@ -251,10 +254,10 @@ const BookingsPage = () => {
                 
                 <div className="space-y-2">
                   <p className="text-sm">
-                    <span className="font-medium">Studio:</span> {booking.studios?.name}
+                    <span className="font-medium">Studio:</span> {booking.studios?.name || 'N/A'}
                   </p>
                   <p className="text-sm">
-                    <span className="font-medium">Paket:</span> {booking.studio_packages?.title}
+                    <span className="font-medium">Paket:</span> {booking.studio_packages?.title || 'N/A'}
                   </p>
                   <p className="text-sm">
                     <span className="font-medium">Tipe:</span> {' '}
