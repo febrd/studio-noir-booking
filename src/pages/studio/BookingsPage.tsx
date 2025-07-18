@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,8 +54,8 @@ const BookingsPage = () => {
   
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all' | ''>('');
-  const [studioFilter, setStudioFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all' | ''>('all');
+  const [studioFilter, setStudioFilter] = useState<string | 'all'>('all');
   
   // Debounced search for better performance
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -78,7 +77,7 @@ const BookingsPage = () => {
     }
   });
 
-  // Enhanced query with manual joins for better performance
+  // Enhanced query with explicit joins
   const { data: bookings, isLoading } = useQuery({
     queryKey: ['bookings-enhanced', debouncedSearchQuery, statusFilter, studioFilter],
     queryFn: async () => {
@@ -88,69 +87,110 @@ const BookingsPage = () => {
         studioFilter 
       });
       
-      // First, get bookings with basic filters
-      let bookingsQuery = supabase
+      let query = supabase
         .from('bookings')
         .select(`
-          *,
-          users!inner(name, email),
-          studio_packages(title, price),
-          studios(name, type),
-          package_categories(name)
+          id,
+          user_id,
+          studio_id,
+          studio_package_id,
+          package_category_id,
+          start_time,
+          end_time,
+          additional_time_minutes,
+          total_amount,
+          status,
+          payment_method,
+          type,
+          created_at,
+          updated_at
         `)
         .order('created_at', { ascending: false });
 
-      // Apply status filter (exclude 'all' option)
+      // Apply status filter (exclude 'all' option and empty string)
       if (statusFilter && statusFilter !== 'all' && statusFilter !== '') {
-        bookingsQuery = bookingsQuery.eq('status', statusFilter);
+        query = query.eq('status', statusFilter);
       }
 
       // Apply studio filter (exclude 'all' option)
       if (studioFilter && studioFilter !== 'all' && studioFilter !== '') {
-        bookingsQuery = bookingsQuery.eq('studio_id', studioFilter);
+        query = query.eq('studio_id', studioFilter);
       }
       
-      const { data: bookingsData, error: bookingsError } = await bookingsQuery;
+      const { data: bookingsData, error: bookingsError } = await query;
       
       if (bookingsError) {
         console.error('Error fetching bookings:', bookingsError);
         throw bookingsError;
       }
 
-      // Filter by search query on the client side for now
-      let filteredBookings = bookingsData || [];
-      if (debouncedSearchQuery.trim()) {
-        const searchLower = debouncedSearchQuery.toLowerCase();
-        filteredBookings = filteredBookings.filter(booking => 
-          booking.users?.name?.toLowerCase().includes(searchLower) ||
-          booking.users?.email?.toLowerCase().includes(searchLower)
-        );
+      if (!bookingsData || bookingsData.length === 0) {
+        return [];
       }
 
-      // Transform the data to match our interface
-      const transformedBookings = filteredBookings.map(booking => ({
-        id: booking.id,
-        user_id: booking.user_id,
-        studio_id: booking.studio_id,
-        studio_package_id: booking.studio_package_id,
-        package_category_id: booking.package_category_id,
-        start_time: booking.start_time,
-        end_time: booking.end_time,
-        additional_time_minutes: booking.additional_time_minutes,
-        total_amount: booking.total_amount,
-        status: booking.status,
-        payment_method: booking.payment_method,
-        type: booking.type,
-        created_at: booking.created_at,
-        updated_at: booking.updated_at,
-        customer_name: booking.users?.name || 'Unknown',
-        customer_email: booking.users?.email || 'Unknown',
-        package_title: booking.studio_packages?.title,
-        package_price: booking.studio_packages?.price,
-        studio_name: booking.studios?.name || 'Unknown Studio',
-        studio_type: booking.studios?.type || 'regular',
-        category_name: booking.package_categories?.name
-      }));
+      // Get unique user IDs, studio IDs, and package IDs for batch fetching
+      const userIds = [...new Set(bookingsData.map(b => b.user_id))];
+      const studioIds = [...new Set(bookingsData.map(b => b.studio_id))];
+      const packageIds = [...new Set(bookingsData.map(b => b.studio_package_id))];
+      const categoryIds = [...new Set(bookingsData.map(b => b.package_category_id).filter(Boolean))];
+
+      // Fetch users
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .in('id', userIds);
+
+      // Fetch studios
+      const { data: studiosData } = await supabase
+        .from('studios')
+        .select('id, name, type')
+        .in('id', studioIds);
+
+      // Fetch packages
+      const { data: packagesData } = await supabase
+        .from('studio_packages')
+        .select('id, title, price')
+        .in('id', packageIds);
+
+      // Fetch categories
+      const { data: categoriesData } = categoryIds.length > 0 ? await supabase
+        .from('package_categories')
+        .select('id, name')
+        .in('id', categoryIds) : { data: [] };
+
+      // Create lookup maps
+      const usersMap = new Map(usersData?.map(u => [u.id, u]) || []);
+      const studiosMap = new Map(studiosData?.map(s => [s.id, s]) || []);
+      const packagesMap = new Map(packagesData?.map(p => [p.id, p]) || []);
+      const categoriesMap = new Map(categoriesData?.map(c => [c.id, c]) || []);
+
+      // Transform and filter the data
+      let transformedBookings = bookingsData.map(booking => {
+        const user = usersMap.get(booking.user_id);
+        const studio = studiosMap.get(booking.studio_id);
+        const packageInfo = packagesMap.get(booking.studio_package_id);
+        const category = booking.package_category_id ? categoriesMap.get(booking.package_category_id) : null;
+
+        return {
+          ...booking,
+          customer_name: user?.name || 'Unknown',
+          customer_email: user?.email || 'Unknown',
+          package_title: packageInfo?.title || 'Package tidak ditemukan',
+          package_price: packageInfo?.price || 0,
+          studio_name: studio?.name || 'Unknown Studio',
+          studio_type: studio?.type || 'regular',
+          category_name: category?.name || undefined
+        };
+      });
+
+      // Apply search filter on the client side
+      if (debouncedSearchQuery.trim()) {
+        const searchLower = debouncedSearchQuery.toLowerCase();
+        transformedBookings = transformedBookings.filter(booking => 
+          booking.customer_name.toLowerCase().includes(searchLower) ||
+          booking.customer_email.toLowerCase().includes(searchLower)
+        );
+      }
 
       console.log('Transformed bookings:', transformedBookings);
       return transformedBookings as BookingWithDetails[];
@@ -298,8 +338,8 @@ const BookingsPage = () => {
   // Clear filters function
   const clearFilters = () => {
     setSearchQuery('');
-    setStatusFilter('');
-    setStudioFilter('');
+    setStatusFilter('all');
+    setStudioFilter('all');
   };
 
   if (isLoading) {
@@ -368,7 +408,7 @@ const BookingsPage = () => {
             
             <div className="space-y-2">
               <label className="text-sm font-medium">Status</label>
-              <Select value={statusFilter || ''} onValueChange={(value) => setStatusFilter(value as BookingStatus | 'all' | '')}>
+              <Select value={statusFilter || 'all'} onValueChange={(value) => setStatusFilter(value as BookingStatus | 'all' | '')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Semua status" />
                 </SelectTrigger>
@@ -386,7 +426,7 @@ const BookingsPage = () => {
             
             <div className="space-y-2">
               <label className="text-sm font-medium">Studio</label>
-              <Select value={studioFilter || ''} onValueChange={setStudioFilter}>
+              <Select value={studioFilter || 'all'} onValueChange={setStudioFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Semua studio" />
                 </SelectTrigger>
@@ -552,13 +592,13 @@ const BookingsPage = () => {
           <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Belum ada booking</h3>
           <p className="text-gray-600 mb-4">
-            {searchQuery || statusFilter || studioFilter 
+            {searchQuery || statusFilter !== 'all' || studioFilter !== 'all'
               ? "Tidak ada booking yang sesuai dengan filter yang dipilih"
               : "Mulai dengan menambahkan booking pertama Anda"
             }
           </p>
           <div className="space-y-2">
-            {(searchQuery || statusFilter || studioFilter) && (
+            {(searchQuery || statusFilter !== 'all' || studioFilter !== 'all') && (
               <Button variant="outline" onClick={clearFilters}>
                 Reset Filter
               </Button>
