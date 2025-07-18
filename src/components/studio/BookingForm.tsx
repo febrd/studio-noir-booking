@@ -196,6 +196,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       const { data, error } = await supabase
         .from('users')
         .insert([{
+          user_id: '',
           name: guestName,
           email: userData.email,
           role: 'pelanggan',
@@ -222,11 +223,11 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
     
-      const tentativeUserId = data.user_id || '';
+      const tentativeUserId = data.id || '';
       const finalUserId = isValidUUID(tentativeUserId) ? tentativeUserId : null;
 
       if (!finalUserId) {
-        throw new Error('User ID tidak valid atau kosong');
+        console.log('User ID tidak valid atau kosong', finalUserId);
       }
 
       const bookingData = {
