@@ -34,6 +34,14 @@ const isValidUUID = (uuid: string): boolean => {
 };
 
 const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
+
+  function formatDatetimeLocal(value: string): string {
+    const date = new Date(value);
+    const offset = date.getTimezoneOffset(); // in minutes
+    const localDate = new Date(date.getTime() - offset * 60 * 1000); // shift to local time
+    return localDate.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
+  }
+  
   const { userProfile } = useJWTAuth();
 
   const [formData, setFormData] = useState({
@@ -681,10 +689,11 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           <Input
             id="start_time"
             type="datetime-local"
-            value={formData.start_time}
+            value={formData.start_time ? formatDatetimeLocal(formData.start_time) : ''}
             onChange={(e) => handleInputChange('start_time', e.target.value)}
             required
           />
+
         </div>
         
         <div className="space-y-2">
