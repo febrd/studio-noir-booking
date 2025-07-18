@@ -241,6 +241,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         type: data.type,
         status: data.status,
         total_amount: totalPrice,
+        performed_by: userProfile.id,
       };
      
 
