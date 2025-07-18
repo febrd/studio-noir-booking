@@ -41,7 +41,7 @@ const JWTAuth = () => {
     e.preventDefault();
     
     if (!loginForm.email || !loginForm.password) {
-      setError('Email dan password harus diisi');
+      setError('Email/Whatsapp dan password harus diisi');
       return;
     }
 
@@ -133,13 +133,13 @@ const JWTAuth = () => {
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
+                    <Label htmlFor="login-email">Email/Whatsapp</Label>
                     <Input
                       id="login-email"
-                      type="email"
+                      type="text"
                       value={loginForm.email}
                       onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                      placeholder="email@contoh.com"
+                      placeholder="Email/Whatsapp Anda"
                       disabled={isSubmitting}
                       autoComplete="email"
                     />
@@ -159,13 +159,8 @@ const JWTAuth = () => {
                   
                   {/* Sample users info */}
                   <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
-                    <p className="font-medium mb-1">Akun Demo (password: password123):</p>
-                    <ul className="space-y-1 text-xs">
-                      <li>• owner@studionoir.com (Owner)</li>
-                      <li>• admin@studionoir.com (Admin)</li>
-                      <li>• keuangan@studionoir.com (Keuangan)</li>
-                      <li>• pelanggan@studionoir.com (Pelanggan)</li>
-                    </ul>
+                    <p className="font-medium mb-1">Gunakan Credentials yang terdaftar</p>
+                   
                   </div>
                   
                   <Button 
@@ -200,13 +195,13 @@ const JWTAuth = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-email">Email</Label>
+                    <Label htmlFor="register-email">Email/Whatsapp</Label>
                     <Input
                       id="register-email"
-                      type="email"
+                      type="text"
                       value={registerForm.email}
                       onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                      placeholder="email@contoh.com"
+                      placeholder="Email/Whatsapp Anda"
                       disabled={isSubmitting}
                       autoComplete="email"
                     />
