@@ -45,56 +45,95 @@ const BookingsPage = () => {
     }
   });
 
-  // Enhanced query with search and filters
+  // Enhanced query with search and filters - using separate queries to avoid relationship issues
   const { data: bookings, isLoading } = useQuery({
     queryKey: ['bookings', searchQuery, statusFilter, studioFilter],
     queryFn: async () => {
-      let query = supabase
+      console.log('Fetching bookings with filters:', { searchQuery, statusFilter, studioFilter });
+      
+      // First, get the basic booking data
+      let bookingsQuery = supabase
         .from('bookings')
         .select(`
           *,
-          users (
+          users!inner (
             id,
             name,
             email
           ),
-          studios (
+          studios!inner (
             id,
             name,
             type
-          ),
-          studio_packages (
-            id,
-            title,
-            price,
-            base_time_minutes
-          ),
-          package_categories (
-            id,
-            name
           )
         `)
         .order('created_at', { ascending: false });
 
       // Apply search filter for user name/email
       if (searchQuery.trim()) {
-        query = query.or(`users.name.ilike.%${searchQuery}%,users.email.ilike.%${searchQuery}%`);
+        bookingsQuery = bookingsQuery.or(`users.name.ilike.%${searchQuery}%,users.email.ilike.%${searchQuery}%`);
       }
 
       // Apply status filter with proper typing
       if (statusFilter) {
-        query = query.eq('status', statusFilter as BookingStatus);
+        bookingsQuery = bookingsQuery.eq('status', statusFilter);
       }
 
       // Apply studio filter
       if (studioFilter) {
-        query = query.eq('studio_id', studioFilter);
+        bookingsQuery = bookingsQuery.eq('studio_id', studioFilter);
       }
       
-      const { data, error } = await query;
+      const { data: bookingsData, error: bookingsError } = await bookingsQuery;
       
-      if (error) throw error;
-      return data;
+      if (bookingsError) {
+        console.error('Error fetching bookings:', bookingsError);
+        throw bookingsError;
+      }
+
+      // Then get studio packages and package categories separately
+      const packageIds = [...new Set(bookingsData?.map(b => b.studio_package_id).filter(Boolean))];
+      const categoryIds = [...new Set(bookingsData?.map(b => b.package_category_id).filter(Boolean))];
+
+      let studioPackages: any[] = [];
+      let packageCategories: any[] = [];
+
+      if (packageIds.length > 0) {
+        const { data: packagesData, error: packagesError } = await supabase
+          .from('studio_packages')
+          .select('*')
+          .in('id', packageIds);
+        
+        if (!packagesError) {
+          studioPackages = packagesData || [];
+        }
+      }
+
+      if (categoryIds.length > 0) {
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('package_categories')
+          .select('*')
+          .in('id', categoryIds);
+        
+        if (!categoriesError) {
+          packageCategories = categoriesData || [];
+        }
+      }
+
+      // Merge the data
+      const enrichedBookings = bookingsData?.map(booking => {
+        const studioPackage = studioPackages.find(pkg => pkg.id === booking.studio_package_id);
+        const packageCategory = packageCategories.find(cat => cat.id === booking.package_category_id);
+        
+        return {
+          ...booking,
+          studio_packages: studioPackage,
+          package_categories: packageCategory
+        };
+      });
+
+      console.log('Fetched bookings:', enrichedBookings);
+      return enrichedBookings;
     }
   });
 
@@ -258,7 +297,7 @@ const BookingsPage = () => {
                   <SelectValue placeholder="Semua status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Semua status</SelectItem>
+                  <SelectItem value="all">Semua status</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="confirmed">Confirmed</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
@@ -276,7 +315,7 @@ const BookingsPage = () => {
                   <SelectValue placeholder="Semua studio" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Semua studio</SelectItem>
+                  <SelectItem value="all">Semua studio</SelectItem>
                   {studios?.map((studio) => (
                     <SelectItem key={studio.id} value={studio.id}>
                       {studio.name}
