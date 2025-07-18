@@ -88,7 +88,12 @@ const JWTAuth = () => {
       setError(result.error || 'Registrasi gagal');
     } else {
       setSuccess('Registrasi berhasil! Anda Akan Diarahkan ke Halaman Login...');
+      const loginResult = await signIn(registerForm.email, registerForm.password);
+      if (!loginResult.success) {
+        setError('Registrasi berhasil tapi gagal login otomatis. Silakan login manual.');
+      }
       setRegisterForm({ name: '', email: '', password: '', confirmPassword: '' });
+
     }
     
     setIsSubmitting(false);
