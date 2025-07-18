@@ -215,6 +215,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       console.error('Error creating guest user:', error);
       toast.error('Gagal membuat user guest');
     }
+    
   });
 
   // Create/Update booking mutation - FIXED: Better error handling
@@ -244,6 +245,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         performed_by: userProfile.id,
       };
      
+      console.log("== Inserted guest user data:", data);
 
       console.log('🔧 BookingData to save:', bookingData);
       console.log('📦 userProfile:', userProfile);
