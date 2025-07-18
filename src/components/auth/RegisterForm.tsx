@@ -82,13 +82,13 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="register-email">Email</Label>
+        <Label htmlFor="register-email">Nomor Whatsapp</Label>
         <Input
           id="register-email"
-          type="email"
+          type="number"
           value={registerForm.email}
           onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-          placeholder="email@contoh.com"
+          placeholder="628xxxxxx"
           disabled={isSubmitting}
           autoComplete="email"
         />
