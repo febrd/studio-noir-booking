@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,7 +55,7 @@ const BookingsPage = () => {
   
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all' | ''>('all');
+  const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all'>('all');
   const [studioFilter, setStudioFilter] = useState<string | 'all'>('all');
   
   // Debounced search for better performance
@@ -107,13 +108,13 @@ const BookingsPage = () => {
         `)
         .order('created_at', { ascending: false });
 
-      // Apply status filter (exclude 'all' option and empty string)
-      if (statusFilter && statusFilter !== 'all' && statusFilter !== '') {
+      // Apply status filter (exclude 'all' option)
+      if (statusFilter && statusFilter !== 'all') {
         query = query.eq('status', statusFilter);
       }
 
       // Apply studio filter (exclude 'all' option)
-      if (studioFilter && studioFilter !== 'all' && studioFilter !== '') {
+      if (studioFilter && studioFilter !== 'all') {
         query = query.eq('studio_id', studioFilter);
       }
       
@@ -158,11 +159,18 @@ const BookingsPage = () => {
         .select('id, name')
         .in('id', categoryIds) : { data: [] };
 
-      // Create lookup maps
-      const usersMap = new Map(usersData?.map(u => [u.id, u]) || []);
-      const studiosMap = new Map(studiosData?.map(s => [s.id, s]) || []);
-      const packagesMap = new Map(packagesData?.map(p => [p.id, p]) || []);
-      const categoriesMap = new Map(categoriesData?.map(c => [c.id, c]) || []);
+      // Create lookup maps with proper typing
+      const usersMap = new Map<string, any>();
+      usersData?.forEach(u => usersMap.set(u.id, u));
+      
+      const studiosMap = new Map<string, any>();
+      studiosData?.forEach(s => studiosMap.set(s.id, s));
+      
+      const packagesMap = new Map<string, any>();
+      packagesData?.forEach(p => packagesMap.set(p.id, p));
+      
+      const categoriesMap = new Map<string, any>();
+      categoriesData?.forEach(c => categoriesMap.set(c.id, c));
 
       // Transform and filter the data
       let transformedBookings = bookingsData.map(booking => {
@@ -408,7 +416,7 @@ const BookingsPage = () => {
             
             <div className="space-y-2">
               <label className="text-sm font-medium">Status</label>
-              <Select value={statusFilter || 'all'} onValueChange={(value) => setStatusFilter(value as BookingStatus | 'all' | '')}>
+              <Select value={statusFilter || 'all'} onValueChange={(value) => setStatusFilter(value as BookingStatus | 'all')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Semua status" />
                 </SelectTrigger>
