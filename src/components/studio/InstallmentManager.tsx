@@ -208,7 +208,7 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Plus className="h-5 w-5" />
-              Tambah Cicilan
+              Tambah Pelunasan
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -261,7 +261,7 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
                 disabled={addInstallmentMutation.isPending}
                 className="w-full"
               >
-                {addInstallmentMutation.isPending ? 'Menyimpan...' : 'Tambah Cicilan'}
+                {addInstallmentMutation.isPending ? 'Menyimpan...' : 'Tambah Pelunasan'}
               </Button>
             </form>
           </CardContent>
