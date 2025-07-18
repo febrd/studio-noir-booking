@@ -84,6 +84,54 @@ export type Database = {
           },
         ]
       }
+      booking_logs: {
+        Row: {
+          action_type: string
+          booking_id: string
+          created_at: string | null
+          id: string
+          new_data: Json | null
+          note: string | null
+          old_data: Json | null
+          performed_by: string
+        }
+        Insert: {
+          action_type: string
+          booking_id: string
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          note?: string | null
+          old_data?: Json | null
+          performed_by: string
+        }
+        Update: {
+          action_type?: string
+          booking_id?: string
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          note?: string | null
+          old_data?: Json | null
+          performed_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_logs_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_logs_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_sessions: {
         Row: {
           additional_time_minutes: number | null
@@ -201,24 +249,33 @@ export type Database = {
           booking_id: string
           created_at: string
           id: string
+          installment_number: number | null
           note: string | null
           paid_at: string
+          payment_method: string | null
+          performed_by: string | null
         }
         Insert: {
           amount: number
           booking_id: string
           created_at?: string
           id?: string
+          installment_number?: number | null
           note?: string | null
           paid_at?: string
+          payment_method?: string | null
+          performed_by?: string | null
         }
         Update: {
           amount?: number
           booking_id?: string
           created_at?: string
           id?: string
+          installment_number?: number | null
           note?: string | null
           paid_at?: string
+          payment_method?: string | null
+          performed_by?: string | null
         }
         Relationships: [
           {
@@ -226,6 +283,13 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installments_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -435,30 +499,42 @@ export type Database = {
           amount: number
           booking_id: string
           created_at: string
+          description: string | null
           id: string
           payment_provider_id: string | null
           payment_type: Database["public"]["Enums"]["payment_type"]
+          performed_by: string | null
+          reference_id: string | null
           status: Database["public"]["Enums"]["transaction_status"]
+          type: string | null
           updated_at: string
         }
         Insert: {
           amount: number
           booking_id: string
           created_at?: string
+          description?: string | null
           id?: string
           payment_provider_id?: string | null
           payment_type: Database["public"]["Enums"]["payment_type"]
+          performed_by?: string | null
+          reference_id?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
+          type?: string | null
           updated_at?: string
         }
         Update: {
           amount?: number
           booking_id?: string
           created_at?: string
+          description?: string | null
           id?: string
           payment_provider_id?: string | null
           payment_type?: Database["public"]["Enums"]["payment_type"]
+          performed_by?: string | null
+          reference_id?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
+          type?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -474,6 +550,13 @@ export type Database = {
             columns: ["payment_provider_id"]
             isOneToOne: false
             referencedRelation: "payment_providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -529,6 +612,10 @@ export type Database = {
           exclude_booking_id?: string
         }
         Returns: boolean
+      }
+      get_booking_remaining_amount: {
+        Args: { booking_id_param: string }
+        Returns: number
       }
       get_current_user_role: {
         Args: Record<PropertyKey, never>

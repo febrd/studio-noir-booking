@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { CreditCard, Plus, Calendar } from 'lucide-react';
+import { CreditCard, Plus, Calendar, User } from 'lucide-react';
 
 interface InstallmentManagerProps {
   bookingId: string;
@@ -21,17 +22,36 @@ interface InstallmentManagerProps {
 const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }: InstallmentManagerProps) => {
   const [newInstallment, setNewInstallment] = useState({
     amount: '',
-    note: ''
+    note: '',
+    payment_method: 'offline'
   });
   const queryClient = useQueryClient();
 
-  // Fetch installments for this booking
+  // Get current user for tracking
+  const { data: currentUser } = useQuery({
+    queryKey: ['current-user'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .limit(1)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch installments for this booking with enhanced data
   const { data: installments, isLoading } = useQuery({
     queryKey: ['installments', bookingId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('installments')
-        .select('*')
+        .select(`
+          *,
+          users:performed_by(name, email)
+        `)
         .eq('booking_id', bookingId)
         .order('paid_at', { ascending: false });
       
@@ -40,15 +60,21 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
     }
   });
 
-  // Add installment mutation
+  // Add installment mutation with enhanced tracking
   const addInstallmentMutation = useMutation({
-    mutationFn: async (installmentData: { amount: number; note: string }) => {
+    mutationFn: async (installmentData: { amount: number; note: string; payment_method: string }) => {
+      if (!currentUser?.id) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase
         .from('installments')
         .insert([{
           booking_id: bookingId,
           amount: installmentData.amount,
-          note: installmentData.note
+          note: installmentData.note,
+          payment_method: installmentData.payment_method,
+          performed_by: currentUser.id
         }])
         .select()
         .single();
@@ -58,9 +84,10 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
     },
     onSuccess: () => {
       toast.success('Cicilan berhasil ditambahkan');
-      setNewInstallment({ amount: '', note: '' });
+      setNewInstallment({ amount: '', note: '', payment_method: 'offline' });
       queryClient.invalidateQueries({ queryKey: ['installments', bookingId] });
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings-enhanced'] });
+      queryClient.invalidateQueries({ queryKey: ['installment-summary'] });
       onSuccess?.();
     },
     onError: (error) => {
@@ -89,7 +116,8 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
     
     addInstallmentMutation.mutate({
       amount,
-      note: newInstallment.note
+      note: newInstallment.note,
+      payment_method: newInstallment.payment_method
     });
   };
 
@@ -113,13 +141,23 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
     }
   };
 
+  const getPaymentMethodBadge = (method: string) => {
+    const colors = {
+      offline: 'bg-gray-100 text-gray-800',
+      online: 'bg-blue-100 text-blue-800',
+      transfer: 'bg-green-100 text-green-800',
+      cash: 'bg-yellow-100 text-yellow-800'
+    };
+    return colors[method as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+  };
+
   if (isLoading) {
     return <div>Loading installments...</div>;
   }
 
   return (
     <div className="space-y-6">
-      {/* Payment Summary */}
+      {/* Enhanced Payment Summary */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -148,10 +186,14 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
               {currentStatus.toUpperCase()}
             </Badge>
           </div>
+          <div className="flex justify-between">
+            <span>Jumlah Cicilan:</span>
+            <span className="font-medium">{installments?.length || 0}x pembayaran</span>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Add New Installment */}
+      {/* Enhanced Add New Installment */}
       {!isFullyPaid && (
         <Card>
           <CardHeader>
@@ -174,6 +216,24 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
                   placeholder={`Maksimal: ${formatPrice(remainingAmount)}`}
                   required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment_method">Metode Pembayaran *</Label>
+                <Select 
+                  value={newInstallment.payment_method} 
+                  onValueChange={(value) => setNewInstallment(prev => ({ ...prev, payment_method: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih metode pembayaran" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="offline">Offline/Tunai</SelectItem>
+                    <SelectItem value="transfer">Transfer Bank</SelectItem>
+                    <SelectItem value="online">Online Payment</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="space-y-2">
@@ -199,31 +259,50 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
         </Card>
       )}
 
-      {/* Installment History */}
+      {/* Enhanced Installment History */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Riwayat Cicilan
+            Riwayat Cicilan ({installments?.length || 0})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {installments && installments.length > 0 ? (
             <div className="space-y-3">
               {installments.map((installment) => (
-                <div key={installment.id} className="flex justify-between items-start p-3 border rounded-lg">
-                  <div>
-                    <div className="font-semibold">{formatPrice(installment.amount)}</div>
-                    <div className="text-sm text-gray-600">
-                      {formatDateTime(installment.paid_at)}
+                <div key={installment.id} className="flex justify-between items-start p-4 border rounded-lg bg-gray-50">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-semibold text-lg">{formatPrice(installment.amount)}</span>
+                      <Badge className={getPaymentMethodBadge(installment.payment_method)}>
+                        {installment.payment_method}
+                      </Badge>
+                      {installment.installment_number && (
+                        <Badge variant="outline">
+                          Cicilan #{installment.installment_number}
+                        </Badge>
+                      )}
                     </div>
-                    {installment.note && (
-                      <div className="text-sm text-gray-500 mt-1">
-                        {installment.note}
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        <span>{formatDateTime(installment.paid_at)}</span>
                       </div>
-                    )}
+                      {installment.users && (
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          <span>Dicatat oleh: {installment.users.name}</span>
+                        </div>
+                      )}
+                      {installment.note && (
+                        <div className="text-gray-500 mt-1 italic">
+                          "{installment.note}"
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <Badge variant="outline" className="text-green-600">
+                  <Badge variant="outline" className="text-green-600 border-green-300">
                     Lunas
                   </Badge>
                 </div>

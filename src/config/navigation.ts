@@ -1,4 +1,3 @@
-
 import { 
   Home, 
   CreditCard, 
@@ -8,7 +7,12 @@ import {
   Calendar,
   Settings,
   Package,
-  FolderOpen
+  FolderOpen,
+  BarChart3,
+  Tags,
+  Plus,
+  DollarSign,
+  Activity
 } from 'lucide-react';
 
 export interface NavigationItem {
@@ -108,6 +112,49 @@ export const navigationConfig: NavigationItem[] = [
     icon: Calendar,
     allowedRoles: ['owner', 'admin', 'keuangan']
   }
+];
+
+export const studioManagementItems = [
+  {
+    title: "Dashboard",
+    url: "/studio",
+    icon: BarChart3,
+  },
+  {
+    title: "Studios",
+    url: "/studio/studios",
+    icon: Building2,
+  },
+  {
+    title: "Kategori Paket",
+    url: "/studio/categories",
+    icon: Tags,
+  },
+  {
+    title: "Paket Studio",
+    url: "/studio/packages",
+    icon: Package,
+  },
+  {
+    title: "Layanan Tambahan",
+    url: "/studio/services",
+    icon: Plus,
+  },
+  {
+    title: "Bookings",
+    url: "/studio/bookings",
+    icon: Calendar,
+  },
+  {
+    title: "Transaksi Offline",
+    url: "/studio/transactions",
+    icon: DollarSign,
+  },
+  {
+    title: "Log Aktivitas",
+    url: "/studio/logs",
+    icon: Activity,
+  },
 ];
 
 export const getAccessibleNavigation = (userRole: string): NavigationItem[] => {

@@ -7,6 +7,8 @@ import PackagesPage from './PackagesPage';
 import ServicesPage from './ServicesPage';
 import BookingsPage from './BookingsPage';
 import StudioDashboard from './StudioDashboard';
+import OfflineTransactionsPage from './OfflineTransactionsPage';
+import BookingLogsPage from './BookingLogsPage';
 
 const StudioManagement = () => {
   return (
@@ -18,6 +20,8 @@ const StudioManagement = () => {
         <Route path="packages" element={<PackagesPage />} />
         <Route path="services" element={<ServicesPage />} />
         <Route path="bookings" element={<BookingsPage />} />
+        <Route path="transactions" element={<OfflineTransactionsPage />} />
+        <Route path="logs" element={<BookingLogsPage />} />
       </Routes>
     </ModernLayout>
   );
