@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,7 +55,7 @@ const BookingsPage = () => {
   
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<BookingStatus | ''>('');
+  const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all' | ''>('');
   const [studioFilter, setStudioFilter] = useState('');
   
   // Debounced search for better performance
@@ -77,7 +78,7 @@ const BookingsPage = () => {
     }
   });
 
-  // Enhanced query using the new database view for better performance
+  // Enhanced query with manual joins for better performance
   const { data: bookings, isLoading } = useQuery({
     queryKey: ['bookings-enhanced', debouncedSearchQuery, statusFilter, studioFilter],
     queryFn: async () => {
@@ -87,36 +88,72 @@ const BookingsPage = () => {
         studioFilter 
       });
       
-      // Use the new view for better performance and complete data
-      let query = supabase
-        .from('bookings_with_user_info')
-        .select('*')
+      // First, get bookings with basic filters
+      let bookingsQuery = supabase
+        .from('bookings')
+        .select(`
+          *,
+          users!inner(name, email),
+          studio_packages(title, price),
+          studios(name, type),
+          package_categories(name)
+        `)
         .order('created_at', { ascending: false });
 
-      // Apply search filter for customer name/email using the view columns
+      // Apply status filter (exclude 'all' option)
+      if (statusFilter && statusFilter !== 'all' && statusFilter !== '') {
+        bookingsQuery = bookingsQuery.eq('status', statusFilter);
+      }
+
+      // Apply studio filter (exclude 'all' option)
+      if (studioFilter && studioFilter !== 'all' && studioFilter !== '') {
+        bookingsQuery = bookingsQuery.eq('studio_id', studioFilter);
+      }
+      
+      const { data: bookingsData, error: bookingsError } = await bookingsQuery;
+      
+      if (bookingsError) {
+        console.error('Error fetching bookings:', bookingsError);
+        throw bookingsError;
+      }
+
+      // Filter by search query on the client side for now
+      let filteredBookings = bookingsData || [];
       if (debouncedSearchQuery.trim()) {
-        query = query.or(`customer_name.ilike.%${debouncedSearchQuery}%,customer_email.ilike.%${debouncedSearchQuery}%`);
+        const searchLower = debouncedSearchQuery.toLowerCase();
+        filteredBookings = filteredBookings.filter(booking => 
+          booking.users?.name?.toLowerCase().includes(searchLower) ||
+          booking.users?.email?.toLowerCase().includes(searchLower)
+        );
       }
 
-      // Apply status filter
-      if (statusFilter && statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
+      // Transform the data to match our interface
+      const transformedBookings = filteredBookings.map(booking => ({
+        id: booking.id,
+        user_id: booking.user_id,
+        studio_id: booking.studio_id,
+        studio_package_id: booking.studio_package_id,
+        package_category_id: booking.package_category_id,
+        start_time: booking.start_time,
+        end_time: booking.end_time,
+        additional_time_minutes: booking.additional_time_minutes,
+        total_amount: booking.total_amount,
+        status: booking.status,
+        payment_method: booking.payment_method,
+        type: booking.type,
+        created_at: booking.created_at,
+        updated_at: booking.updated_at,
+        customer_name: booking.users?.name || 'Unknown',
+        customer_email: booking.users?.email || 'Unknown',
+        package_title: booking.studio_packages?.title,
+        package_price: booking.studio_packages?.price,
+        studio_name: booking.studios?.name || 'Unknown Studio',
+        studio_type: booking.studios?.type || 'regular',
+        category_name: booking.package_categories?.name
+      }));
 
-      // Apply studio filter
-      if (studioFilter && studioFilter !== 'all') {
-        query = query.eq('studio_id', studioFilter);
-      }
-      
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Error fetching bookings:', error);
-        throw error;
-      }
-
-      console.log('Fetched bookings from view:', data);
-      return data as BookingWithDetails[];
+      console.log('Transformed bookings:', transformedBookings);
+      return transformedBookings as BookingWithDetails[];
     }
   });
 
@@ -127,18 +164,41 @@ const BookingsPage = () => {
       if (!bookings?.length) return {};
       
       const bookingIds = bookings.map(b => b.id);
-      const { data, error } = await supabase
-        .from('booking_with_installments')
-        .select('id, total_paid, remaining_amount, installment_count, payment_status')
-        .in('id', bookingIds);
+      
+      // Get installments for all bookings
+      const { data: installments, error } = await supabase
+        .from('installments')
+        .select('booking_id, amount')
+        .in('booking_id', bookingIds);
       
       if (error) throw error;
       
-      // Convert to object for easy lookup
-      return data?.reduce((acc, item) => {
-        acc[item.id] = item;
-        return acc;
-      }, {} as Record<string, any>) || {};
+      // Calculate totals for each booking
+      const summary: Record<string, any> = {};
+      
+      bookings.forEach(booking => {
+        const bookingInstallments = installments?.filter(i => i.booking_id === booking.id) || [];
+        const totalPaid = bookingInstallments.reduce((sum, inst) => sum + (inst.amount || 0), 0);
+        const remainingAmount = (booking.total_amount || 0) - totalPaid;
+        const installmentCount = bookingInstallments.length;
+        
+        let paymentStatus: BookingStatus = booking.status;
+        if (totalPaid >= (booking.total_amount || 0)) {
+          paymentStatus = 'paid';
+        } else if (totalPaid > 0) {
+          paymentStatus = 'installment';
+        }
+        
+        summary[booking.id] = {
+          id: booking.id,
+          total_paid: totalPaid,
+          remaining_amount: remainingAmount,
+          installment_count: installmentCount,
+          payment_status: paymentStatus
+        };
+      });
+      
+      return summary;
     },
     enabled: !!bookings?.length
   });
@@ -308,7 +368,7 @@ const BookingsPage = () => {
             
             <div className="space-y-2">
               <label className="text-sm font-medium">Status</label>
-              <Select value={statusFilter} onValueChange={(value: BookingStatus | '') => setStatusFilter(value)}>
+              <Select value={statusFilter || ''} onValueChange={(value) => setStatusFilter(value as BookingStatus | 'all' | '')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Semua status" />
                 </SelectTrigger>
@@ -326,7 +386,7 @@ const BookingsPage = () => {
             
             <div className="space-y-2">
               <label className="text-sm font-medium">Studio</label>
-              <Select value={studioFilter} onValueChange={setStudioFilter}>
+              <Select value={studioFilter || ''} onValueChange={setStudioFilter}>
                 <SelectTrigger>
                   <SelectValue placeholder="Semua studio" />
                 </SelectTrigger>
