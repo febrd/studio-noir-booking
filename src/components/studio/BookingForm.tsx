@@ -219,13 +219,15 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         end_time: endTime
       };
   
-      console.log('Saving booking with data:', bookingData);
+      console.log('🔧 BookingData to save:', bookingData);
+      console.log('📦 userProfile:', userProfile);
+      console.log('📝 incoming data parameter:', data);
   
       let result;
       let oldData: any = null;
   
       if (booking?.id) {
-        // Ambil data lama untuk log
+        // Ambil data lama
         const { data: existing, error: fetchError } = await supabase
           .from('bookings')
           .select('*')
@@ -233,9 +235,10 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           .single();
   
         if (fetchError) {
-          console.warn('Gagal mengambil data lama:', fetchError);
+          console.warn('⚠️ Gagal mengambil data lama:', fetchError);
         } else {
           oldData = existing;
+          console.log('📜 Old booking data:', oldData);
         }
   
         // Update booking
@@ -247,7 +250,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           .single();
   
         if (error) {
-          console.error('Error updating booking:', error);
+          console.error('❌ Error updating booking:', error);
           throw error;
         }
   
@@ -261,14 +264,16 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           .single();
   
         if (error) {
-          console.error('Error creating booking:', error);
+          console.error('❌ Error creating booking:', error);
           throw error;
         }
   
         result = newBooking;
       }
   
-      // Log aktivitas ke booking_logs
+      console.log('✅ Final saved booking result:', result);
+  
+      // Logging aktivitas
       if (userProfile?.id && ['admin', 'owner'].includes(userProfile.role)) {
         const isUpdate = Boolean(booking?.id);
         const logPayload = {
@@ -280,19 +285,22 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           ...(isUpdate && { new_data: result }),
         };
   
+        console.log('🧾 Log payload to insert:', logPayload);
+  
         const { error: logError } = await supabase
           .from('booking_logs')
           .insert([logPayload]);
   
         if (logError) {
-          console.error('Error inserting booking log:', logError);
+          console.error('⚠️ Error inserting booking log:', logError);
           toast.warning('Booking disimpan tapi gagal mencatat log.');
         }
+      } else {
+        console.warn('⚠️ Tidak mencatat log: userProfile belum siap atau tidak memiliki izin.');
       }
   
-      // Handle additional services
+      // Additional services
       if (selectedServices.length > 0) {
-        // Delete old services if updating
         if (booking?.id) {
           await supabase
             .from('booking_additional_services')
@@ -300,7 +308,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
             .eq('booking_id', booking.id);
         }
   
-        // Insert new services
         const serviceData = selectedServices.map(service => ({
           booking_id: result.id,
           additional_service_id: service.id,
@@ -308,12 +315,14 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           total_price: service.price * service.quantity
         }));
   
+        console.log('🧩 Additional services to insert:', serviceData);
+  
         const { error: serviceError } = await supabase
           .from('booking_additional_services')
           .insert(serviceData);
   
         if (serviceError) {
-          console.error('Error creating additional services:', serviceError);
+          console.error('❌ Error creating additional services:', serviceError);
           throw serviceError;
         }
       }
@@ -327,11 +336,13 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     },
   
     onError: (error: any) => {
-      console.error('Error saving booking:', error);
+      console.error('❌ Error saving booking:', error);
       let errorMessage = 'Gagal menyimpan booking';
   
       if (error.code === '23503') {
         errorMessage = 'Error: Data yang dipilih tidak valid atau sudah dihapus';
+      } else if (error.code === '23502') {
+        errorMessage = 'Error: Ada kolom penting yang belum diisi (mungkin performed_by?)';
       } else if (error.message) {
         errorMessage = `Error booking: ${error.message}`;
       }
