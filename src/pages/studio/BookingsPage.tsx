@@ -74,17 +74,17 @@ const BookingsPage = () => {
           type,
           total_amount,
           created_at,
-          studios!inner (
+          studios (
             id,
             name,
             type
           ),
-          studio_packages!inner (
+          studio_packages (
             id,
             title,
             price
           ),
-          users!inner (
+          users (
             id,
             name,
             email
@@ -103,7 +103,7 @@ const BookingsPage = () => {
       const { data, error } = await query;
       
       if (error) throw error;
-      return data as BookingWithRelations[];
+      return data as unknown as BookingWithRelations[];
     }
   });
 
