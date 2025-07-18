@@ -13,8 +13,37 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import BookingForm from '@/components/studio/BookingForm';
 import InstallmentManager from '@/components/studio/InstallmentManager';
 import TimeExtensionManager from '@/components/studio/TimeExtensionManager';
+import { useDebounce } from '@/hooks/useDebounce';
 
 type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'paid' | 'expired' | 'failed' | 'installment';
+
+interface BookingWithDetails {
+  id: string;
+  user_id: string;
+  studio_id: string;
+  studio_package_id: string;
+  package_category_id?: string;
+  start_time?: string;
+  end_time?: string;
+  additional_time_minutes?: number;
+  total_amount?: number;
+  status: BookingStatus;
+  payment_method: string;
+  type: string;
+  created_at: string;
+  updated_at: string;
+  customer_name: string;
+  customer_email: string;
+  package_title?: string;
+  package_price?: number;
+  studio_name: string;
+  studio_type: string;
+  category_name?: string;
+  total_paid?: number;
+  remaining_amount?: number;
+  installment_count?: number;
+  payment_status?: BookingStatus;
+}
 
 const BookingsPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -23,10 +52,13 @@ const BookingsPage = () => {
   const [installmentBooking, setInstallmentBooking] = useState<any>(null);
   const [extendTimeBooking, setExtendTimeBooking] = useState<any>(null);
   
-  // Add search and filter states with proper typing
+  // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<BookingStatus | ''>('');
   const [studioFilter, setStudioFilter] = useState('');
+  
+  // Debounced search for better performance
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   
   const queryClient = useQueryClient();
 
@@ -45,96 +77,70 @@ const BookingsPage = () => {
     }
   });
 
-  // Enhanced query with search and filters - using separate queries to avoid relationship issues
+  // Enhanced query using the new database view for better performance
   const { data: bookings, isLoading } = useQuery({
-    queryKey: ['bookings', searchQuery, statusFilter, studioFilter],
+    queryKey: ['bookings-enhanced', debouncedSearchQuery, statusFilter, studioFilter],
     queryFn: async () => {
-      console.log('Fetching bookings with filters:', { searchQuery, statusFilter, studioFilter });
+      console.log('Fetching bookings with filters:', { 
+        searchQuery: debouncedSearchQuery, 
+        statusFilter, 
+        studioFilter 
+      });
       
-      // First, get the basic booking data
-      let bookingsQuery = supabase
-        .from('bookings')
-        .select(`
-          *,
-          users!inner (
-            id,
-            name,
-            email
-          ),
-          studios!inner (
-            id,
-            name,
-            type
-          )
-        `)
+      // Use the new view for better performance and complete data
+      let query = supabase
+        .from('bookings_with_user_info')
+        .select('*')
         .order('created_at', { ascending: false });
 
-      // Apply search filter for user name/email
-      if (searchQuery.trim()) {
-        bookingsQuery = bookingsQuery.or(`users.name.ilike.%${searchQuery}%,users.email.ilike.%${searchQuery}%`);
+      // Apply search filter for customer name/email using the view columns
+      if (debouncedSearchQuery.trim()) {
+        query = query.or(`customer_name.ilike.%${debouncedSearchQuery}%,customer_email.ilike.%${debouncedSearchQuery}%`);
       }
 
-      // Apply status filter with proper typing
-      if (statusFilter) {
-        bookingsQuery = bookingsQuery.eq('status', statusFilter);
+      // Apply status filter
+      if (statusFilter && statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
       }
 
       // Apply studio filter
-      if (studioFilter) {
-        bookingsQuery = bookingsQuery.eq('studio_id', studioFilter);
+      if (studioFilter && studioFilter !== 'all') {
+        query = query.eq('studio_id', studioFilter);
       }
       
-      const { data: bookingsData, error: bookingsError } = await bookingsQuery;
+      const { data, error } = await query;
       
-      if (bookingsError) {
-        console.error('Error fetching bookings:', bookingsError);
-        throw bookingsError;
+      if (error) {
+        console.error('Error fetching bookings:', error);
+        throw error;
       }
 
-      // Then get studio packages and package categories separately
-      const packageIds = [...new Set(bookingsData?.map(b => b.studio_package_id).filter(Boolean))];
-      const categoryIds = [...new Set(bookingsData?.map(b => b.package_category_id).filter(Boolean))];
-
-      let studioPackages: any[] = [];
-      let packageCategories: any[] = [];
-
-      if (packageIds.length > 0) {
-        const { data: packagesData, error: packagesError } = await supabase
-          .from('studio_packages')
-          .select('*')
-          .in('id', packageIds);
-        
-        if (!packagesError) {
-          studioPackages = packagesData || [];
-        }
-      }
-
-      if (categoryIds.length > 0) {
-        const { data: categoriesData, error: categoriesError } = await supabase
-          .from('package_categories')
-          .select('*')
-          .in('id', categoryIds);
-        
-        if (!categoriesError) {
-          packageCategories = categoriesData || [];
-        }
-      }
-
-      // Merge the data
-      const enrichedBookings = bookingsData?.map(booking => {
-        const studioPackage = studioPackages.find(pkg => pkg.id === booking.studio_package_id);
-        const packageCategory = packageCategories.find(cat => cat.id === booking.package_category_id);
-        
-        return {
-          ...booking,
-          studio_packages: studioPackage,
-          package_categories: packageCategory
-        };
-      });
-
-      console.log('Fetched bookings:', enrichedBookings);
-      return enrichedBookings;
+      console.log('Fetched bookings from view:', data);
+      return data as BookingWithDetails[];
     }
+  });
+
+  // Get installment summary for each booking
+  const { data: installmentSummary } = useQuery({
+    queryKey: ['installment-summary', bookings?.map(b => b.id)],
+    queryFn: async () => {
+      if (!bookings?.length) return {};
+      
+      const bookingIds = bookings.map(b => b.id);
+      const { data, error } = await supabase
+        .from('booking_with_installments')
+        .select('id, total_paid, remaining_amount, installment_count, payment_status')
+        .in('id', bookingIds);
+      
+      if (error) throw error;
+      
+      // Convert to object for easy lookup
+      return data?.reduce((acc, item) => {
+        acc[item.id] = item;
+        return acc;
+      }, {} as Record<string, any>) || {};
+    },
+    enabled: !!bookings?.length
   });
 
   const deleteBookingMutation = useMutation({
@@ -160,7 +166,8 @@ const BookingsPage = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings-enhanced'] });
+      queryClient.invalidateQueries({ queryKey: ['installment-summary'] });
       toast.success('Booking berhasil dihapus');
       setDeletingBooking(null);
     },
@@ -172,25 +179,29 @@ const BookingsPage = () => {
 
   const handleCreateSuccess = () => {
     setIsCreateDialogOpen(false);
-    queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    queryClient.invalidateQueries({ queryKey: ['bookings-enhanced'] });
+    queryClient.invalidateQueries({ queryKey: ['installment-summary'] });
   };
 
   const handleEditSuccess = () => {
     setEditingBooking(null);
-    queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    queryClient.invalidateQueries({ queryKey: ['bookings-enhanced'] });
+    queryClient.invalidateQueries({ queryKey: ['installment-summary'] });
   };
 
   const handleInstallmentSuccess = () => {
     setInstallmentBooking(null);
-    queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    queryClient.invalidateQueries({ queryKey: ['bookings-enhanced'] });
+    queryClient.invalidateQueries({ queryKey: ['installment-summary'] });
   };
 
   const handleTimeExtensionSuccess = () => {
     setExtendTimeBooking(null);
-    queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    queryClient.invalidateQueries({ queryKey: ['bookings-enhanced'] });
+    queryClient.invalidateQueries({ queryKey: ['installment-summary'] });
   };
 
-  const handleDelete = (booking: any) => {
+  const handleDelete = (booking: BookingWithDetails) => {
     setDeletingBooking(booking);
   };
 
@@ -249,7 +260,7 @@ const BookingsPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
-          <p className="text-gray-600">Kelola booking studio</p>
+          <p className="text-gray-600">Kelola booking studio dengan sistem cicilan</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
@@ -267,18 +278,18 @@ const BookingsPage = () => {
         </Dialog>
       </div>
 
-      {/* Enhanced search and filter section */}
+      {/* Enhanced search and filter section with realtime search */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            Filter & Pencarian
+            Filter & Pencarian Realtime
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Cari Customer</label>
+              <label className="text-sm font-medium">Cari Customer (Realtime)</label>
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
@@ -288,6 +299,11 @@ const BookingsPage = () => {
                   className="pl-10"
                 />
               </div>
+              {searchQuery && (
+                <p className="text-xs text-gray-500">
+                  Mencari: "{debouncedSearchQuery}" {debouncedSearchQuery !== searchQuery && "(mengetik...)"}
+                </p>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -340,109 +356,135 @@ const BookingsPage = () => {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {bookings?.map((booking) => (
-          <Card key={booking.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                    <Calendar className="h-6 w-6 text-blue-600" />
+        {bookings?.map((booking) => {
+          const installmentInfo = installmentSummary?.[booking.id];
+          const actualStatus = installmentInfo?.payment_status || booking.status;
+          const totalPaid = installmentInfo?.total_paid || 0;
+          const remainingAmount = installmentInfo?.remaining_amount || booking.total_amount || 0;
+          
+          return (
+            <Card key={booking.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                      <Calendar className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">
+                        {booking.package_title || 'Package tidak ditemukan'}
+                      </CardTitle>
+                      <Badge variant="outline" className="mt-1">
+                        {booking.studio_name}
+                      </Badge>
+                    </div>
                   </div>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setEditingBooking(booking)}
+                      title="Edit booking"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDelete(booking)}
+                      title="Hapus booking"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-4 w-4 text-gray-500" />
                   <div>
-                    <CardTitle className="text-lg">
-                      {booking.studio_packages?.title || 'Package tidak ditemukan'}
-                    </CardTitle>
-                    <Badge variant="outline" className="mt-1">
-                      {booking.studios?.name}
-                    </Badge>
+                    <p className="font-medium">{booking.customer_name}</p>
+                    <p className="text-gray-500">{booking.customer_email}</p>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setEditingBooking(booking)}
-                    title="Edit booking"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleDelete(booking)}
-                    title="Hapus booking"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              <div className="flex items-center gap-2 text-sm">
-                <User className="h-4 w-4 text-gray-500" />
-                <div>
-                  <p className="font-medium">{booking.users?.name}</p>
-                  <p className="text-gray-500">{booking.users?.email}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4 text-gray-500" />
-                <div>
-                  <p>Mulai: {formatDateTime(booking.start_time)}</p>
-                  <p>Selesai: {formatDateTime(booking.end_time)}</p>
-                  {booking.additional_time_minutes > 0 && (
-                    <p className="text-blue-600">+ {booking.additional_time_minutes} menit tambahan</p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-gray-500" />
-                  <span className="font-bold text-green-600">
-                    {formatPrice(booking.total_amount || 0)}
-                  </span>
-                </div>
-                <Badge className={getStatusColor(booking.status)}>
-                  {booking.status}
-                </Badge>
-              </div>
-              
-              <div className="flex gap-2 pt-2">
-                {(booking.status === 'pending' || booking.status === 'installment') && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setInstallmentBooking(booking)}
-                    className="flex-1 text-xs"
-                  >
-                    Kelola Cicilan
-                  </Button>
+                
+                {booking.start_time && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="h-4 w-4 text-gray-500" />
+                    <div>
+                      <p>Mulai: {formatDateTime(booking.start_time)}</p>
+                      {booking.end_time && <p>Selesai: {formatDateTime(booking.end_time)}</p>}
+                      {booking.additional_time_minutes && booking.additional_time_minutes > 0 && (
+                        <p className="text-blue-600">+ {booking.additional_time_minutes} menit tambahan</p>
+                      )}
+                    </div>
+                  </div>
                 )}
                 
-                {(booking.status === 'confirmed' || booking.status === 'paid') && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setExtendTimeBooking(booking)}
-                    className="flex-1 text-xs"
-                  >
-                    Tambah Waktu
-                  </Button>
-                )}
-              </div>
-              
-              <div className="text-xs text-gray-500 border-t pt-2">
-                <p>Dibuat: {formatDateTime(booking.created_at)}</p>
-                <p>Payment: {booking.payment_method}</p>
-                {booking.package_categories && (
-                  <p>Kategori: {booking.package_categories.name}</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-gray-500" />
+                    <div className="text-sm">
+                      <p className="font-bold text-green-600">
+                        Total: {formatPrice(booking.total_amount || 0)}
+                      </p>
+                      {totalPaid > 0 && (
+                        <>
+                          <p className="text-blue-600">
+                            Dibayar: {formatPrice(totalPaid)}
+                          </p>
+                          <p className="text-orange-600">
+                            Sisa: {formatPrice(remainingAmount)}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <Badge className={getStatusColor(actualStatus)}>
+                    {actualStatus}
+                  </Badge>
+                </div>
+                
+                <div className="flex gap-2 pt-2">
+                  {(actualStatus === 'pending' || actualStatus === 'installment') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setInstallmentBooking(booking)}
+                      className="flex-1 text-xs"
+                    >
+                      Kelola Cicilan
+                    </Button>
+                  )}
+                  
+                  {(actualStatus === 'confirmed' || actualStatus === 'paid') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setExtendTimeBooking(booking)}
+                      className="flex-1 text-xs"
+                    >
+                      Tambah Waktu
+                    </Button>
+                  )}
+                </div>
+                
+                <div className="text-xs text-gray-500 border-t pt-2">
+                  <p>Dibuat: {formatDateTime(booking.created_at)}</p>
+                  <p>Payment: {booking.payment_method}</p>
+                  {booking.category_name && (
+                    <p>Kategori: {booking.category_name}</p>
+                  )}
+                  {installmentInfo?.installment_count > 0 && (
+                    <p className="text-purple-600">
+                      Cicilan: {installmentInfo.installment_count}x pembayaran
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {bookings?.length === 0 && (
@@ -511,7 +553,7 @@ const BookingsPage = () => {
             <TimeExtensionManager 
               bookingId={extendTimeBooking.id}
               currentEndTime={extendTimeBooking.end_time}
-              studioType={extendTimeBooking.studios?.type || 'regular'}
+              studioType={extendTimeBooking.studio_type || 'regular'}
               currentAdditionalTime={extendTimeBooking.additional_time_minutes || 0}
               onSuccess={handleTimeExtensionSuccess} 
             />
@@ -525,7 +567,7 @@ const BookingsPage = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Booking</AlertDialogTitle>
             <AlertDialogDescription>
-              Apakah Anda yakin ingin menghapus booking untuk "{deletingBooking?.users?.name}"? 
+              Apakah Anda yakin ingin menghapus booking untuk "{deletingBooking?.customer_name}"? 
               Tindakan ini tidak dapat dibatalkan dan akan menghapus semua data terkait termasuk cicilan.
             </AlertDialogDescription>
           </AlertDialogHeader>
