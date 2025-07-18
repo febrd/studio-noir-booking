@@ -19,12 +19,19 @@ interface BookingFormProps {
   onSuccess: () => void;
 }
 
+
 interface AdditionalService {
   id: string;
   name: string;
   price: number;
   quantity: number;
 }
+
+// UUID validation helper
+const isValidUUID = (uuid: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+};
 
 const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const { userProfile } = useJWTAuth();
@@ -213,12 +220,30 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   // Create/Update booking mutation - FIXED: Better error handling
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
+    
+      const tentativeUserId = data.user_id || '';
+      const finalUserId = isValidUUID(tentativeUserId) ? tentativeUserId : null;
+
+      if (!finalUserId) {
+        throw new Error('User ID tidak valid atau kosong');
+      }
+
       const bookingData = {
         ...data,
+        user_id: finalUserId, // ✅ gunakan UUID yang sudah tervalidasi
+        studio_id: data.studio_id,
+        studio_package_id: data.studio_package_id,
+        package_category_id: data.package_category_id || null,
+        start_time: data.start_time,
+        end_time: endTime,
+        additional_time_minutes: data.additional_time_minutes || 0,
+        payment_method: data.payment_method,
+        type: data.type,
+        status: data.status,
         total_amount: totalPrice,
-        end_time: endTime
       };
-  
+     
+
       console.log('🔧 BookingData to save:', bookingData);
       console.log('📦 userProfile:', userProfile);
       console.log('📝 incoming data parameter:', data);
