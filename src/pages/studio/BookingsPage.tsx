@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -218,8 +219,8 @@ const BookingsPage = () => {
                     <Calendar className="h-6 w-6 text-orange-600" />
                   </div>
                   <div>
-                    <CardTitle className="text-base">{booking.users?.name}</CardTitle>
-                    <p className="text-sm text-gray-600">{booking.users?.email}</p>
+                    <CardTitle className="text-base">{booking.users?.name || 'N/A'}</CardTitle>
+                    <p className="text-sm text-gray-600">{booking.users?.email || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -256,7 +257,7 @@ const BookingsPage = () => {
                     <span className="font-medium">Studio:</span> {booking.studios?.name || 'N/A'}
                   </p>
                   <p className="text-sm">
-                    <span className="font-medium">Paket:</span> {booking.studio_packages?.title || 'N/A'}
+                    <span className="font-medium">Paket:</span> {Array.isArray(booking.studio_packages) ? 'N/A' : (booking.studio_packages?.title || 'N/A')}
                   </p>
                   <p className="text-sm">
                     <span className="font-medium">Tipe:</span> {' '}
