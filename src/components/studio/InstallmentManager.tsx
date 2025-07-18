@@ -69,7 +69,12 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
       if (!userProfile?.id) {
         throw new Error('User not authenticated');
       }
+      const { data: previousInstallments } = await supabase
+      .from('installments')
+      .select('installment_number')
+      .eq('booking_id', bookingId);
 
+      const nextNumber = (previousInstallments?.length || 0) + 1;
       const { data, error } = await supabase
         .from('installments')
         .insert([{
@@ -77,7 +82,8 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
           amount: installmentData.amount,
           note: installmentData.note,
           payment_method: installmentData.payment_method,
-          performed_by: userProfile.id
+          performed_by: userProfile.id,
+          installment_number: nextNumber
         }])
         .select()
         .single();
