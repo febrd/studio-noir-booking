@@ -13,6 +13,7 @@ import Unauthorized from "./pages/Unauthorized";
 import PaymentGateway from "./pages/PaymentGateway";
 import Users from "./pages/admin/Users";
 import PaymentProviders from "./pages/admin/PaymentProviders";
+import StudioManagement from "./pages/studio/StudioManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -73,6 +74,16 @@ const App: React.FC = () => {
                 element={
                   <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
                     <PaymentProviders />
+                  </JWTProtectedRoute>
+                } 
+              />
+              
+              {/* Studio Management Routes */}
+              <Route 
+                path="/studio/*" 
+                element={
+                  <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
+                    <StudioManagement />
                   </JWTProtectedRoute>
                 } 
               />

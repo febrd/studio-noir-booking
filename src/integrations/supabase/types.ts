@@ -21,6 +21,7 @@ export type Database = {
           id: string
           name: string
           price: number
+          studio_id: string
           updated_at: string
         }
         Insert: {
@@ -29,6 +30,7 @@ export type Database = {
           id?: string
           name: string
           price: number
+          studio_id: string
           updated_at?: string
         }
         Update: {
@@ -37,9 +39,18 @@ export type Database = {
           id?: string
           name?: string
           price?: number
+          studio_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "additional_services_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       booking_additional_services: {
         Row: {
@@ -61,13 +72,6 @@ export type Database = {
           quantity?: number
         }
         Relationships: [
-          {
-            foreignKeyName: "booking_additional_services_additional_service_id_fkey"
-            columns: ["additional_service_id"]
-            isOneToOne: false
-            referencedRelation: "additional_services"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "booking_additional_services_booking_id_fkey"
             columns: ["booking_id"]
@@ -121,6 +125,7 @@ export type Database = {
           id: string
           payment_method: Database["public"]["Enums"]["payment_method"]
           status: Database["public"]["Enums"]["booking_status"]
+          studio_id: string | null
           studio_package_id: string
           total_amount: number | null
           type: Database["public"]["Enums"]["booking_type"]
@@ -132,6 +137,7 @@ export type Database = {
           id?: string
           payment_method: Database["public"]["Enums"]["payment_method"]
           status?: Database["public"]["Enums"]["booking_status"]
+          studio_id?: string | null
           studio_package_id: string
           total_amount?: number | null
           type?: Database["public"]["Enums"]["booking_type"]
@@ -143,6 +149,7 @@ export type Database = {
           id?: string
           payment_method?: Database["public"]["Enums"]["payment_method"]
           status?: Database["public"]["Enums"]["booking_status"]
+          studio_id?: string | null
           studio_package_id?: string
           total_amount?: number | null
           type?: Database["public"]["Enums"]["booking_type"]
@@ -151,10 +158,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "bookings_studio_package_id_fkey"
-            columns: ["studio_package_id"]
+            foreignKeyName: "bookings_studio_id_fkey"
+            columns: ["studio_id"]
             isOneToOne: false
-            referencedRelation: "studio_packages"
+            referencedRelation: "studios"
             referencedColumns: ["id"]
           },
           {
@@ -209,6 +216,7 @@ export type Database = {
           description: string | null
           id: string
           price: number
+          studio_id: string
           title: string
           updated_at: string
         }
@@ -218,6 +226,7 @@ export type Database = {
           description?: string | null
           id?: string
           price: number
+          studio_id: string
           title: string
           updated_at?: string
         }
@@ -227,7 +236,49 @@ export type Database = {
           description?: string | null
           id?: string
           price?: number
+          studio_id?: string
           title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "studio_packages_studio_id_fkey"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      studios: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          location: string | null
+          name: string
+          type: Database["public"]["Enums"]["booking_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          name: string
+          type: Database["public"]["Enums"]["booking_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          location?: string | null
+          name?: string
+          type?: Database["public"]["Enums"]["booking_type"]
           updated_at?: string
         }
         Relationships: []
@@ -391,7 +442,14 @@ export type Database = {
       }
     }
     Enums: {
-      booking_status: "pending" | "confirmed" | "completed" | "cancelled"
+      booking_status:
+        | "pending"
+        | "confirmed"
+        | "completed"
+        | "cancelled"
+        | "paid"
+        | "expired"
+        | "failed"
       booking_type: "self_photo" | "regular"
       payment_environment: "sandbox" | "production"
       payment_method: "online" | "offline"
@@ -532,7 +590,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      booking_status: ["pending", "confirmed", "completed", "cancelled"],
+      booking_status: [
+        "pending",
+        "confirmed",
+        "completed",
+        "cancelled",
+        "paid",
+        "expired",
+        "failed",
+      ],
       booking_type: ["self_photo", "regular"],
       payment_environment: ["sandbox", "production"],
       payment_method: ["online", "offline"],
