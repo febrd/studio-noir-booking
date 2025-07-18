@@ -580,7 +580,13 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           {formData.additional_time_minutes > 0 && (
             <div className="flex justify-between text-sm">
               <span>Tambahan waktu ({formData.additional_time_minutes} menit)</span>
+               {/* post session additional time price (for both studios) */}
+               {selectedStudio?.type === 'regular' && (
               <span>{formatPrice(Math.ceil(formData.additional_time_minutes / 5) * 15000)}</span>
+               )}
+               {selectedStudio?.type === 'self_photo' && (
+              <span>{formatPrice(Math.ceil(formData.additional_time_minutes / 5) * 5000)}</span>
+               )}
             </div>
           )}
           
