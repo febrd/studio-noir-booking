@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Clock, Plus, Minus } from 'lucide-react';
+import { Calendar, Clock, Plus, Minus, AlertTriangle } from 'lucide-react';
 
 interface BookingFormProps {
   booking?: any;
@@ -45,6 +45,8 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const [totalPrice, setTotalPrice] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createGuestUser, setCreateGuestUser] = useState(false);
+  const [bookingConflict, setBookingConflict] = useState(false);
+  const [endTime, setEndTime] = useState('');
 
   // Fetch users (customers only)
   const { data: users } = useQuery({
@@ -76,7 +78,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   });
 
-  // Get selected studio early to avoid declaration issues
+  // Get selected studio info
   const selectedStudio = studios?.find(s => s.id === formData.studio_id);
 
   // Fetch package categories based on studio
@@ -147,6 +149,24 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
 
   const selectedPackage = packages?.find(p => p.id === formData.studio_package_id);
 
+  // Check for booking conflicts
+  const checkConflictMutation = useMutation({
+    mutationFn: async ({ studioId, startTime, endTime }: { studioId: string, startTime: string, endTime: string }) => {
+      const { data, error } = await supabase.rpc('check_booking_conflict', {
+        studio_id_param: studioId,
+        start_time_param: startTime,
+        end_time_param: endTime,
+        exclude_booking_id: booking?.id || null
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (hasConflict) => {
+      setBookingConflict(hasConflict);
+    }
+  });
+
   // Create guest user mutation
   const createGuestMutation = useMutation({
     mutationFn: async (userData: { name: string; email: string }) => {
@@ -183,28 +203,55 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   });
 
-  // Create booking mutation
-  const createMutation = useMutation({
+  // Create/Update booking mutation
+  const saveMutation = useMutation({
     mutationFn: async (data: any) => {
-      // Create booking
-      const { data: bookingData, error: bookingError } = await supabase
-        .from('bookings')
-        .insert([{
-          ...data,
-          total_amount: totalPrice,
-          end_time: calculateEndTime(data.start_time, selectedPackage?.base_time_minutes || 0, data.additional_time_minutes || 0)
-        }])
-        .select()
-        .single();
+      const bookingData = {
+        ...data,
+        total_amount: totalPrice,
+        end_time: endTime
+      };
+
+      let result;
+      if (booking?.id) {
+        // Update existing booking
+        const { data: updatedBooking, error } = await supabase
+          .from('bookings')
+          .update(bookingData)
+          .eq('id', booking.id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = updatedBooking;
+      } else {
+        // Create new booking
+        const { data: newBooking, error } = await supabase
+          .from('bookings')
+          .insert([bookingData])
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = newBooking;
+      }
       
-      if (bookingError) throw bookingError;
-      
-      // Create booking additional services
+      // Handle additional services
       if (selectedServices.length > 0) {
+        // Delete existing services for updates
+        if (booking?.id) {
+          await supabase
+            .from('booking_additional_services')
+            .delete()
+            .eq('booking_id', booking.id);
+        }
+        
+        // Insert new services
         const serviceData = selectedServices.map(service => ({
-          booking_id: bookingData.id,
+          booking_id: result.id,
           additional_service_id: service.id,
-          quantity: service.quantity
+          quantity: service.quantity,
+          total_price: service.price * service.quantity
         }));
         
         const { error: serviceError } = await supabase
@@ -214,27 +261,39 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         if (serviceError) throw serviceError;
       }
       
-      return bookingData;
+      return result;
     },
     onSuccess: () => {
-      toast.success('Booking berhasil ditambahkan');
+      toast.success(booking?.id ? 'Booking berhasil diupdate' : 'Booking berhasil ditambahkan');
       onSuccess();
     },
     onError: (error) => {
-      console.error('Error creating booking:', error);
-      toast.error('Gagal menambahkan booking');
+      console.error('Error saving booking:', error);
+      toast.error('Gagal menyimpan booking');
     }
   });
 
   // Calculate end time
   const calculateEndTime = (startTime: string, baseMinutes: number, additionalMinutes: number = 0) => {
-    if (!startTime) return '';
+    if (!startTime || !baseMinutes) return '';
     
     const start = new Date(startTime);
     const totalMinutes = baseMinutes + additionalMinutes;
     const end = new Date(start.getTime() + (totalMinutes * 60 * 1000));
     
     return end.toISOString();
+  };
+
+  // Calculate additional time cost
+  const calculateAdditionalTimeCost = (minutes: number, studioType: string) => {
+    if (minutes <= 0) return 0;
+    
+    const slots = Math.ceil(minutes / 5);
+    if (studioType === 'self_photo') {
+      return slots * 5000;
+    } else {
+      return slots * 15000;
+    }
   };
 
   // Calculate total price
@@ -251,16 +310,43 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       total += service.price * service.quantity;
     });
     
-    // Additional time (50,000 per 30 minutes)
-    if (formData.additional_time_minutes > 0) {
-      total += Math.ceil(formData.additional_time_minutes / 30) * 50000;
+    // Additional time
+    if (formData.additional_time_minutes > 0 && selectedStudio) {
+      total += calculateAdditionalTimeCost(formData.additional_time_minutes, selectedStudio.type);
     }
     
     setTotalPrice(total);
-  }, [selectedPackage, selectedServices, formData.additional_time_minutes]);
+  }, [selectedPackage, selectedServices, formData.additional_time_minutes, selectedStudio]);
+
+  // Update end time when start time, package, or additional time changes
+  useEffect(() => {
+    if (formData.start_time && selectedPackage) {
+      const newEndTime = calculateEndTime(
+        formData.start_time, 
+        selectedPackage.base_time_minutes, 
+        formData.additional_time_minutes
+      );
+      setEndTime(newEndTime);
+      
+      // Check for conflicts
+      if (newEndTime && formData.studio_id) {
+        checkConflictMutation.mutate({
+          studioId: formData.studio_id,
+          startTime: formData.start_time,
+          endTime: newEndTime
+        });
+      }
+    }
+  }, [formData.start_time, selectedPackage, formData.additional_time_minutes, formData.studio_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (bookingConflict) {
+      toast.error('Jadwal bertabrakan dengan booking lain. Silakan pilih waktu yang berbeda.');
+      return;
+    }
+    
     setIsSubmitting(true);
 
     try {
@@ -269,7 +355,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         await createGuestMutation.mutateAsync(guestUser);
       }
       
-      await createMutation.mutateAsync(formData);
+      await saveMutation.mutateAsync(formData);
     } finally {
       setIsSubmitting(false);
     }
@@ -319,6 +405,11 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       style: 'currency',
       currency: 'IDR'
     }).format(price);
+  };
+
+  const formatDateTime = (dateTimeString: string) => {
+    if (!dateTimeString) return '';
+    return new Date(dateTimeString).toLocaleString('id-ID');
   };
 
   return (
@@ -469,6 +560,31 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         </div>
       </div>
 
+      {/* Booking Conflict Warning */}
+      {bookingConflict && (
+        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800">
+          <AlertTriangle className="h-4 w-4" />
+          <span className="text-sm">
+            Jadwal bertabrakan dengan booking lain. Silakan pilih waktu yang berbeda.
+          </span>
+        </div>
+      )}
+
+      {/* Schedule Info */}
+      {endTime && (
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center gap-2 text-blue-800">
+            <Clock className="h-4 w-4" />
+            <span className="text-sm font-medium">Jadwal Booking</span>
+          </div>
+          <div className="mt-2 text-sm text-blue-700">
+            <p>Mulai: {formatDateTime(formData.start_time)}</p>
+            <p>Selesai: {formatDateTime(endTime)}</p>
+            <p>Durasi: {selectedPackage?.base_time_minutes + formData.additional_time_minutes} menit</p>
+          </div>
+        </div>
+      )}
+
       {/* Additional Services */}
       {additionalServices && additionalServices.length > 0 && (
         <div className="space-y-4">
@@ -547,6 +663,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="confirmed">Confirmed</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="installment">Installment</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
@@ -577,20 +694,16 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
             </div>
           ))}
           
-          {formData.additional_time_minutes > 0 && (
+          {formData.additional_time_minutes > 0 && selectedStudio && (
             <div className="flex justify-between text-sm">
               <span>
                 Tambahan waktu ({formData.additional_time_minutes} menit)
               </span>
               <span>
-                {selectedStudio?.type === 'regular' &&
-                  formatPrice(Math.ceil(formData.additional_time_minutes / 5) * 15000)}
-                {selectedStudio?.type === 'self_photo' &&
-                  formatPrice(Math.ceil(formData.additional_time_minutes / 5) * 5000)}
+                {formatPrice(calculateAdditionalTimeCost(formData.additional_time_minutes, selectedStudio.type))}
               </span>
             </div>
           )}
-
           
           <div className="border-t pt-2 flex justify-between font-bold text-lg">
             <span>Total</span>
@@ -604,14 +717,16 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           type="submit" 
           disabled={
             isSubmitting || 
+            bookingConflict ||
             (!formData.user_id && (!createGuestUser || !guestUser.name || !guestUser.email)) ||
             !formData.studio_id || 
             !formData.studio_package_id ||
-            !formData.start_time
+            !formData.start_time ||
+            (selectedStudio?.type === 'regular' && !formData.package_category_id)
           } 
           className="flex-1"
         >
-          {isSubmitting ? 'Menyimpan...' : 'Tambah Booking'}
+          {isSubmitting ? 'Menyimpan...' : booking?.id ? 'Update Booking' : 'Tambah Booking'}
         </Button>
       </div>
     </form>

@@ -58,18 +58,21 @@ export type Database = {
           booking_id: string
           id: string
           quantity: number
+          total_price: number | null
         }
         Insert: {
           additional_service_id: string
           booking_id: string
           id?: string
           quantity?: number
+          total_price?: number | null
         }
         Update: {
           additional_service_id?: string
           booking_id?: string
           id?: string
           quantity?: number
+          total_price?: number | null
         }
         Relationships: [
           {
@@ -121,9 +124,13 @@ export type Database = {
       }
       bookings: {
         Row: {
+          additional_time_minutes: number | null
           created_at: string
+          end_time: string | null
           id: string
+          package_category_id: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
+          start_time: string | null
           status: Database["public"]["Enums"]["booking_status"]
           studio_id: string | null
           studio_package_id: string
@@ -133,9 +140,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          additional_time_minutes?: number | null
           created_at?: string
+          end_time?: string | null
           id?: string
+          package_category_id?: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
+          start_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
           studio_id?: string | null
           studio_package_id: string
@@ -145,9 +156,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          additional_time_minutes?: number | null
           created_at?: string
+          end_time?: string | null
           id?: string
+          package_category_id?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
+          start_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
           studio_id?: string | null
           studio_package_id?: string
@@ -157,6 +172,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "bookings_package_category_id_fkey"
+            columns: ["package_category_id"]
+            isOneToOne: false
+            referencedRelation: "package_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "bookings_studio_id_fkey"
             columns: ["studio_id"]
@@ -169,6 +191,41 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      installments: {
+        Row: {
+          amount: number
+          booking_id: string
+          created_at: string
+          id: string
+          note: string | null
+          paid_at: string
+        }
+        Insert: {
+          amount: number
+          booking_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          paid_at?: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          paid_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "installments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
             referencedColumns: ["id"]
           },
         ]
@@ -460,6 +517,19 @@ export type Database = {
         Args: { booking_id_param: string }
         Returns: number
       }
+      calculate_total_installments: {
+        Args: { booking_id_param: string }
+        Returns: number
+      }
+      check_booking_conflict: {
+        Args: {
+          studio_id_param: string
+          start_time_param: string
+          end_time_param: string
+          exclude_booking_id?: string
+        }
+        Returns: boolean
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -495,6 +565,7 @@ export type Database = {
         | "paid"
         | "expired"
         | "failed"
+        | "installment"
       booking_type: "self_photo" | "regular"
       payment_environment: "sandbox" | "production"
       payment_method: "online" | "offline"
@@ -643,6 +714,7 @@ export const Constants = {
         "paid",
         "expired",
         "failed",
+        "installment",
       ],
       booking_type: ["self_photo", "regular"],
       payment_environment: ["sandbox", "production"],
