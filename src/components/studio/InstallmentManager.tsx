@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { CreditCard, Plus, Calendar, User } from 'lucide-react';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 
 interface InstallmentManagerProps {
   bookingId: string;
@@ -25,6 +26,8 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
     note: '',
     payment_method: 'offline'
   });
+  const { userProfile } = useJWTAuth();
+
   const queryClient = useQueryClient();
 
   // Get current user for tracking
@@ -63,7 +66,7 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
   // Add installment mutation with enhanced tracking
   const addInstallmentMutation = useMutation({
     mutationFn: async (installmentData: { amount: number; note: string; payment_method: string }) => {
-      if (!currentUser?.id) {
+      if (!userProfile?.id) {
         throw new Error('User not authenticated');
       }
 
@@ -74,7 +77,7 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
           amount: installmentData.amount,
           note: installmentData.note,
           payment_method: installmentData.payment_method,
-          performed_by: currentUser.id
+          performed_by: userProfile.id
         }])
         .select()
         .single();
