@@ -243,9 +243,9 @@ const OfflineTransactionsPage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua nominal</SelectItem>
-                  <SelectItem value="small">< Rp 100,000</SelectItem>
+                  <SelectItem value="small">Kurang dari Rp 100,000</SelectItem>
                   <SelectItem value="medium">Rp 100,000 - 500,000</SelectItem>
-                  <SelectItem value="large">> Rp 500,000</SelectItem>
+                  <SelectItem value="large">Lebih dari Rp 500,000</SelectItem>
                 </SelectContent>
               </Select>
             </div>
