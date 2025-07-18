@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Clock, Plus, Minus, AlertTriangle } from 'lucide-react';
+import { Calendar, Clock, Plus, Minus, AlertTriangle, Search } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface BookingFormProps {
   booking?: any;
@@ -47,16 +48,24 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const [createGuestUser, setCreateGuestUser] = useState(false);
   const [bookingConflict, setBookingConflict] = useState(false);
   const [endTime, setEndTime] = useState('');
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
 
-  // Fetch users (customers only)
+  // Fetch users with search functionality
   const { data: users } = useQuery({
-    queryKey: ['users-customers'],
+    queryKey: ['users-customers', customerSearch],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('users')
         .select('id, name, email')
         .eq('role', 'pelanggan')
         .order('name');
+      
+      if (customerSearch.trim()) {
+        query = query.or(`name.ilike.%${customerSearch}%,email.ilike.%${customerSearch}%`);
+      }
+      
+      const { data, error } = await query.limit(50);
       
       if (error) throw error;
       return data;
@@ -78,7 +87,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   });
 
-  // Get selected studio info
   const selectedStudio = studios?.find(s => s.id === formData.studio_id);
 
   // Fetch package categories based on studio
@@ -111,12 +119,10 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         .eq('studio_id', formData.studio_id)
         .order('title');
 
-      // For regular studios, filter by category if selected
       if (selectedStudio?.type === 'regular' && formData.package_category_id) {
         query = query.eq('category_id', formData.package_category_id);
       }
 
-      // For self photo studios, only show packages without categories
       if (selectedStudio?.type === 'self_photo') {
         query = query.is('category_id', null);
       }
@@ -167,26 +173,19 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   });
 
-  // Create guest user mutation
+  // Create guest user mutation - FIXED: Use proper UUID generation
   const createGuestMutation = useMutation({
     mutationFn: async (userData: { name: string; email: string }) => {
-      // Generate guest ID
-      const { count } = await supabase
-        .from('users')
-        .select('id', { count: 'exact' })
-        .like('id', 'guest_%');
-      
-      const guestNumber = (count || 0) + 1;
-      const guestId = `guest_${guestNumber.toString().padStart(3, '0')}`;
-      
       // Generate random password
       const randomPassword = Math.random().toString(36).slice(-8);
+      
+      // Use proper UUID generation and add guest prefix to name
+      const guestName = `guest_${userData.name}`;
       
       const { data, error } = await supabase
         .from('users')
         .insert([{
-          id: guestId,
-          name: userData.name,
+          name: guestName,
           email: userData.email,
           role: 'pelanggan',
           password: randomPassword
@@ -199,11 +198,15 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     },
     onSuccess: (data) => {
       setFormData(prev => ({ ...prev, user_id: data.id }));
-      toast.success(`Guest user created: ${data.id}`);
+      toast.success(`Guest user created: ${data.name}`);
+    },
+    onError: (error) => {
+      console.error('Error creating guest user:', error);
+      toast.error('Gagal membuat user guest');
     }
   });
 
-  // Create/Update booking mutation
+  // Create/Update booking mutation - FIXED: Better error handling
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
       const bookingData = {
@@ -211,6 +214,8 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         total_amount: totalPrice,
         end_time: endTime
       };
+
+      console.log('Saving booking with data:', bookingData);
 
       let result;
       if (booking?.id) {
@@ -222,7 +227,10 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           .select()
           .single();
         
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating booking:', error);
+          throw error;
+        }
         result = updatedBooking;
       } else {
         // Create new booking
@@ -232,7 +240,10 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           .select()
           .single();
         
-        if (error) throw error;
+        if (error) {
+          console.error('Error creating booking:', error);
+          throw error;
+        }
         result = newBooking;
       }
       
@@ -258,7 +269,10 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           .from('booking_additional_services')
           .insert(serviceData);
         
-        if (serviceError) throw serviceError;
+        if (serviceError) {
+          console.error('Error creating additional services:', serviceError);
+          throw serviceError;
+        }
       }
       
       return result;
@@ -267,9 +281,17 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       toast.success(booking?.id ? 'Booking berhasil diupdate' : 'Booking berhasil ditambahkan');
       onSuccess();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error saving booking:', error);
-      toast.error('Gagal menyimpan booking');
+      let errorMessage = 'Gagal menyimpan booking';
+      
+      if (error.code === '23503') {
+        errorMessage = 'Error: Data yang dipilih tidak valid atau sudah dihapus';
+      } else if (error.message) {
+        errorMessage = `Error: ${error.message}`;
+      }
+      
+      toast.error(errorMessage);
     }
   });
 
@@ -412,9 +434,11 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     return new Date(dateTimeString).toLocaleString('id-ID');
   };
 
+  const selectedUser = users?.find(u => u.id === formData.user_id);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-h-[80vh] overflow-y-auto">
-      {/* Customer Selection */}
+      {/* Customer Selection - IMPROVED: Searchable dropdown */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Customer</h3>
         
@@ -454,18 +478,52 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         ) : (
           <div className="space-y-2">
             <Label htmlFor="user_id">Pilih Customer *</Label>
-            <Select value={formData.user_id} onValueChange={(value) => handleInputChange('user_id', value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih customer yang sudah terdaftar" />
-              </SelectTrigger>
-              <SelectContent>
-                {users?.map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name} ({user.email})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={customerSearchOpen}
+                  className="w-full justify-between"
+                >
+                  {selectedUser ? (
+                    `${selectedUser.name} (${selectedUser.email})`
+                  ) : (
+                    "Cari dan pilih customer..."
+                  )}
+                  <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput 
+                    placeholder="Cari nama atau email customer..." 
+                    value={customerSearch}
+                    onValueChange={setCustomerSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>Tidak ada customer ditemukan.</CommandEmpty>
+                    <CommandGroup>
+                      {users?.map((user) => (
+                        <CommandItem
+                          key={user.id}
+                          value={`${user.name} ${user.email}`}
+                          onSelect={() => {
+                            handleInputChange('user_id', user.id);
+                            setCustomerSearchOpen(false);
+                          }}
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium">{user.name}</span>
+                            <span className="text-sm text-gray-500">{user.email}</span>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
         )}
       </div>

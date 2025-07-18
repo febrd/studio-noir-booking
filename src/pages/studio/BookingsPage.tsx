@@ -4,62 +4,38 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Calendar, Clock, CreditCard } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Edit, Trash2, Calendar, Clock, User, DollarSign, Search, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BookingForm from '@/components/studio/BookingForm';
 import InstallmentManager from '@/components/studio/InstallmentManager';
 import TimeExtensionManager from '@/components/studio/TimeExtensionManager';
-import type { Database } from '@/integrations/supabase/types';
-
-type BookingStatus = Database['public']['Enums']['booking_status'];
-
-interface BookingWithRelations {
-  id: string;
-  status: BookingStatus;
-  payment_method: string;
-  type: string;
-  total_amount: number | null;
-  start_time: string | null;
-  end_time: string | null;
-  additional_time_minutes: number | null;
-  created_at: string;
-  studios: {
-    id: string;
-    name: string;
-    type: string;
-  } | null;
-  studio_packages: {
-    id: string;
-    title: string;
-    price: number;
-  } | null;
-  users: {
-    id: string;
-    name: string;
-    email: string;
-  } | null;
-}
 
 const BookingsPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [editingBooking, setEditingBooking] = useState<BookingWithRelations | null>(null);
-  const [deletingBooking, setDeletingBooking] = useState<BookingWithRelations | null>(null);
-  const [installmentBooking, setInstallmentBooking] = useState<BookingWithRelations | null>(null);
-  const [extendTimeBooking, setExtendTimeBooking] = useState<BookingWithRelations | null>(null);
-  const [selectedStudio, setSelectedStudio] = useState<string>('all');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [editingBooking, setEditingBooking] = useState<any>(null);
+  const [deletingBooking, setDeletingBooking] = useState<any>(null);
+  const [installmentBooking, setInstallmentBooking] = useState<any>(null);
+  const [extendTimeBooking, setExtendTimeBooking] = useState<any>(null);
+  
+  // IMPROVED: Add search and filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [studioFilter, setStudioFilter] = useState('');
+  
   const queryClient = useQueryClient();
 
+  // Fetch studios for filter dropdown
   const { data: studios } = useQuery({
     queryKey: ['studios-filter'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('studios')
-        .select('id, name, type')
+        .select('id, name')
         .eq('is_active', true)
         .order('name');
       
@@ -68,21 +44,19 @@ const BookingsPage = () => {
     }
   });
 
+  // IMPROVED: Enhanced query with search and filters
   const { data: bookings, isLoading } = useQuery({
-    queryKey: ['bookings', selectedStudio, selectedStatus],
+    queryKey: ['bookings', searchQuery, statusFilter, studioFilter],
     queryFn: async () => {
       let query = supabase
         .from('bookings')
         .select(`
-          id,
-          status,
-          payment_method,
-          type,
-          total_amount,
-          start_time,
-          end_time,
-          additional_time_minutes,
-          created_at,
+          *,
+          users (
+            id,
+            name,
+            email
+          ),
           studios (
             id,
             name,
@@ -91,33 +65,53 @@ const BookingsPage = () => {
           studio_packages (
             id,
             title,
-            price
+            price,
+            base_time_minutes
           ),
-          users (
+          package_categories (
             id,
-            name,
-            email
+            name
           )
         `)
         .order('created_at', { ascending: false });
 
-      if (selectedStudio !== 'all') {
-        query = query.eq('studio_id', selectedStudio);
+      // Apply search filter for user name/email
+      if (searchQuery.trim()) {
+        query = query.or(`users.name.ilike.%${searchQuery}%,users.email.ilike.%${searchQuery}%`);
       }
 
-      if (selectedStatus !== 'all') {
-        query = query.eq('status', selectedStatus as BookingStatus);
+      // Apply status filter
+      if (statusFilter) {
+        query = query.eq('status', statusFilter);
+      }
+
+      // Apply studio filter
+      if (studioFilter) {
+        query = query.eq('studio_id', studioFilter);
       }
       
       const { data, error } = await query;
       
       if (error) throw error;
-      return data as unknown as BookingWithRelations[];
+      return data;
     }
   });
 
   const deleteBookingMutation = useMutation({
     mutationFn: async (bookingId: string) => {
+      // Delete additional services first
+      await supabase
+        .from('booking_additional_services')
+        .delete()
+        .eq('booking_id', bookingId);
+      
+      // Delete installments
+      await supabase
+        .from('installments')
+        .delete()
+        .eq('booking_id', bookingId);
+      
+      // Delete booking
       const { error } = await supabase
         .from('bookings')
         .delete()
@@ -146,7 +140,17 @@ const BookingsPage = () => {
     queryClient.invalidateQueries({ queryKey: ['bookings'] });
   };
 
-  const handleDelete = (booking: BookingWithRelations) => {
+  const handleInstallmentSuccess = () => {
+    setInstallmentBooking(null);
+    queryClient.invalidateQueries({ queryKey: ['bookings'] });
+  };
+
+  const handleTimeExtensionSuccess = () => {
+    setExtendTimeBooking(null);
+    queryClient.invalidateQueries({ queryKey: ['bookings'] });
+  };
+
+  const handleDelete = (booking: any) => {
     setDeletingBooking(booking);
   };
 
@@ -154,18 +158,6 @@ const BookingsPage = () => {
     if (deletingBooking) {
       deleteBookingMutation.mutate(deletingBooking.id);
     }
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR'
-    }).format(price);
-  };
-
-  const formatDateTime = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString('id-ID');
   };
 
   const getStatusColor = (status: string) => {
@@ -176,18 +168,27 @@ const BookingsPage = () => {
       case 'installment': return 'bg-purple-100 text-purple-800';
       case 'completed': return 'bg-gray-100 text-gray-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
-      case 'expired': return 'bg-orange-100 text-orange-800';
-      case 'failed': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const isBookingActive = (booking: BookingWithRelations) => {
-    if (!booking.start_time || !booking.end_time) return false;
-    const now = new Date();
-    const startTime = new Date(booking.start_time);
-    const endTime = new Date(booking.end_time);
-    return now >= startTime && now <= endTime && booking.status !== 'cancelled';
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR'
+    }).format(price);
+  };
+
+  const formatDateTime = (dateTimeString: string) => {
+    if (!dateTimeString) return '';
+    return new Date(dateTimeString).toLocaleString('id-ID');
+  };
+
+  // Clear filters function
+  const clearFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('');
+    setStudioFilter('');
   };
 
   if (isLoading) {
@@ -208,7 +209,7 @@ const BookingsPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
-          <p className="text-gray-600">Kelola booking dan sesi studio</p>
+          <p className="text-gray-600">Kelola booking studio</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
@@ -217,7 +218,7 @@ const BookingsPage = () => {
               Tambah Booking
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-4xl">
             <DialogHeader>
               <DialogTitle>Tambah Booking Baru</DialogTitle>
             </DialogHeader>
@@ -226,42 +227,77 @@ const BookingsPage = () => {
         </Dialog>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-4">
-        <div className="w-48">
-          <Select value={selectedStudio} onValueChange={setSelectedStudio}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by studio" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Studio</SelectItem>
-              {studios?.map((studio) => (
-                <SelectItem key={studio.id} value={studio.id}>
-                  {studio.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="w-48">
-          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Status</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="confirmed">Confirmed</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="installment">Installment</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-              <SelectItem value="expired">Expired</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      {/* IMPROVED: Enhanced search and filter section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filter & Pencarian
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Cari Customer</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Nama atau email customer..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Status</label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Semua status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Semua status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="installment">Installment</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Studio</label>
+              <Select value={studioFilter} onValueChange={setStudioFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Semua studio" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Semua studio</SelectItem>
+                  {studios?.map((studio) => (
+                    <SelectItem key={studio.id} value={studio.id}>
+                      {studio.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Aksi</label>
+              <Button 
+                variant="outline" 
+                onClick={clearFilters}
+                className="w-full"
+              >
+                Reset Filter
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {bookings?.map((booking) => (
@@ -269,16 +305,14 @@ const BookingsPage = () => {
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                    isBookingActive(booking) ? 'bg-green-50' : 'bg-orange-50'
-                  }`}>
-                    <Calendar className={`h-6 w-6 ${
-                      isBookingActive(booking) ? 'text-green-600' : 'text-orange-600'
-                    }`} />
+                  <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                    <Calendar className="h-6 w-6 text-blue-600" />
                   </div>
                   <div>
-                    <CardTitle className="text-base">{booking.users?.name || 'N/A'}</CardTitle>
-                    <p className="text-sm text-gray-600">{booking.users?.email || 'N/A'}</p>
+                    <CardTitle className="text-lg">{booking.studio_packages?.title}</CardTitle>
+                    <Badge variant="outline" className="mt-1">
+                      {booking.studios?.name}
+                    </Badge>
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -286,90 +320,83 @@ const BookingsPage = () => {
                     size="sm"
                     variant="ghost"
                     onClick={() => setEditingBooking(booking)}
+                    title="Edit booking"
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
-                  {(booking.status === 'pending' || booking.status === 'installment') && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setInstallmentBooking(booking)}
-                    >
-                      <CreditCard className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {isBookingActive(booking) && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setExtendTimeBooking(booking)}
-                    >
-                      <Clock className="h-4 w-4" />
-                    </Button>
-                  )}
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => handleDelete(booking)}
+                    title="Hapus booking"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-0">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Badge className={getStatusColor(booking.status)}>
-                    {booking.status}
-                  </Badge>
-                  <Badge variant="outline">
-                    {booking.payment_method}
-                  </Badge>
+            <CardContent className="pt-0 space-y-3">
+              <div className="flex items-center gap-2 text-sm">
+                <User className="h-4 w-4 text-gray-500" />
+                <div>
+                  <p className="font-medium">{booking.users?.name}</p>
+                  <p className="text-gray-500">{booking.users?.email}</p>
                 </div>
-                
-                <div className="space-y-2">
-                  <p className="text-sm">
-                    <span className="font-medium">Studio:</span> {booking.studios?.name || 'N/A'}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Paket:</span> {booking.studio_packages?.title || 'N/A'}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Tipe:</span> {' '}
-                    {booking.type === 'self_photo' ? 'Self Photo' : 'Regular'}
-                  </p>
-                  {booking.start_time && (
-                    <p className="text-sm">
-                      <span className="font-medium">Mulai:</span> {formatDateTime(booking.start_time)}
-                    </p>
-                  )}
-                  {booking.end_time && (
-                    <p className="text-sm">
-                      <span className="font-medium">Selesai:</span> {formatDateTime(booking.end_time)}
-                    </p>
-                  )}
-                  {booking.additional_time_minutes && booking.additional_time_minutes > 0 && (
-                    <p className="text-sm">
-                      <span className="font-medium">Tambahan:</span> {booking.additional_time_minutes} menit
-                    </p>
-                  )}
-                  {booking.total_amount && (
-                    <p className="text-sm font-bold text-green-600">
-                      Total: {formatPrice(booking.total_amount)}
-                    </p>
+              </div>
+              
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="h-4 w-4 text-gray-500" />
+                <div>
+                  <p>Mulai: {formatDateTime(booking.start_time)}</p>
+                  <p>Selesai: {formatDateTime(booking.end_time)}</p>
+                  {booking.additional_time_minutes > 0 && (
+                    <p className="text-blue-600">+ {booking.additional_time_minutes} menit tambahan</p>
                   )}
                 </div>
-
-                {isBookingActive(booking) && (
-                  <div className="p-2 bg-green-50 border border-green-200 rounded text-sm text-green-800">
-                    🟢 Sesi Aktif
-                  </div>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-gray-500" />
+                  <span className="font-bold text-green-600">
+                    {formatPrice(booking.total_amount || 0)}
+                  </span>
+                </div>
+                <Badge className={getStatusColor(booking.status)}>
+                  {booking.status}
+                </Badge>
+              </div>
+              
+              <div className="flex gap-2 pt-2">
+                {(booking.status === 'pending' || booking.status === 'installment') && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setInstallmentBooking(booking)}
+                    className="flex-1 text-xs"
+                  >
+                    Kelola Cicilan
+                  </Button>
                 )}
-
-                <p className="text-xs text-gray-500">
-                  Dibuat: {new Date(booking.created_at).toLocaleDateString('id-ID')}
-                </p>
+                
+                {(booking.status === 'confirmed' || booking.status === 'paid') && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setExtendTimeBooking(booking)}
+                    className="flex-1 text-xs"
+                  >
+                    Tambah Waktu
+                  </Button>
+                )}
+              </div>
+              
+              <div className="text-xs text-gray-500 border-t pt-2">
+                <p>Dibuat: {formatDateTime(booking.created_at)}</p>
+                <p>Payment: {booking.payment_method}</p>
+                {booking.package_categories && (
+                  <p>Kategori: {booking.package_categories.name}</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -380,17 +407,29 @@ const BookingsPage = () => {
         <div className="text-center py-12">
           <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Belum ada booking</h3>
-          <p className="text-gray-600 mb-4">Mulai dengan menambahkan booking pertama Anda</p>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Tambah Booking
-          </Button>
+          <p className="text-gray-600 mb-4">
+            {searchQuery || statusFilter || studioFilter 
+              ? "Tidak ada booking yang sesuai dengan filter yang dipilih"
+              : "Mulai dengan menambahkan booking pertama Anda"
+            }
+          </p>
+          <div className="space-y-2">
+            {(searchQuery || statusFilter || studioFilter) && (
+              <Button variant="outline" onClick={clearFilters}>
+                Reset Filter
+              </Button>
+            )}
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Tambah Booking
+            </Button>
+          </div>
         </div>
       )}
 
       {/* Edit Dialog */}
       <Dialog open={!!editingBooking} onOpenChange={() => setEditingBooking(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Edit Booking</DialogTitle>
           </DialogHeader>
@@ -405,15 +444,14 @@ const BookingsPage = () => {
 
       {/* Installment Dialog */}
       <Dialog open={!!installmentBooking} onOpenChange={() => setInstallmentBooking(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Kelola Cicilan - {installmentBooking?.users?.name}</DialogTitle>
+            <DialogTitle>Kelola Cicilan</DialogTitle>
           </DialogHeader>
           {installmentBooking && (
             <InstallmentManager 
-              bookingId={installmentBooking.id}
-              totalAmount={installmentBooking.total_amount || 0}
-              currentStatus={installmentBooking.status}
+              booking={installmentBooking} 
+              onSuccess={handleInstallmentSuccess} 
             />
           )}
         </DialogContent>
@@ -421,16 +459,14 @@ const BookingsPage = () => {
 
       {/* Time Extension Dialog */}
       <Dialog open={!!extendTimeBooking} onOpenChange={() => setExtendTimeBooking(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Perpanjang Waktu - {extendTimeBooking?.users?.name}</DialogTitle>
+            <DialogTitle>Tambah Waktu Sesi</DialogTitle>
           </DialogHeader>
           {extendTimeBooking && (
             <TimeExtensionManager 
-              bookingId={extendTimeBooking.id}
-              currentEndTime={extendTimeBooking.end_time || ''}
-              studioType={extendTimeBooking.studios?.type || ''}
-              currentAdditionalTime={extendTimeBooking.additional_time_minutes || 0}
+              booking={extendTimeBooking} 
+              onSuccess={handleTimeExtensionSuccess} 
             />
           )}
         </DialogContent>
@@ -443,7 +479,7 @@ const BookingsPage = () => {
             <AlertDialogTitle>Hapus Booking</AlertDialogTitle>
             <AlertDialogDescription>
               Apakah Anda yakin ingin menghapus booking untuk "{deletingBooking?.users?.name}"? 
-              Tindakan ini tidak dapat dibatalkan.
+              Tindakan ini tidak dapat dibatalkan dan akan menghapus semua data terkait termasuk cicilan.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
