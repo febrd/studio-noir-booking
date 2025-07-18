@@ -76,6 +76,9 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   });
 
+  // Get selected studio early to avoid declaration issues
+  const selectedStudio = studios?.find(s => s.id === formData.studio_id);
+
   // Fetch package categories based on studio
   const { data: categories } = useQuery({
     queryKey: ['package-categories', formData.studio_id],
@@ -142,7 +145,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     enabled: !!formData.studio_id
   });
 
-  const selectedStudio = studios?.find(s => s.id === formData.studio_id);
   const selectedPackage = packages?.find(p => p.id === formData.studio_package_id);
 
   // Create guest user mutation
@@ -329,7 +331,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           <Checkbox
             id="create-guest"
             checked={createGuestUser}
-            onCheckedChange={setCreateGuestUser}
+            onCheckedChange={(checked) => setCreateGuestUser(checked === true)}
           />
           <Label htmlFor="create-guest">Buat akun guest baru</Label>
         </div>
@@ -481,7 +483,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
                   <div className="flex items-center space-x-3">
                     <Checkbox
                       checked={isSelected}
-                      onCheckedChange={(checked) => handleServiceToggle(service, checked as boolean)}
+                      onCheckedChange={(checked) => handleServiceToggle(service, checked === true)}
                     />
                     <div>
                       <p className="font-medium">{service.name}</p>
