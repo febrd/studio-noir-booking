@@ -128,7 +128,7 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
             Mendaftar...
           </>
         ) : (
-          'Daftar Sebagai Pelanggan'
+          'Daftar Pelanggan Baru'
         )}
       </Button>
     </form>
