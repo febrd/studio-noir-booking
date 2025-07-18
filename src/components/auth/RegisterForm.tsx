@@ -88,7 +88,7 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
           type="text"
           value={registerForm.email}
           onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-          placeholder="628xxxxxx"
+          placeholder="Email/Whatsapp Anda"
           disabled={isSubmitting}
           autoComplete="email"
         />

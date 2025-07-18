@@ -49,13 +49,13 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
   return (
     <form onSubmit={handleLogin} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="login-email">Email</Label>
+        <Label htmlFor="login-email">Email/Whatsapp</Label>
         <Input
           id="login-email"
-          type="email"
+          type="text"
           value={loginForm.email}
           onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-          placeholder="email@contoh.com"
+          placeholder="Email/Whatsapp Anda"
           disabled={isSubmitting}
           autoComplete="email"
         />
@@ -75,13 +75,7 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
       
       {/* Sample users info */}
       <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
-        <p className="font-medium mb-1">Akun Demo (password: password123):</p>
-        <ul className="space-y-1 text-xs">
-          <li>• owner@studionoir.com (Owner)</li>
-          <li>• admin@studionoir.com (Admin)</li>
-          <li>• keuangan@studionoir.com (Keuangan)</li>
-          <li>• pelanggan@studionoir.com (Pelanggan)</li>
-        </ul>
+      
       </div>
       
       <Button 
