@@ -1,4 +1,5 @@
 
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,10 +16,34 @@ import type { Database } from '@/integrations/supabase/types';
 
 type BookingStatus = Database['public']['Enums']['booking_status'];
 
+interface BookingWithRelations {
+  id: string;
+  status: BookingStatus;
+  payment_method: string;
+  type: string;
+  total_amount: number | null;
+  created_at: string;
+  studios: {
+    id: string;
+    name: string;
+    type: string;
+  } | null;
+  studio_packages: {
+    id: string;
+    title: string;
+    price: number;
+  } | null;
+  users: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+}
+
 const BookingsPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [editingBooking, setEditingBooking] = useState<any>(null);
-  const [deletingBooking, setDeletingBooking] = useState<any>(null);
+  const [editingBooking, setEditingBooking] = useState<BookingWithRelations | null>(null);
+  const [deletingBooking, setDeletingBooking] = useState<BookingWithRelations | null>(null);
   const [selectedStudio, setSelectedStudio] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const queryClient = useQueryClient();
@@ -43,18 +68,23 @@ const BookingsPage = () => {
       let query = supabase
         .from('bookings')
         .select(`
-          *,
-          studios!bookings_studio_id_fkey (
+          id,
+          status,
+          payment_method,
+          type,
+          total_amount,
+          created_at,
+          studios!inner (
             id,
             name,
             type
           ),
-          studio_packages!bookings_studio_package_id_fkey (
+          studio_packages!inner (
             id,
             title,
             price
           ),
-          users!bookings_user_id_fkey (
+          users!inner (
             id,
             name,
             email
@@ -73,7 +103,7 @@ const BookingsPage = () => {
       const { data, error } = await query;
       
       if (error) throw error;
-      return data;
+      return data as BookingWithRelations[];
     }
   });
 
@@ -107,7 +137,7 @@ const BookingsPage = () => {
     queryClient.invalidateQueries({ queryKey: ['bookings'] });
   };
 
-  const handleDelete = (booking: any) => {
+  const handleDelete = (booking: BookingWithRelations) => {
     setDeletingBooking(booking);
   };
 
@@ -257,7 +287,7 @@ const BookingsPage = () => {
                     <span className="font-medium">Studio:</span> {booking.studios?.name || 'N/A'}
                   </p>
                   <p className="text-sm">
-                    <span className="font-medium">Paket:</span> {Array.isArray(booking.studio_packages) ? 'N/A' : (booking.studio_packages?.title || 'N/A')}
+                    <span className="font-medium">Paket:</span> {booking.studio_packages?.title || 'N/A'}
                   </p>
                   <p className="text-sm">
                     <span className="font-medium">Tipe:</span> {' '}
@@ -332,3 +362,4 @@ const BookingsPage = () => {
 };
 
 export default BookingsPage;
+
