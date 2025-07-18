@@ -461,7 +461,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
             id="additional_time"
             type="number"
             min="0"
-            step="30"
+            step="5"
             value={formData.additional_time_minutes}
             onChange={(e) => handleInputChange('additional_time_minutes', parseInt(e.target.value) || 0)}
             placeholder="0"
@@ -580,7 +580,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           {formData.additional_time_minutes > 0 && (
             <div className="flex justify-between text-sm">
               <span>Tambahan waktu ({formData.additional_time_minutes} menit)</span>
-              <span>{formatPrice(Math.ceil(formData.additional_time_minutes / 30) * 50000)}</span>
+              <span>{formatPrice(Math.ceil(formData.additional_time_minutes / 5) * 15000)}</span>
             </div>
           )}
           
