@@ -32,20 +32,37 @@ const TimeExtensionManager = ({
     mutationFn: async (additionalMinutes: number) => {
       const currentTime = new Date();
       const newAdditionalTime = currentAdditionalTime + additionalMinutes;
-      
-      // Calculate new end time from current time + additional minutes
+    
       const newEndTime = new Date(currentTime.getTime() + (additionalMinutes * 60 * 1000));
-      
+    
+      // 1. Hitung biaya tambahan per menit
+      const extensionCost = studioType === 'self_photo'
+        ? additionalMinutes * 5000
+        : additionalMinutes * 15000;
+    
+      // 2. Ambil total_amount lama
+      const { data: currentData, error: fetchError } = await supabase
+        .from('bookings')
+        .select('total_amount')
+        .eq('id', bookingId)
+        .single();
+    
+      if (fetchError) throw fetchError;
+    
+      const newTotalAmount = (currentData?.total_amount || 0) + extensionCost;
+    
+      // 3. Update data booking
       const { data, error } = await supabase
         .from('bookings')
         .update({
           additional_time_minutes: newAdditionalTime,
-          end_time: newEndTime.toISOString()
+          end_time: newEndTime.toISOString(),
+          total_amount: newTotalAmount
         })
         .eq('id', bookingId)
         .select()
         .single();
-      
+    
       if (error) throw error;
       return data;
     },
@@ -160,7 +177,7 @@ const TimeExtensionManager = ({
                 </span>
               </div>
               <p className="text-xs text-blue-600 mt-1">
-                {Math.ceil(extensionMinutes / 5)} slot × {formatPrice(studioType === 'self_photo' ? 5000 : 15000)}
+                {extensionMinutes} menit × {formatPrice(studioType === 'self_photo' ? 5000 : 15000)}
               </p>
             </div>
           )}
