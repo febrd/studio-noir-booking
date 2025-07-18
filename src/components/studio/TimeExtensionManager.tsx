@@ -14,13 +14,15 @@ interface TimeExtensionManagerProps {
   currentEndTime: string;
   studioType: string;
   currentAdditionalTime: number;
+  onSuccess?: () => void;
 }
 
 const TimeExtensionManager = ({ 
   bookingId, 
   currentEndTime, 
   studioType, 
-  currentAdditionalTime 
+  currentAdditionalTime,
+  onSuccess 
 }: TimeExtensionManagerProps) => {
   const [extensionMinutes, setExtensionMinutes] = useState(0);
   const queryClient = useQueryClient();
@@ -51,6 +53,7 @@ const TimeExtensionManager = ({
       toast.success('Waktu berhasil diperpanjang');
       setExtensionMinutes(0);
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      onSuccess?.();
     },
     onError: (error) => {
       console.error('Error extending time:', error);

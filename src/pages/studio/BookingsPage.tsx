@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +14,8 @@ import BookingForm from '@/components/studio/BookingForm';
 import InstallmentManager from '@/components/studio/InstallmentManager';
 import TimeExtensionManager from '@/components/studio/TimeExtensionManager';
 
+type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'paid' | 'expired' | 'failed' | 'installment';
+
 const BookingsPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState<any>(null);
@@ -22,9 +23,9 @@ const BookingsPage = () => {
   const [installmentBooking, setInstallmentBooking] = useState<any>(null);
   const [extendTimeBooking, setExtendTimeBooking] = useState<any>(null);
   
-  // IMPROVED: Add search and filter states
+  // Add search and filter states with proper typing
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<BookingStatus | ''>('');
   const [studioFilter, setStudioFilter] = useState('');
   
   const queryClient = useQueryClient();
@@ -44,7 +45,7 @@ const BookingsPage = () => {
     }
   });
 
-  // IMPROVED: Enhanced query with search and filters
+  // Enhanced query with search and filters
   const { data: bookings, isLoading } = useQuery({
     queryKey: ['bookings', searchQuery, statusFilter, studioFilter],
     queryFn: async () => {
@@ -80,9 +81,9 @@ const BookingsPage = () => {
         query = query.or(`users.name.ilike.%${searchQuery}%,users.email.ilike.%${searchQuery}%`);
       }
 
-      // Apply status filter
+      // Apply status filter with proper typing
       if (statusFilter) {
-        query = query.eq('status', statusFilter);
+        query = query.eq('status', statusFilter as BookingStatus);
       }
 
       // Apply studio filter
@@ -227,7 +228,7 @@ const BookingsPage = () => {
         </Dialog>
       </div>
 
-      {/* IMPROVED: Enhanced search and filter section */}
+      {/* Enhanced search and filter section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -252,7 +253,7 @@ const BookingsPage = () => {
             
             <div className="space-y-2">
               <label className="text-sm font-medium">Status</label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(value: BookingStatus | '') => setStatusFilter(value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Semua status" />
                 </SelectTrigger>
@@ -309,7 +310,9 @@ const BookingsPage = () => {
                     <Calendar className="h-6 w-6 text-blue-600" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">{booking.studio_packages?.title}</CardTitle>
+                    <CardTitle className="text-lg">
+                      {booking.studio_packages?.title || 'Package tidak ditemukan'}
+                    </CardTitle>
                     <Badge variant="outline" className="mt-1">
                       {booking.studios?.name}
                     </Badge>
@@ -450,7 +453,9 @@ const BookingsPage = () => {
           </DialogHeader>
           {installmentBooking && (
             <InstallmentManager 
-              booking={installmentBooking} 
+              bookingId={installmentBooking.id}
+              totalAmount={installmentBooking.total_amount || 0}
+              currentStatus={installmentBooking.status}
               onSuccess={handleInstallmentSuccess} 
             />
           )}
@@ -465,7 +470,10 @@ const BookingsPage = () => {
           </DialogHeader>
           {extendTimeBooking && (
             <TimeExtensionManager 
-              booking={extendTimeBooking} 
+              bookingId={extendTimeBooking.id}
+              currentEndTime={extendTimeBooking.end_time}
+              studioType={extendTimeBooking.studios?.type || 'regular'}
+              currentAdditionalTime={extendTimeBooking.additional_time_minutes || 0}
               onSuccess={handleTimeExtensionSuccess} 
             />
           )}

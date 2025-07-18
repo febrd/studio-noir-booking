@@ -15,9 +15,10 @@ interface InstallmentManagerProps {
   bookingId: string;
   totalAmount: number;
   currentStatus: string;
+  onSuccess?: () => void;
 }
 
-const InstallmentManager = ({ bookingId, totalAmount, currentStatus }: InstallmentManagerProps) => {
+const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }: InstallmentManagerProps) => {
   const [newInstallment, setNewInstallment] = useState({
     amount: '',
     note: ''
@@ -60,6 +61,7 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus }: Installme
       setNewInstallment({ amount: '', note: '' });
       queryClient.invalidateQueries({ queryKey: ['installments', bookingId] });
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      onSuccess?.();
     },
     onError: (error) => {
       console.error('Error adding installment:', error);
