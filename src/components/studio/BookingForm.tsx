@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Clock, Plus, Minus, AlertTriangle, Search } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
+
 
 interface BookingFormProps {
   booking?: any;
@@ -25,6 +27,8 @@ interface AdditionalService {
 }
 
 const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
+  const { userProfile } = useJWTAuth();
+
   const [formData, setFormData] = useState({
     user_id: booking?.user_id || '',
     studio_id: booking?.studio_id || '',
@@ -214,49 +218,88 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         total_amount: totalPrice,
         end_time: endTime
       };
-
+  
       console.log('Saving booking with data:', bookingData);
-
+  
       let result;
+      let oldData: any = null;
+  
       if (booking?.id) {
-        // Update existing booking
+        // Ambil data lama untuk log
+        const { data: existing, error: fetchError } = await supabase
+          .from('bookings')
+          .select('*')
+          .eq('id', booking.id)
+          .single();
+  
+        if (fetchError) {
+          console.warn('Gagal mengambil data lama:', fetchError);
+        } else {
+          oldData = existing;
+        }
+  
+        // Update booking
         const { data: updatedBooking, error } = await supabase
           .from('bookings')
           .update(bookingData)
           .eq('id', booking.id)
           .select()
           .single();
-        
+  
         if (error) {
           console.error('Error updating booking:', error);
           throw error;
         }
+  
         result = updatedBooking;
       } else {
-        // Create new booking
+        // Create booking
         const { data: newBooking, error } = await supabase
           .from('bookings')
           .insert([bookingData])
           .select()
           .single();
-        
+  
         if (error) {
           console.error('Error creating booking:', error);
           throw error;
         }
+  
         result = newBooking;
       }
-      
+  
+      // Log aktivitas ke booking_logs
+      if (userProfile?.id && ['admin', 'owner'].includes(userProfile.role)) {
+        const isUpdate = Boolean(booking?.id);
+        const logPayload = {
+          booking_id: result.id,
+          action_type: isUpdate ? 'update' : 'create',
+          note: isUpdate ? 'Booking diperbarui oleh admin/owner' : 'Booking dibuat oleh admin/owner',
+          performed_by: userProfile.id,
+          ...(isUpdate && { old_data: oldData }),
+          ...(isUpdate && { new_data: result }),
+        };
+  
+        const { error: logError } = await supabase
+          .from('booking_logs')
+          .insert([logPayload]);
+  
+        if (logError) {
+          console.error('Error inserting booking log:', logError);
+          toast.warning('Booking disimpan tapi gagal mencatat log.');
+        }
+      }
+  
       // Handle additional services
       if (selectedServices.length > 0) {
-        // Delete existing services for updates
+        // Delete old services if updating
         if (booking?.id) {
           await supabase
             .from('booking_additional_services')
             .delete()
             .eq('booking_id', booking.id);
         }
-        
+  
         // Insert new services
         const serviceData = selectedServices.map(service => ({
           booking_id: result.id,
@@ -264,36 +307,39 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           quantity: service.quantity,
           total_price: service.price * service.quantity
         }));
-        
+  
         const { error: serviceError } = await supabase
           .from('booking_additional_services')
           .insert(serviceData);
-        
+  
         if (serviceError) {
           console.error('Error creating additional services:', serviceError);
           throw serviceError;
         }
       }
-      
+  
       return result;
     },
+  
     onSuccess: () => {
       toast.success(booking?.id ? 'Booking berhasil diupdate' : 'Booking berhasil ditambahkan');
       onSuccess();
     },
+  
     onError: (error: any) => {
       console.error('Error saving booking:', error);
       let errorMessage = 'Gagal menyimpan booking';
-      
+  
       if (error.code === '23503') {
         errorMessage = 'Error: Data yang dipilih tidak valid atau sudah dihapus';
       } else if (error.message) {
-        errorMessage = `Error: ${error.message}`;
+        errorMessage = `Error booking: ${error.message}`;
       }
-      
+  
       toast.error(errorMessage);
     }
   });
+  
 
   // Calculate end time
   const calculateEndTime = (startTime: string, baseMinutes: number, additionalMinutes: number = 0) => {
