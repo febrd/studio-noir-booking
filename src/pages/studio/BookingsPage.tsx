@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -44,17 +43,17 @@ const BookingsPage = () => {
         .from('bookings')
         .select(`
           *,
-          studios (
+          studios!bookings_studio_id_fkey (
             id,
             name,
             type
           ),
-          studio_packages (
+          studio_packages!bookings_studio_package_id_fkey (
             id,
             title,
             price
           ),
-          users (
+          users!bookings_user_id_fkey (
             id,
             name,
             email
