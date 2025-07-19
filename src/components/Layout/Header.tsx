@@ -1,4 +1,5 @@
-import { useAuth } from '@/hooks/useAuth';
+
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { Bell, Settings, User, Menu, LogOut, Crown, Shield, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,7 +17,7 @@ interface HeaderProps {
 }
 
 export const Header = ({ onMenuToggle, isSidebarOpen }: HeaderProps) => {
-  const { userProfile, signOut } = useAuth();
+  const { userProfile, signOut } = useJWTAuth();
 
   const getRoleIcon = (role: string) => {
     switch (role) {
