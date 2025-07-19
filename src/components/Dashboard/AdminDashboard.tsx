@@ -1,9 +1,10 @@
+
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { Users, Calendar, Building2, TrendingUp, BookOpen, DollarSign } from 'lucide-react';
+import { Users, Calendar, Building2, TrendingUp, BookOpen, DollarSign, UserCheck } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
 import { id } from 'date-fns/locale';
 
@@ -17,7 +18,7 @@ export const AdminDashboard = () => {
       const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
       const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
 
-      const [bookings, studios, users, packages] = await Promise.all([
+      const [bookings, walkinSessions, studios, users, packages] = await Promise.all([
         supabase
           .from('bookings')
           .select(`
@@ -27,6 +28,20 @@ export const AdminDashboard = () => {
             studio_packages (title, price),
             installments (amount)
           `)
+          .eq('is_walking_session', false)
+          .gte('created_at', weekStart.toISOString())
+          .lte('created_at', weekEnd.toISOString()),
+        
+        supabase
+          .from('bookings')
+          .select(`
+            *,
+            users (name, email),
+            studios (name, type),
+            studio_packages (title, price),
+            installments (amount)
+          `)
+          .eq('is_walking_session', true)
           .gte('created_at', weekStart.toISOString())
           .lte('created_at', weekEnd.toISOString()),
         
@@ -37,6 +52,7 @@ export const AdminDashboard = () => {
 
       return {
         bookings: bookings.data || [],
+        walkinSessions: walkinSessions.data || [],
         studios: studios.data || [],
         users: users.data || [],
         packages: packages.data || []
@@ -48,18 +64,21 @@ export const AdminDashboard = () => {
     return <div className="flex justify-center items-center h-64">Loading dashboard...</div>;
   }
 
-  const { bookings, studios, users, packages } = dashboardData || {};
+  const { bookings, walkinSessions, studios, users, packages } = dashboardData || {};
+  const allBookings = [...(bookings || []), ...(walkinSessions || [])];
 
-  // Calculate daily bookings for the week
+  // Calculate daily bookings for the week including walk-ins
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
   const dailyBookings = weekDays.map(day => {
-    const dayBookings = bookings?.filter(booking => {
+    const dayBookings = allBookings?.filter(booking => {
       const bookingDate = new Date(booking.created_at);
       return format(bookingDate, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd');
     }) || [];
+
+    const dayWalkins = dayBookings.filter(b => b.is_walking_session);
 
     const revenue = dayBookings.reduce((sum, booking) => {
       const bookingAmount = booking.total_amount || 0;
@@ -70,16 +89,19 @@ export const AdminDashboard = () => {
     return {
       day: format(day, 'EEE', { locale: id }),
       bookings: dayBookings.length,
+      walkins: dayWalkins.length,
       revenue
     };
   });
 
-  // Studio utilization for pie chart
+  // Studio utilization for pie chart including walk-ins
   const studioUtilization = studios?.map(studio => {
-    const studioBookings = bookings?.filter(b => b.studio_id === studio.id) || [];
+    const studioBookings = allBookings?.filter(b => b.studio_id === studio.id) || [];
+    const studioWalkins = studioBookings.filter(b => b.is_walking_session);
     return {
       name: studio.name,
       bookings: studioBookings.length,
+      walkins: studioWalkins.length,
       type: studio.type
     };
   }).filter(s => s.bookings > 0) || [];
@@ -97,7 +119,8 @@ export const AdminDashboard = () => {
   };
 
   const totalRevenue = dailyBookings.reduce((sum, day) => sum + day.revenue, 0);
-  const totalBookingsCount = bookings?.length || 0;
+  const totalBookingsCount = allBookings?.length || 0;
+  const totalWalkinCount = walkinSessions?.length || 0;
 
   return (
     <div className="space-y-6 p-6">
@@ -109,16 +132,29 @@ export const AdminDashboard = () => {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bookings Minggu Ini</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalBookingsCount}</div>
             <p className="text-xs text-muted-foreground">
               Rata-rata {(totalBookingsCount / 7).toFixed(1)} per hari
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Walk-in Sessions</CardTitle>
+            <UserCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalWalkinCount}</div>
+            <p className="text-xs text-muted-foreground">
+              {totalBookingsCount > 0 ? ((totalWalkinCount / totalBookingsCount) * 100).toFixed(1) : 0}% dari total booking
             </p>
           </CardContent>
         </Card>
@@ -169,13 +205,13 @@ export const AdminDashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Tren Booking Harian</CardTitle>
-            <CardDescription>Jumlah booking dan revenue per hari</CardDescription>
+            <CardDescription>Jumlah booking dan walk-in per hari</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer
               config={{
-                bookings: { label: "Bookings", color: "hsl(var(--chart-1))" },
-                revenue: { label: "Revenue", color: "hsl(var(--chart-2))" }
+                bookings: { label: "Total Bookings", color: "hsl(var(--chart-1))" },
+                walkins: { label: "Walk-ins", color: "hsl(var(--chart-2))" }
               }}
               className="h-[300px]"
             >
@@ -186,6 +222,10 @@ export const AdminDashboard = () => {
                       <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8}/>
                       <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.1}/>
                     </linearGradient>
+                    <linearGradient id="colorWalkins" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0.1}/>
+                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="day" />
@@ -194,9 +234,18 @@ export const AdminDashboard = () => {
                   <Area 
                     type="monotone" 
                     dataKey="bookings" 
+                    stackId="1"
                     stroke="hsl(var(--chart-1))" 
                     fillOpacity={1} 
                     fill="url(#colorBookings)" 
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="walkins" 
+                    stackId="2"
+                    stroke="hsl(var(--chart-2))" 
+                    fillOpacity={1} 
+                    fill="url(#colorWalkins)" 
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -308,33 +357,29 @@ export const AdminDashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              Package Management
+              <UserCheck className="h-5 w-5" />
+              Walk-in Summary
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span>Total Packages:</span>
-                <span className="font-medium">{packages?.length || 0}</span>
+                <span>Total Walk-ins:</span>
+                <span className="font-medium">{totalWalkinCount}</span>
               </div>
               <div className="flex justify-between">
-                <span>Avg Price:</span>
+                <span>Walk-in Rate:</span>
                 <span className="font-medium">
-                  Rp {packages?.length ? Math.round(packages.reduce((sum, p) => sum + (p.price || 0), 0) / packages.length).toLocaleString('id-ID') : 0}
+                  {totalBookingsCount > 0 ? ((totalWalkinCount / totalBookingsCount) * 100).toFixed(1) : 0}%
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Most Expensive:</span>
-                <span className="font-medium text-green-600">
-                  Rp {packages?.length ? Math.max(...packages.map(p => p.price || 0)).toLocaleString('id-ID') : 0}
-                </span>
+                <span>Regular Bookings:</span>
+                <span className="font-medium">{(bookings?.length || 0)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Most Affordable:</span>
-                <span className="font-medium text-blue-600">
-                  Rp {packages?.length ? Math.min(...packages.map(p => p.price || 0)).toLocaleString('id-ID') : 0}
-                </span>
+                <span>Avg Walk-ins/Day:</span>
+                <span className="font-medium text-blue-600">{(totalWalkinCount / 7).toFixed(1)}</span>
               </div>
             </div>
           </CardContent>

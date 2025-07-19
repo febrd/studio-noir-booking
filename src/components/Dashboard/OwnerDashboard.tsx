@@ -4,12 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { DollarSign, Users, Calendar, TrendingUp, Building2, Target } from 'lucide-react';
+import { DollarSign, Users, Calendar, TrendingUp, Building2, Target, UserCheck } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
 
 export const OwnerDashboard = () => {
-  // Fetch comprehensive dashboard data
+  // Fetch comprehensive dashboard data including walk-ins
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['owner-dashboard'],
     queryFn: async () => {
@@ -19,8 +19,8 @@ export const OwnerDashboard = () => {
       const lastMonth = subDays(startDate, 1);
       const lastMonthStart = startOfMonth(lastMonth);
 
-      // Fetch bookings data for current and last month
-      const [currentBookings, lastMonthBookings, studios, users, targets] = await Promise.all([
+      // Fetch bookings data for current and last month including walk-ins
+      const [currentBookings, currentWalkins, lastMonthBookings, lastMonthWalkins, studios, users, targets] = await Promise.all([
         supabase
           .from('bookings')
           .select(`
@@ -30,12 +30,34 @@ export const OwnerDashboard = () => {
             studio_packages (title, price),
             installments (amount)
           `)
+          .eq('is_walking_session', false)
           .gte('created_at', startDate.toISOString())
           .lte('created_at', endDate.toISOString()),
         
         supabase
           .from('bookings')
-          .select('total_amount, installments (amount)')
+          .select(`
+            *,
+            users (name, email),
+            studios (name, type),
+            studio_packages (title, price),
+            installments (amount)
+          `)
+          .eq('is_walking_session', true)
+          .gte('created_at', startDate.toISOString())
+          .lte('created_at', endDate.toISOString()),
+        
+        supabase
+          .from('bookings')
+          .select('total_amount, installments (amount), is_walking_session')
+          .eq('is_walking_session', false)
+          .gte('created_at', lastMonthStart.toISOString())
+          .lt('created_at', startDate.toISOString()),
+
+        supabase
+          .from('bookings')
+          .select('total_amount, installments (amount), is_walking_session')
+          .eq('is_walking_session', true)
           .gte('created_at', lastMonthStart.toISOString())
           .lt('created_at', startDate.toISOString()),
         
@@ -44,9 +66,13 @@ export const OwnerDashboard = () => {
         supabase.from('monthly_targets').select('*').eq('month', currentMonth.getMonth() + 1).eq('year', currentMonth.getFullYear())
       ]);
 
+      const allCurrentBookings = [...(currentBookings.data || []), ...(currentWalkins.data || [])];
+      const allLastMonthBookings = [...(lastMonthBookings.data || []), ...(lastMonthWalkins.data || [])];
+
       return {
-        currentBookings: currentBookings.data || [],
-        lastMonthBookings: lastMonthBookings.data || [],
+        currentBookings: allCurrentBookings,
+        currentWalkins: currentWalkins.data || [],
+        lastMonthBookings: allLastMonthBookings,
         studios: studios.data || [],
         users: users.data || [],
         targets: targets.data || []
@@ -58,7 +84,7 @@ export const OwnerDashboard = () => {
     return <div className="flex justify-center items-center h-64">Loading dashboard...</div>;
   }
 
-  const { currentBookings, lastMonthBookings, studios, users, targets } = dashboardData || {};
+  const { currentBookings, currentWalkins, lastMonthBookings, studios, users, targets } = dashboardData || {};
 
   // Calculate revenue including installments
   const calculateRevenue = (bookings: any[]) => {
@@ -73,18 +99,21 @@ export const OwnerDashboard = () => {
   const lastMonthRevenue = calculateRevenue(lastMonthBookings);
   const revenueGrowth = lastMonthRevenue > 0 ? ((currentRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
 
-  // Studio performance analysis
+  // Studio performance analysis including walk-ins
   const studioPerformance = currentBookings?.reduce((acc, booking) => {
     const studioName = booking.studios?.name || 'Unknown';
     if (!acc[studioName]) {
-      acc[studioName] = { revenue: 0, bookings: 0 };
+      acc[studioName] = { revenue: 0, bookings: 0, walkins: 0 };
     }
     const bookingRevenue = booking.total_amount || 0;
     const installmentRevenue = booking.installments?.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0) || 0;
     acc[studioName].revenue += Math.max(bookingRevenue, installmentRevenue);
     acc[studioName].bookings += 1;
+    if (booking.is_walking_session) {
+      acc[studioName].walkins += 1;
+    }
     return acc;
-  }, {} as Record<string, { revenue: number; bookings: number }>) || {};
+  }, {} as Record<string, { revenue: number; bookings: number; walkins: number }>) || {};
 
   const topStudios = Object.entries(studioPerformance)
     .map(([name, data]) => ({ name, ...data }))
@@ -95,14 +124,17 @@ export const OwnerDashboard = () => {
   const paymentAnalysis = currentBookings?.reduce((acc, booking) => {
     const method = booking.payment_method || 'unknown';
     if (!acc[method]) {
-      acc[method] = { count: 0, revenue: 0 };
+      acc[method] = { count: 0, revenue: 0, walkins: 0 };
     }
     acc[method].count += 1;
+    if (booking.is_walking_session) {
+      acc[method].walkins += 1;
+    }
     const bookingRevenue = booking.total_amount || 0;
     const installmentRevenue = booking.installments?.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0) || 0;
     acc[method].revenue += Math.max(bookingRevenue, installmentRevenue);
     return acc;
-  }, {} as Record<string, { count: number; revenue: number }>) || {};
+  }, {} as Record<string, { count: number; revenue: number; walkins: number }>) || {};
 
   const paymentData = Object.entries(paymentAnalysis).map(([method, data]) => ({
     method: method === 'online' ? 'Online' : 'Offline',
@@ -120,6 +152,8 @@ export const OwnerDashboard = () => {
 
   const currentTarget = targets?.[0]?.target_amount || 20000000;
   const targetAchievement = (currentRevenue / currentTarget) * 100;
+  const totalWalkinsCount = currentWalkins?.length || 0;
+  const totalBookingsCount = currentBookings?.length || 0;
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
@@ -133,7 +167,7 @@ export const OwnerDashboard = () => {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue Bulan Ini</CardTitle>
@@ -153,9 +187,22 @@ export const OwnerDashboard = () => {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{currentBookings?.length || 0}</div>
+            <div className="text-2xl font-bold">{totalBookingsCount}</div>
             <p className="text-xs text-muted-foreground">
-              Rata-rata: Rp {currentBookings?.length ? Math.round(currentRevenue / currentBookings.length).toLocaleString('id-ID') : 0} per booking
+              Rata-rata: Rp {totalBookingsCount ? Math.round(currentRevenue / totalBookingsCount).toLocaleString('id-ID') : 0} per booking
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Walk-in Sessions</CardTitle>
+            <UserCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalWalkinsCount}</div>
+            <p className="text-xs text-muted-foreground">
+              {totalBookingsCount > 0 ? ((totalWalkinsCount / totalBookingsCount) * 100).toFixed(1) : 0}% dari total booking
             </p>
           </CardContent>
         </Card>
@@ -196,7 +243,7 @@ export const OwnerDashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Top 5 Studios Performance</CardTitle>
-            <CardDescription>Revenue dan jumlah booking per studio</CardDescription>
+            <CardDescription>Revenue dan jumlah booking per studio (termasuk walk-in)</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -223,7 +270,7 @@ export const OwnerDashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Payment Method Distribution</CardTitle>
-            <CardDescription>Distribusi metode pembayaran</CardDescription>
+            <CardDescription>Distribusi metode pembayaran (termasuk walk-in)</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -305,11 +352,11 @@ export const OwnerDashboard = () => {
             Studio Management Summary
           </CardTitle>
           <CardDescription>
-            Ringkasan status dan performa studio
+            Ringkasan status dan performa studio (termasuk walk-in sessions)
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="p-4 border rounded-lg">
               <h3 className="font-semibold mb-2">Studio Types</h3>
               <div className="space-y-1">
@@ -337,7 +384,17 @@ export const OwnerDashboard = () => {
                 {topStudios[0]?.name || 'N/A'}
               </div>
               <div className="text-sm text-muted-foreground">
-                {topStudios[0]?.bookings || 0} bookings
+                {topStudios[0]?.bookings || 0} bookings ({topStudios[0]?.walkins || 0} walk-ins)
+              </div>
+            </div>
+
+            <div className="p-4 border rounded-lg">
+              <h3 className="font-semibold mb-2">Walk-in Performance</h3>
+              <div className="text-2xl font-bold text-blue-600">
+                {totalWalkinsCount}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {totalBookingsCount > 0 ? ((totalWalkinsCount / totalBookingsCount) * 100).toFixed(1) : 0}% conversion rate
               </div>
             </div>
           </div>
