@@ -52,8 +52,8 @@ export function AppSidebar() {
           </div>
           {state === "expanded" && (
             <div>
-              <h2 className="font-semibold text-elegant">Studio Noir</h2>
-              <p className="text-xs text-muted-foreground">Admin Panel</p>
+              <h2 className="font-semibold text-elegant">Masuk Studio</h2>
+              <p className="text-xs text-muted-foreground">Panel</p>
             </div>
           )}
         </div>
