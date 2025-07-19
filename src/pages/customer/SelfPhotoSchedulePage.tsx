@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Clock, User, MapPin, Calendar as CalendarIcon, ArrowLeft, Info } from 'lucide-react';
-import { format, addDays, isSameDay, parseISO, isAfter, isBefore, startOfDay, addMinutes } from 'date-fns';
+import { Clock, MapPin, Calendar as CalendarIcon, ArrowLeft } from 'lucide-react';
+import { format, isSameDay, parseISO, isBefore, startOfDay, addMinutes } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,7 +50,7 @@ interface BookedSlot {
   id: string;
 }
 
-const RegularSchedulePage: React.FC = () => {
+const SelfPhotoSchedulePage: React.FC = () => {
   const { packageId } = useParams<{ packageId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -213,7 +213,7 @@ const RegularSchedulePage: React.FC = () => {
           status: 'confirmed',
           total_amount: selectedPackage.price,
           payment_method: 'online',
-          type: 'regular'
+          type: 'self_photo'
         })
         .select()
         .single();
@@ -226,7 +226,7 @@ const RegularSchedulePage: React.FC = () => {
       });
 
       // Navigate to checkout page
-      navigate(`/customer/regular-checkout/${data.id}`);
+      navigate(`/customer/self-photo-checkout/${data.id}`);
     } catch (error) {
       console.error('Error creating booking:', error);
       toast({
@@ -323,7 +323,7 @@ const RegularSchedulePage: React.FC = () => {
       <div className="container mx-auto p-4">
         <div className="text-center">
           <p className="text-lg text-gray-600">Package not found</p>
-          <Button onClick={() => navigate('/customer/regular-packages')} className="mt-4">
+          <Button onClick={() => navigate('/customer/self-photo-packages')} className="mt-4">
             Back to Packages
           </Button>
         </div>
@@ -337,13 +337,13 @@ const RegularSchedulePage: React.FC = () => {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate('/customer/regular-packages')}
+          onClick={() => navigate('/customer/self-photo-packages')}
           className="mr-4"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Packages
         </Button>
-        <h1 className="text-2xl font-bold">Schedule Your Session</h1>
+        <h1 className="text-2xl font-bold">Schedule Your Self Photo Session</h1>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -508,4 +508,4 @@ const RegularSchedulePage: React.FC = () => {
   );
 };
 
-export default RegularSchedulePage;
+export default SelfPhotoSchedulePage;
