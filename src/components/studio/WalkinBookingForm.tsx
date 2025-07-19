@@ -18,6 +18,7 @@ const walkinBookingSchema = z.object({
   customer_name: z.string().min(1, 'Nama customer wajib diisi'),
   customer_email: z.string().email('Email tidak valid').min(1, 'Email wajib diisi'),
   studio_id: z.string().min(1, 'Studio wajib dipilih'),
+  category_id: z.string().optional(),
   package_id: z.string().min(1, 'Package wajib dipilih'),
   start_time: z.string().min(1, 'Waktu mulai wajib diisi'),
   end_time: z.string().min(1, 'Waktu selesai wajib diisi'),
@@ -45,6 +46,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       customer_name: booking?.customer_name || '',
       customer_email: booking?.customer_email || '',
       studio_id: booking?.studio_id || '',
+      category_id: booking?.package_category_id || '',
       package_id: booking?.studio_package_id || '',
       start_time: booking?.start_time ? format(new Date(booking.start_time), 'HH:mm') : '',
       end_time: booking?.end_time ? format(new Date(booking.end_time), 'HH:mm') : '',
@@ -68,24 +70,72 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
     }
   });
 
-  // Fetch packages based on selected studio
+  // Get selected studio details
   const selectedStudioId = form.watch('studio_id');
-  const { data: packages } = useQuery({
-    queryKey: ['packages-by-studio', selectedStudioId],
+  const selectedStudio = studios?.find(studio => studio.id === selectedStudioId);
+  const isRegularStudio = selectedStudio?.type === 'regular';
+
+  // Fetch categories for regular studios
+  const { data: categories } = useQuery({
+    queryKey: ['package-categories-by-studio', selectedStudioId],
     queryFn: async () => {
-      if (!selectedStudioId) return [];
+      if (!selectedStudioId || !isRegularStudio) return [];
       
       const { data, error } = await supabase
-        .from('studio_packages')
-        .select('id, title, price, base_time_minutes')
+        .from('package_categories')
+        .select('id, name, description')
         .eq('studio_id', selectedStudioId)
-        .order('title');
+        .order('name');
       
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedStudioId
+    enabled: !!selectedStudioId && isRegularStudio
   });
+
+  // Fetch packages based on selected studio and category
+  const selectedCategoryId = form.watch('category_id');
+  const { data: packages } = useQuery({
+    queryKey: ['packages-by-studio-category', selectedStudioId, selectedCategoryId, isRegularStudio],
+    queryFn: async () => {
+      if (!selectedStudioId) return [];
+      
+      let query = supabase
+        .from('studio_packages')
+        .select('id, title, price, base_time_minutes')
+        .eq('studio_id', selectedStudioId);
+      
+      // For regular studios, filter by category if selected
+      if (isRegularStudio && selectedCategoryId) {
+        query = query.eq('category_id', selectedCategoryId);
+      }
+      // For self-photo studios, get packages without category requirement
+      else if (!isRegularStudio) {
+        query = query.is('category_id', null);
+      }
+      
+      const { data, error } = await query.order('title');
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedStudioId && (!isRegularStudio || !!selectedCategoryId || !isRegularStudio)
+  });
+
+  // Reset category and package when studio changes
+  useEffect(() => {
+    if (selectedStudioId) {
+      form.setValue('category_id', '');
+      form.setValue('package_id', '');
+    }
+  }, [selectedStudioId, form]);
+
+  // Reset package when category changes for regular studios
+  useEffect(() => {
+    if (isRegularStudio && selectedCategoryId) {
+      form.setValue('package_id', '');
+    }
+  }, [selectedCategoryId, isRegularStudio, form]);
 
   // Create/Update mutation
   const createMutation = useMutation({
@@ -151,6 +201,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
           .update({
             studio_id: data.studio_id,
             studio_package_id: data.package_id,
+            package_category_id: isRegularStudio ? data.category_id : null,
             start_time: startDateTime.toISOString(),
             end_time: endDateTime.toISOString(),
             payment_method: dbPaymentMethod,
@@ -169,6 +220,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
             user_id: customerId,
             studio_id: data.studio_id,
             studio_package_id: data.package_id,
+            package_category_id: isRegularStudio ? data.category_id : null,
             start_time: startDateTime.toISOString(),
             end_time: endDateTime.toISOString(),
             payment_method: dbPaymentMethod,
@@ -254,7 +306,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
                 <SelectContent>
                   {studios?.map((studio) => (
                     <SelectItem key={studio.id} value={studio.id}>
-                      {studio.name} ({studio.type})
+                      {studio.name} ({studio.type === 'self_photo' ? 'Self Photo' : 'Regular'})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -264,12 +316,39 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
               )}
             </div>
 
+            {/* Category selection - only for regular studios */}
+            {isRegularStudio && (
+              <div>
+                <Label htmlFor="category_id">Kategori Package *</Label>
+                <Select 
+                  value={form.watch('category_id')} 
+                  onValueChange={(value) => form.setValue('category_id', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih kategori" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories?.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {categories?.length === 0 && selectedStudioId && (
+                  <p className="text-sm text-amber-600">
+                    Belum ada kategori untuk studio ini. Silakan buat kategori terlebih dahulu.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <Label htmlFor="package_id">Package *</Label>
               <Select 
                 value={form.watch('package_id')} 
                 onValueChange={(value) => form.setValue('package_id', value)}
-                disabled={!selectedStudioId}
+                disabled={!selectedStudioId || (isRegularStudio && !selectedCategoryId)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Pilih package" />
