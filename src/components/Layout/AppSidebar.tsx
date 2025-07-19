@@ -31,6 +31,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronRight } from 'lucide-react';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
+import { Link } from 'react-router-dom';
 
 // Define types for menu items
 type MenuItemWithUrl = {
@@ -82,22 +83,22 @@ export function AppSidebar() {
           items: [
             {
               title: "Studios",
-              url: "/studio/studios",
+              url: "/studios",
               icon: Camera,
             },
             {
               title: "Package Categories",
-              url: "/studio/categories",
+              url: "/categories",
               icon: Package,
             },
             {
               title: "Packages",
-              url: "/studio/packages",
+              url: "/packages",
               icon: Package,
             },
             {
               title: "Additional Services",
-              url: "/studio/services",
+              url: "/services",
               icon: Settings,
             },
            
@@ -109,12 +110,12 @@ export function AppSidebar() {
           items: [
             {
               title: "Bookings",
-              url: "/studio/bookings",
+              url: "/bookings",
               icon: Calendar,
             },
             {
               title: "Walk-in Sessions",
-              url: "/studio/walkin-sessions",
+              url: "/walkin-sessions",
               icon: UserCheck,
             },
             {
@@ -140,7 +141,7 @@ export function AppSidebar() {
             },
             {
               title: "Booking Logs",
-              url: "/studio/booking-logs",
+              url: "/booking-logs",
               icon: BookOpen,
             },
           ],
@@ -213,7 +214,6 @@ export function AppSidebar() {
 
   // Only show payment gateway for owner
   const ownerOnlyItems: MenuItem[] = userProfile?.role === 'owner' ? [
-
     {
       title: "Payment Providers",
       url: "/admin/payment-providers",
@@ -247,10 +247,10 @@ export function AppSidebar() {
                             {item.items.map((subItem) => (
                               <SidebarMenuSubItem key={subItem.title}>
                                 <SidebarMenuSubButton asChild>
-                                  <a href={subItem.url}>
+                                  <Link to={subItem.url}>
                                     <subItem.icon />
                                     <span>{subItem.title}</span>
-                                  </a>
+                                  </Link>
                                 </SidebarMenuSubButton>
                               </SidebarMenuSubItem>
                             ))}
@@ -260,10 +260,10 @@ export function AppSidebar() {
                     </Collapsible>
                   ) : hasUrl(item) ? (
                     <SidebarMenuButton asChild tooltip={item.title}>
-                      <a href={item.url}>
+                      <Link to={item.url}>
                         <item.icon />
                         <span>{item.title}</span>
-                      </a>
+                      </Link>
                     </SidebarMenuButton>
                   ) : null}
                 </SidebarMenuItem>
