@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +14,7 @@ import BookingForm from '@/components/studio/BookingForm';
 import InstallmentManager from '@/components/studio/InstallmentManager';
 import TimeExtensionManager from '@/components/studio/TimeExtensionManager';
 import { useDebounce } from '@/hooks/useDebounce';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'paid' | 'expired' | 'failed' | 'installment';
 
@@ -542,13 +542,9 @@ const BookingsPage = () => {
                             Dibayar: {formatPrice(totalPaid)}
                           </p>
 
-                          {remainingAmount > 0 ? (
+                          {actualStatus !== 'paid' && remainingAmount > 0 && (
                             <p className="text-orange-600">
                               Sisa: {formatPrice(remainingAmount)}
-                            </p>
-                          ) : (
-                            <p className="text-green-600">
-                              Sisa tagihan: -
                             </p>
                           )}
                         </>
@@ -644,18 +640,20 @@ const BookingsPage = () => {
 
       {/* Installment Dialog */}
       <Dialog open={!!installmentBooking} onOpenChange={() => setInstallmentBooking(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Kelola Cicilan</DialogTitle>
           </DialogHeader>
-          {installmentBooking && (
-            <InstallmentManager 
-              bookingId={installmentBooking.id}
-              totalAmount={installmentBooking.total_amount || 0}
-              currentStatus={installmentBooking.status}
-              onSuccess={handleInstallmentSuccess} 
-            />
-          )}
+          <ScrollArea className="max-h-[60vh] pr-4">
+            {installmentBooking && (
+              <InstallmentManager 
+                bookingId={installmentBooking.id}
+                totalAmount={installmentBooking.total_amount || 0}
+                currentStatus={installmentBooking.status}
+                onSuccess={handleInstallmentSuccess} 
+              />
+            )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
