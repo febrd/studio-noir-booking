@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +14,17 @@ import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfDay, endOfDay, addMinutes } from 'date-fns';
 import { WalkinTimeExtensionManager } from './WalkinTimeExtensionManager';
+
+// WITA timezone utilities - Consistent with BookingForm
+const parseWITADateTime = (dateTimeString: string): Date => {
+  if (!dateTimeString) return new Date();
+  
+  // Create date object treating the input as WITA time
+  const date = new Date(dateTimeString);
+  // Subtract 8 hours to get the actual UTC time that represents this WITA time
+  const witaOffset = 8 * 60; // 8 hours in minutes
+  return new Date(date.getTime() - (witaOffset * 60000));
+};
 
 const walkinBookingSchema = z.object({
   customer_name: z.string().min(1, 'Nama customer wajib diisi'),
@@ -159,7 +169,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
     return packagePrice + extensionCost + servicesTotal;
   };
 
-  // Auto-calculate end time
+  // Auto-calculate end time with WITA consistency
   const calculateEndTime = () => {
     const startTime = form.watch('start_time');
     if (!startTime || !selectedPackage) return '';
@@ -201,18 +211,21 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
     }
   }, [selectedCategoryId, isRegularStudio, form]);
 
-  // Create/Update mutation
+  // Create/Update mutation with WITA timezone preservation
   const createMutation = useMutation({
+    mutationKey: ['save-walkin-booking'],
     mutationFn: async (data: WalkinBookingFormData) => {
-      const startDateTime = new Date(`${todayString}T${data.start_time}:00`);
+      // Create full datetime string with WITA consistency
+      const startTimeString = `${todayString}T${data.start_time}:00`;
+      const startDateTime = parseWITADateTime(startTimeString);
       const totalMinutes = (selectedPackage?.base_time_minutes || 0) + additionalTime;
-      const endDateTime = addMinutes(startDateTime, totalMinutes);
+      const endDateTime = new Date(startDateTime.getTime() + (totalMinutes * 60 * 1000));
 
-      console.log('Checking conflict for:', {
-        studio_id: data.studio_id,
-        start_time: startDateTime.toISOString(),
-        end_time: endDateTime.toISOString(),
-        exclude_booking_id: booking?.id || null
+      console.log('🔧 Walk-in WITA Times:', {
+        startInput: startTimeString,
+        startDateTime: startDateTime.toISOString(),
+        endDateTime: endDateTime.toISOString(),
+        totalMinutes
       });
 
       // Check for conflicts with regular bookings only (exclude walk-in sessions from conflict check)
@@ -294,7 +307,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       const totalAmount = calculateTotalAmount();
 
       if (booking) {
-        // Update existing booking
+        // Update existing booking - maintain WITA times
         const { error } = await supabase
           .from('bookings')
           .update({
@@ -346,7 +359,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
 
         return { id: booking.id };
       } else {
-        // Create new booking
+        // Create new booking - maintain WITA times
         const { data: newBooking, error } = await supabase
           .from('bookings')
           .insert({
@@ -459,7 +472,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
         {/* Session Details */}
         <Card>
           <CardHeader>
-            <CardTitle>Detail Sesi - {format(today, 'dd/MM/yyyy')}</CardTitle>
+            <CardTitle>Detail Sesi - {format(today, 'dd/MM/yyyy')} (WITA)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -528,19 +541,20 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="start_time">Waktu Mulai *</Label>
+                <Label htmlFor="start_time">Waktu Mulai (WITA) *</Label>
                 <Input
                   id="start_time"
                   type="time"
                   {...form.register('start_time')}
                 />
+                <p className="text-xs text-gray-500 mt-1">Waktu Indonesia Timur</p>
                 {form.formState.errors.start_time && (
                   <p className="text-sm text-red-600">{form.formState.errors.start_time.message}</p>
                 )}
               </div>
 
               <div>
-                <Label htmlFor="end_time">Waktu Selesai</Label>
+                <Label htmlFor="end_time">Waktu Selesai (WITA)</Label>
                 <Input
                   id="end_time"
                   type="time"
