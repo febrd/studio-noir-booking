@@ -555,13 +555,13 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="guest-email">Email *</Label>
+              <Label htmlFor="guest-email">Email/Whatsapp *</Label>
               <Input
                 id="guest-email"
-                type="email"
+                type="text"
                 value={guestUser.email}
                 onChange={(e) => setGuestUser(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="email@example.com"
+                placeholder="Emai/Whatsapp"
                 required
               />
             </div>
