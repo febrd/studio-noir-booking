@@ -367,7 +367,7 @@ const BookingsPage = () => {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Bookings - Transaction</h1>
           <p className="text-gray-600">Kelola booking studio dengan sistem cicilan</p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>

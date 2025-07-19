@@ -208,7 +208,7 @@ const OfflineBookingsReport = () => {
     <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Offline Bookings Report</h1>
+          <h1 className="text-3xl font-bold">Offline Transactions - Report</h1>
           <p className="text-muted-foreground">Analisis komprehensif booking offline</p>
         </div>
         <div className="flex gap-2">
