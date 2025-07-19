@@ -169,7 +169,7 @@ export const OwnerDashboard = () => {
             <div className="text-2xl font-bold">{studios?.length || 0}</div>
             <p className="text-xs text-muted-foreground">
               Self Photo: {studios?.filter(s => s.type === 'self_photo').length || 0} | 
-              Regular: {studios?.filter(s => s.type === 'regular_photo').length || 0}
+              Regular: {studios?.filter(s => s.type === 'regular').length || 0}
             </p>
           </CardContent>
         </Card>
@@ -319,7 +319,7 @@ export const OwnerDashboard = () => {
                 </div>
                 <div className="flex justify-between">
                   <span>Regular Photo:</span>
-                  <span className="font-medium">{studios?.filter(s => s.type === 'regular_photo').length || 0}</span>
+                  <span className="font-medium">{studios?.filter(s => s.type === 'regular').length || 0}</span>
                 </div>
               </div>
             </div>

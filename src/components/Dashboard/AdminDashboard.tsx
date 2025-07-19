@@ -60,7 +60,7 @@ export const AdminDashboard = () => {
       return format(bookingDate, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd');
     }) || [];
 
-    const revenue = dailyBookings.reduce((sum, booking) => {
+    const revenue = dayBookings.reduce((sum, booking) => {
       const bookingAmount = booking.total_amount || 0;
       const installmentAmount = booking.installments?.reduce((instSum: number, inst: any) => instSum + (inst.amount || 0), 0) || 0;
       return sum + Math.max(bookingAmount, installmentAmount);
@@ -268,7 +268,7 @@ export const AdminDashboard = () => {
               </div>
               <div className="flex justify-between">
                 <span>Regular Photo:</span>
-                <span className="font-medium">{studios?.filter(s => s.type === 'regular_photo').length || 0}</span>
+                <span className="font-medium">{studios?.filter(s => s.type === 'regular').length || 0}</span>
               </div>
               <div className="flex justify-between">
                 <span>Most Active:</span>

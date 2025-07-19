@@ -54,7 +54,7 @@ export const PelangganDashboard = () => {
   const totalBookings = bookings.length;
   const completedBookings = bookings.filter(b => b.status === 'completed').length;
   const upcomingBookings = bookings.filter(b => {
-    const bookingDate = new Date(b.booking_date);
+    const bookingDate = new Date(b.start_time || b.created_at);
     return bookingDate > new Date() && b.status === 'confirmed';
   }).length;
 
@@ -188,7 +188,7 @@ export const PelangganDashboard = () => {
                         {booking.studio_packages?.title}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {format(new Date(booking.booking_date), 'dd MMMM yyyy, HH:mm', { locale: id })}
+                        {format(new Date(booking.start_time || booking.created_at), 'dd MMMM yyyy, HH:mm', { locale: id })}
                       </p>
                     </div>
                     <div className="text-right">
@@ -239,7 +239,7 @@ export const PelangganDashboard = () => {
                         {pkg.package_categories?.name || 'Kategori tidak diketahui'}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Durasi: {pkg.duration} menit
+                        Durasi: {pkg.base_time_minutes} menit
                       </p>
                     </div>
                     <div className="text-right">
