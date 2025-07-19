@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,8 +9,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format, startOfDay, endOfDay } from 'date-fns';
+import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
 import WalkinBookingForm from '@/components/studio/WalkinBookingForm';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
+
+const WITA_TIMEZONE = 'Asia/Makassar';
 
 const WalkinSessionsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -17,11 +21,28 @@ const WalkinSessionsPage = () => {
   const queryClient = useQueryClient();
   
   const today = new Date();
+  const witaToday = utcToZonedTime(today, WITA_TIMEZONE);
 
-  // Fetch today's walking sessions
-  const { data: sessions, isLoading } = useQuery({
-    queryKey: ['walkin-sessions', format(today, 'yyyy-MM-dd')],
+  console.log('Today UTC:', today);
+  console.log('Today WITA:', witaToday);
+
+  // Fetch today's walking sessions with better debugging
+  const { data: sessions, isLoading, error } = useQuery({
+    queryKey: ['walkin-sessions', format(witaToday, 'yyyy-MM-dd')],
     queryFn: async () => {
+      console.log('Fetching walk-in sessions for date:', format(witaToday, 'yyyy-MM-dd'));
+      
+      // Convert WITA times to UTC for database query
+      const startOfDayWita = startOfDay(witaToday);
+      const endOfDayWita = endOfDay(witaToday);
+      const startOfDayUtc = zonedTimeToUtc(startOfDayWita, WITA_TIMEZONE);
+      const endOfDayUtc = zonedTimeToUtc(endOfDayWita, WITA_TIMEZONE);
+
+      console.log('Query range UTC:', {
+        start: startOfDayUtc.toISOString(),
+        end: endOfDayUtc.toISOString()
+      });
+
       const { data, error } = await supabase
         .from('bookings')
         .select(`
@@ -36,12 +57,26 @@ const WalkinSessionsPage = () => {
           )
         `)
         .eq('is_walking_session', true)
-        .gte('start_time', startOfDay(today).toISOString())
-        .lte('start_time', endOfDay(today).toISOString())
+        .gte('start_time', startOfDayUtc.toISOString())
+        .lte('start_time', endOfDayUtc.toISOString())
         .order('start_time', { ascending: true });
 
-      if (error) throw error;
-      return data;
+      console.log('Walk-in sessions query result:', { data, error });
+
+      if (error) {
+        console.error('Error fetching walk-in sessions:', error);
+        throw error;
+      }
+      
+      // Convert UTC times back to WITA for display
+      const sessionsWithWitaTime = data?.map(session => ({
+        ...session,
+        start_time_wita: utcToZonedTime(new Date(session.start_time), WITA_TIMEZONE),
+        end_time_wita: utcToZonedTime(new Date(session.end_time), WITA_TIMEZONE)
+      })) || [];
+
+      console.log('Sessions with WITA time:', sessionsWithWitaTime);
+      return sessionsWithWitaTime;
     }
   });
 
@@ -85,7 +120,7 @@ const WalkinSessionsPage = () => {
     const variants = {
       pending: 'secondary',
       confirmed: 'default',
-      completed: 'outline', // Changed from 'success' to 'outline'
+      completed: 'outline',
       cancelled: 'destructive'
     } as const;
     
@@ -101,14 +136,40 @@ const WalkinSessionsPage = () => {
     return baseAmount + servicesTotal;
   };
 
+  if (error) {
+    console.error('Query error:', error);
+    return (
+      <ModernLayout>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Walk-in Sessions</h1>
+              <p className="text-muted-foreground">{format(witaToday, 'dd MMMM yyyy')}</p>
+            </div>
+          </div>
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-red-600">Error loading data: {error.message}</p>
+            </CardContent>
+          </Card>
+        </div>
+      </ModernLayout>
+    );
+  }
+
   if (isLoading) {
     return (
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Walk-in Sessions - {format(today, 'dd/MM/yyyy')}</h1>
+      <ModernLayout>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Walk-in Sessions</h1>
+              <p className="text-muted-foreground">{format(witaToday, 'dd MMMM yyyy')}</p>
+            </div>
+          </div>
+          <div className="text-center py-8">Loading...</div>
         </div>
-        <div className="text-center py-8">Loading...</div>
-      </div>
+      </ModernLayout>
     );
   }
 
@@ -118,7 +179,7 @@ const WalkinSessionsPage = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Walk-in Sessions</h1>
-            <p className="text-muted-foreground">{format(today, 'dd MMMM yyyy')}</p>
+            <p className="text-muted-foreground">{format(witaToday, 'dd MMMM yyyy')}</p>
           </div>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -196,16 +257,30 @@ const WalkinSessionsPage = () => {
           </Card>
         </div>
 
+        {/* Debug Information */}
+        {process.env.NODE_ENV === 'development' && (
+          <Card>
+            <CardContent className="p-4">
+              <h3 className="font-semibold mb-2">Debug Info:</h3>
+              <p>Sessions found: {sessions?.length || 0}</p>
+              <p>Today WITA: {format(witaToday, 'yyyy-MM-dd HH:mm:ss')}</p>
+              <pre className="text-xs mt-2 bg-gray-100 p-2 rounded">
+                {JSON.stringify(sessions?.slice(0, 2), null, 2)}
+              </pre>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Sessions List */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           {sessions?.map((session: any) => (
             <Card key={session.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{session.users?.name}</CardTitle>
+                  <CardTitle className="text-lg">{session.users?.name || 'Walk-in Customer'}</CardTitle>
                   {getStatusBadge(session.status)}
                 </div>
-                <p className="text-sm text-muted-foreground">{session.users?.email}</p>
+                <p className="text-sm text-muted-foreground">{session.users?.email || 'No email'}</p>
               </CardHeader>
               
               <CardContent className="space-y-3">
@@ -220,7 +295,7 @@ const WalkinSessionsPage = () => {
                 <div className="flex items-center text-sm">
                   <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
                   <span>
-                    {format(new Date(session.start_time), 'HH:mm')} - {format(new Date(session.end_time), 'HH:mm')}
+                    {format(session.start_time_wita, 'HH:mm')} - {format(session.end_time_wita, 'HH:mm')}
                   </span>
                 </div>
                 
