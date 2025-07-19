@@ -1,16 +1,17 @@
+
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { Download, Users, Clock, DollarSign, TrendingUp } from 'lucide-react';
+import { TrendingUp, Users, Clock, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
+import { ExportButtons } from '@/components/ExportButtons';
 
 interface BookingData {
   id: string;
@@ -26,6 +27,7 @@ interface BookingData {
   end_time: string;
   additional_time_minutes: number;
   created_at: string;
+  performed_by: string | null;
   users: { name: string; email: string };
   studios: { name: string; type: string };
   studio_packages: { title: string; price: number };
@@ -85,12 +87,11 @@ const OfflineBookingsReport = () => {
   const analytics = useMemo(() => {
     if (!bookingsData) return null;
 
-    // Calculate revenue including installments properly
+    // Calculate revenue including installments
     const calculateTotalRevenue = (bookings: BookingData[]) => {
       return bookings.reduce((sum, booking) => {
         const bookingAmount = booking.total_amount || 0;
         const installmentAmount = booking.installments?.reduce((instSum, inst) => instSum + (inst.amount || 0), 0) || 0;
-        // Use the higher value between booking amount and total installments
         return sum + Math.max(bookingAmount, installmentAmount);
       }, 0);
     };
@@ -145,10 +146,9 @@ const OfflineBookingsReport = () => {
       totalBookings: bookingsData.length,
       statusDistribution,
       typeDistribution,
-      totalDuration,
+      installmentStats,
       averageDuration,
-      averageExtraTime,
-      installmentStats
+      averageExtraTime
     };
   }, [bookingsData]);
 
@@ -176,23 +176,16 @@ const OfflineBookingsReport = () => {
       fill: getStatusColor(status)
     }));
 
-    const installmentTrendData = bookingsData
-      .flatMap(booking => booking.installments || [])
-      .reduce((acc, installment) => {
-        const date = format(new Date(installment.paid_at), 'yyyy-MM-dd');
-        acc[date] = (acc[date] || 0) + installment.amount;
-        return acc;
-      }, {} as Record<string, number>);
-
-    const installmentTrendChartData = Object.entries(installmentTrendData).map(([date, amount]) => ({
-      date,
-      amount
-    })).sort((a, b) => a.date.localeCompare(b.date));
+    const typeChartData = Object.entries(analytics.typeDistribution).map(([type, data]) => ({
+      type,
+      revenue: data.revenue,
+      count: data.count
+    }));
 
     return {
       dailyRevenueData,
       statusChartData,
-      installmentTrendChartData
+      typeChartData
     };
   }, [bookingsData, analytics]);
 
@@ -211,18 +204,10 @@ const OfflineBookingsReport = () => {
           <h1 className="text-3xl font-bold">Offline Transactions - Report</h1>
           <p className="text-muted-foreground">Analisis komprehensif booking offline</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export Excel
-          </Button>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export PDF
-          </Button>
-        </div>
+        <ExportButtons />
       </div>
 
+      {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle>Filter Laporan</CardTitle>
@@ -260,6 +245,7 @@ const OfflineBookingsReport = () => {
         </CardContent>
       </Card>
 
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -318,11 +304,12 @@ const OfflineBookingsReport = () => {
         </Card>
       </div>
 
+      {/* Charts */}
       <Tabs defaultValue="revenue" className="space-y-4">
         <TabsList>
           <TabsTrigger value="revenue">Tren Revenue</TabsTrigger>
           <TabsTrigger value="status">Status Distribution</TabsTrigger>
-          <TabsTrigger value="installments">Tren Cicilan</TabsTrigger>
+          <TabsTrigger value="types">Analisis Tipe</TabsTrigger>
         </TabsList>
 
         <TabsContent value="revenue" className="space-y-4">
@@ -385,7 +372,7 @@ const OfflineBookingsReport = () => {
                       fill="#8884d8"
                       dataKey="count"
                     >
-                      {chartData.statusChartData.map((entry, index) => (
+                      {chartData.statusChartData?.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
@@ -397,33 +384,42 @@ const OfflineBookingsReport = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="installments" className="space-y-4">
+        <TabsContent value="types" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Tren Pembayaran Cicilan</CardTitle>
-              <CardDescription>Grafik pembayaran cicilan dari waktu ke waktu</CardDescription>
+              <CardTitle>Analisis per Tipe Booking</CardTitle>
+              <CardDescription>Revenue dan jumlah booking per tipe</CardDescription>
             </CardHeader>
             <CardContent>
               <ChartContainer
                 config={{
-                  amount: {
-                    label: "Amount",
-                    color: "hsl(var(--chart-3))",
+                  revenue: {
+                    label: "Revenue",
+                    color: "hsl(var(--chart-1))",
+                  },
+                  count: {
+                    label: "Count",
+                    color: "hsl(var(--chart-2))",
                   },
                 }}
                 className="h-[300px]"
               >
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData.installmentTrendChartData}>
+                  <BarChart data={chartData.typeChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
+                    <XAxis dataKey="type" />
+                    <YAxis yAxisId="left" />
+                    <YAxis yAxisId="right" orientation="right" />
                     <ChartTooltip
                       content={<ChartTooltipContent />}
-                      formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Cicilan']}
+                      formatter={(value, name) => [
+                        name === 'revenue' ? `Rp ${Number(value).toLocaleString('id-ID')}` : value,
+                        name === 'revenue' ? 'Revenue' : 'Count'
+                      ]}
                     />
-                    <Line type="monotone" dataKey="amount" stroke="var(--color-amount)" strokeWidth={2} />
-                  </LineChart>
+                    <Bar yAxisId="left" dataKey="revenue" fill="var(--color-revenue)" />
+                    <Bar yAxisId="right" dataKey="count" fill="var(--color-count)" />
+                  </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
             </CardContent>

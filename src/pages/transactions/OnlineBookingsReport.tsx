@@ -1,16 +1,17 @@
+
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, ScatterChart, Scatter } from 'recharts';
-import { Download, TrendingUp, Users, Clock, DollarSign } from 'lucide-react';
+import { TrendingUp, Users, Clock, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
+import { ExportButtons } from '@/components/ExportButtons';
 
 interface BookingData {
   id: string;
@@ -215,16 +216,7 @@ const OnlineBookingsReport = () => {
           <h1 className="text-3xl font-bold">Online Transactions - Report</h1>
           <p className="text-muted-foreground">Analisis komprehensif booking online</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export Excel
-          </Button>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export PDF
-          </Button>
-        </div>
+        <ExportButtons />
       </div>
 
       {/* Filters */}
