@@ -50,7 +50,7 @@ export const navigationConfig: NavigationItem[] = [
       },
       {
         name: 'Customer Profiles',
-        href: '/admins/customers',
+        href: '/admin/customers',
         icon: Users,
         allowedRoles: ['owner', 'admin']
       }
