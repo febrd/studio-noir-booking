@@ -1,3 +1,4 @@
+
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,14 +38,14 @@ const OfflineBookingsReport = () => {
     }
   });
 
-  // Filter for offline bookings based on payment_method
+  // Filter for offline bookings - assuming "offline" payment method indicates offline bookings
   const offlineBookings = useMemo(() => {
     if (!bookingsData) return [];
     return bookingsData.filter(booking => {
-      const paymentMethod = booking.payment_method;
-      return paymentMethod === 'cash' || 
-             paymentMethod === 'debit_card' ||
-             !paymentMethod; // null/undefined payment methods are considered offline
+      // If payment_method is strictly "online" or "offline", filter accordingly
+      return booking.payment_method === 'offline' || 
+             booking.payment_method === null || 
+             booking.payment_method === undefined;
     });
   }, [bookingsData]);
 

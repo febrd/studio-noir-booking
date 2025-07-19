@@ -37,14 +37,14 @@ const OnlineBookingsReport = () => {
     }
   });
 
-  // Filter for online bookings based on payment_method
+  // Filter for online bookings - assuming "online" payment method indicates online bookings
   const onlineBookings = useMemo(() => {
     if (!bookingsData) return [];
     return bookingsData.filter(booking => {
-      const paymentMethod = booking.payment_method;
-      return paymentMethod === 'transfer_bank' || 
-             paymentMethod === 'e_wallet' ||
-             paymentMethod === 'credit_card';
+      // If payment_method is strictly "online" or "offline", filter accordingly
+      // Otherwise, we'll need to check the type field or other indicators
+      return booking.payment_method === 'online' || 
+             (booking.type && ['self_photo', 'regular'].includes(booking.type as string));
     });
   }, [bookingsData]);
 
