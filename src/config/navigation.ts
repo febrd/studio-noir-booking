@@ -119,12 +119,6 @@ export const navigationConfig: NavigationItem[] = [
         allowedRoles: ['owner', 'admin', 'keuangan']
       }
     ]
-  },
-  {
-    name: 'Customers',
-    href: '/customers',
-    icon: Calendar,
-    allowedRoles: ['owner', 'admin', 'keuangan']
   }
 ];
 
