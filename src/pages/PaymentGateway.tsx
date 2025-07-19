@@ -46,33 +46,30 @@ const PaymentGateway = () => {
     },
   });
 
-  const createPaymentProviderMutation = useMutation(
-    async () => {
+  const createPaymentProviderMutation = useMutation({
+    mutationFn: async () => {
       const { error } = await supabase
         .from('payment_providers')
-        .insert([{ name, api_key: apiKey, secret_key: secretKey }]);
+        .insert([{ name, client_id: apiKey, client_secret: secretKey }]);
 
       if (error) {
         throw new Error(error.message);
       }
     },
-    {
-      onSuccess: () => {
-        // Invalidate and refetch
-        queryClient.invalidateQueries({ queryKey: ['paymentProviders'] });
-        toast({
-          title: "Success!",
-          description: "Payment provider created successfully.",
-        })
-      },
-      onError: (error: any) => {
-        toast({
-          title: "Failed!",
-          description: error.message,
-        })
-      },
-    }
-  );
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paymentProviders'] });
+      toast({
+        title: "Success!",
+        description: "Payment provider created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed!",
+        description: error.message,
+      });
+    },
+  });
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
@@ -126,7 +123,7 @@ const PaymentGateway = () => {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="apiKey" className="text-right">
-                  API Key
+                  Client ID
                 </Label>
                 <Input
                   type="text"
@@ -138,7 +135,7 @@ const PaymentGateway = () => {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="secretKey" className="text-right">
-                  Secret Key
+                  Client Secret
                 </Label>
                 <Input
                   type="text"
@@ -161,16 +158,16 @@ const PaymentGateway = () => {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[100px]">Name</TableHead>
-                <TableHead>API Key</TableHead>
-                <TableHead>Secret Key</TableHead>
+                <TableHead>Client ID</TableHead>
+                <TableHead>Client Secret</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paymentProviders?.map((provider: any) => (
                 <TableRow key={provider.id}>
                   <TableCell className="font-medium">{provider.name}</TableCell>
-                  <TableCell>{provider.api_key}</TableCell>
-                  <TableCell>{provider.secret_key}</TableCell>
+                  <TableCell>{provider.client_id}</TableCell>
+                  <TableCell>{provider.client_secret}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

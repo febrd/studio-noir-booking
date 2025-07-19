@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,9 +12,15 @@ interface Transaction {
   id: string;
   created_at: string;
   amount: number;
-  payment_method: string;
-  status: string;
-  user_id: string;
+  payment_type: 'online' | 'offline' | 'installment';
+  status: 'pending' | 'processing' | 'success' | 'failed' | 'cancelled' | 'settlement';
+  booking_id: string;
+  performed_by?: string;
+  payment_provider_id?: string;
+  reference_id?: string;
+  description?: string;
+  type?: string;
+  updated_at: string;
 }
 
 const TransactionsPage = () => {
@@ -64,8 +71,16 @@ const TransactionsPage = () => {
       },
     },
     {
-      accessorKey: 'payment_method',
-      header: 'Payment Method',
+      accessorKey: 'payment_type',
+      header: 'Payment Type',
+      cell: ({ row }) => {
+        const paymentType = row.getValue('payment_type') as string;
+        return (
+          <Badge variant="outline">
+            {paymentType}
+          </Badge>
+        );
+      },
     },
     {
       accessorKey: 'status',
@@ -83,8 +98,8 @@ const TransactionsPage = () => {
       },
     },
     {
-      accessorKey: 'user_id',
-      header: 'User ID',
+      accessorKey: 'booking_id',
+      header: 'Booking ID',
     },
   ];
 
