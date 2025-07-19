@@ -208,29 +208,54 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       const totalMinutes = (selectedPackage?.base_time_minutes || 0) + additionalTime;
       const endDateTime = addMinutes(startDateTime, totalMinutes);
 
-      // Check for conflicts with more specific query - exclude walking sessions
-      const { data: conflicts } = await supabase
+      console.log('Checking conflict for:', {
+        studio_id: data.studio_id,
+        start_time: startDateTime.toISOString(),
+        end_time: endDateTime.toISOString(),
+        exclude_booking_id: booking?.id || null
+      });
+
+      // Check for conflicts with regular bookings only (exclude walk-in sessions from conflict check)
+      const { data: conflicts, error: conflictError } = await supabase
         .from('bookings')
-        .select('id, start_time, end_time')
+        .select('id, start_time, end_time, is_walking_session')
         .eq('studio_id', data.studio_id)
-        .eq('is_walking_session', false) // Only check against regular bookings
+        .eq('is_walking_session', false) // Only check regular bookings for conflicts
         .not('status', 'in', '(cancelled,failed)')
         .gte('start_time', startOfDay(today).toISOString())
         .lte('start_time', endOfDay(today).toISOString());
 
+      if (conflictError) {
+        console.error('Error checking conflicts:', conflictError);
+        throw new Error('Gagal memeriksa konflik waktu');
+      }
+
+      console.log('Found potential conflicts:', conflicts);
+
       if (conflicts && conflicts.length > 0) {
-        // Check for actual time overlap
+        // Check for actual time overlap, excluding current booking if editing
         const hasConflict = conflicts.some(conflict => {
           if (booking && conflict.id === booking.id) return false;
           
           const conflictStart = new Date(conflict.start_time);
           const conflictEnd = new Date(conflict.end_time);
           
-          return (
+          const overlaps = (
             (startDateTime >= conflictStart && startDateTime < conflictEnd) ||
             (endDateTime > conflictStart && endDateTime <= conflictEnd) ||
             (startDateTime <= conflictStart && endDateTime >= conflictEnd)
           );
+          
+          console.log('Checking overlap:', {
+            conflictId: conflict.id,
+            conflictStart: conflictStart.toISOString(),
+            conflictEnd: conflictEnd.toISOString(),
+            newStart: startDateTime.toISOString(),
+            newEnd: endDateTime.toISOString(),
+            overlaps
+          });
+          
+          return overlaps;
         });
         
         if (hasConflict) {

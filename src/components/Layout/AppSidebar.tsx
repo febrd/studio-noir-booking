@@ -1,7 +1,20 @@
 
-import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { 
+  Calendar, 
+  Camera, 
+  Users, 
+  Package, 
+  Settings, 
+  BarChart3, 
+  CreditCard, 
+  FileText,
+  Building2,
+  Clock,
+  UserCheck,
+  BookOpen,
+  Wallet
+} from 'lucide-react';
+
 import {
   Sidebar,
   SidebarContent,
@@ -11,112 +24,241 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarHeader,
-  useSidebar,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { cn } from '@/lib/utils';
+import { ChevronRight } from 'lucide-react';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
-import { getAccessibleNavigation } from '@/config/navigation';
 
 export function AppSidebar() {
   const { userProfile } = useJWTAuth();
-  const location = useLocation();
-  const { state } = useSidebar();
-  const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
-  const toggleExpanded = (name: string) => {
-    setExpandedItems(prev =>
-      prev.includes(name)
-        ? prev.filter(item => item !== name)
-        : [...prev, name]
-    );
-  };
+  // Define menu items based on user role
+  const getMenuItems = () => {
+    const commonItems = [
+      {
+        title: "Dashboard",
+        url: "/dashboard",
+        icon: BarChart3,
+      }
+    ];
 
-  const isActive = (href: string) => {
-    if (href === '/') {
-      return location.pathname === '/';
+    if (userProfile?.role === 'owner' || userProfile?.role === 'admin') {
+      return [
+        ...commonItems,
+        {
+          title: "Studio Management",
+          icon: Building2,
+          items: [
+            {
+              title: "Dashboard",
+              url: "/studio",
+              icon: BarChart3,
+            },
+            {
+              title: "Studios",
+              url: "/studio/studios",
+              icon: Camera,
+            },
+            {
+              title: "Package Categories",
+              url: "/studio/categories",
+              icon: Package,
+            },
+            {
+              title: "Packages",
+              url: "/studio/packages",
+              icon: Package,
+            },
+            {
+              title: "Additional Services",
+              url: "/studio/services",
+              icon: Settings,
+            },
+            {
+              title: "Bookings",
+              url: "/studio/bookings",
+              icon: Calendar,
+            },
+            {
+              title: "Walk-in Sessions",
+              url: "/studio/walkin-sessions",
+              icon: UserCheck,
+            },
+            {
+              title: "Booking Logs",
+              url: "/studio/booking-logs",
+              icon: BookOpen,
+            },
+            {
+              title: "Offline Transactions",
+              url: "/studio/offline-transactions",
+              icon: Wallet,
+            },
+          ],
+        },
+        {
+          title: "Transactions",
+          icon: CreditCard,
+          items: [
+            {
+              title: "All Transactions",
+              url: "/transactions",
+              icon: CreditCard,
+            },
+            {
+              title: "Reports",
+              url: "/transactions/reports",
+              icon: FileText,
+            },
+            {
+              title: "Online Bookings",
+              url: "/transactions/online-bookings",
+              icon: Calendar,
+            },
+            {
+              title: "Offline Bookings",
+              url: "/transactions/offline-bookings",
+              icon: Clock,
+            },
+          ],
+        },
+        {
+          title: "Reports & Recaps",
+          icon: FileText,
+          items: [
+            {
+              title: "Monthly Recaps",
+              url: "/recaps",
+              icon: FileText,
+            },
+          ],
+        },
+        {
+          title: "User Management",
+          icon: Users,
+          items: [
+            {
+              title: "Staff Users",
+              url: "/admin/users",
+              icon: Users,
+            },
+            {
+              title: "Customers",
+              url: "/admin/customers",
+              icon: Users,
+            },
+          ],
+        },
+      ];
     }
-    return location.pathname.startsWith(href);
+
+    if (userProfile?.role === 'keuangan') {
+      return [
+        ...commonItems,
+        {
+          title: "Transactions",
+          icon: CreditCard,
+          items: [
+            {
+              title: "All Transactions",
+              url: "/transactions",
+              icon: CreditCard,
+            },
+            {
+              title: "Reports",
+              url: "/transactions/reports",
+              icon: FileText,
+            },
+            {
+              title: "Online Bookings",
+              url: "/transactions/online-bookings",
+              icon: Calendar,
+            },
+            {
+              title: "Offline Bookings",
+              url: "/transactions/offline-bookings",
+              icon: Clock,
+            },
+          ],
+        },
+        {
+          title: "Reports & Recaps",
+          icon: FileText,
+          items: [
+            {
+              title: "Monthly Recaps",
+              url: "/recaps",
+              icon: FileText,
+            },
+          ],
+        },
+      ];
+    }
+
+    // Default for pelanggan
+    return commonItems;
   };
 
-  // Get navigation items based on user role
-  const navigation = getAccessibleNavigation(userProfile?.role || 'pelanggan');
+  // Only show payment gateway for owner
+  const ownerOnlyItems = userProfile?.role === 'owner' ? [
+    {
+      title: "Payment Gateway",
+      url: "/payment-gateway",
+      icon: CreditCard,
+    },
+    {
+      title: "Payment Providers",
+      url: "/admin/payment-providers",
+      icon: Settings,
+    },
+  ] : [];
+
+  const menuItems = [...getMenuItems(), ...ownerOnlyItems];
 
   return (
-    <Sidebar variant="sidebar" className="border-r">
-      <SidebarHeader>
-        <div className="flex items-center gap-3 px-2 py-4">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <div className="w-4 h-4 bg-white rounded-sm"></div>
-          </div>
-          {state === "expanded" && (
-            <div>
-              <h2 className="font-semibold text-elegant">Masuk Studio</h2>
-              <p className="text-xs text-muted-foreground">Panel</p>
-            </div>
-          )}
-        </div>
-      </SidebarHeader>
-
+    <Sidebar variant="inset">
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigation.map((item) => (
-                <SidebarMenuItem key={item.name}>
-                  {item.children && item.children.length > 0 ? (
-                    <Collapsible
-                      open={expandedItems.includes(item.name)}
-                      onOpenChange={() => toggleExpanded(item.name)}
-                    >
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton
-                          isActive={isActive(item.href)}
-                          className="w-full justify-between"
-                        >
-                          <div className="flex items-center gap-2">
-                            <item.icon className="h-4 w-4" />
-                            {state === "expanded" && <span>{item.name}</span>}
-                          </div>
-                          {state === "expanded" && (
-                            <ChevronDown
-                              className={cn(
-                                'h-4 w-4 transition-transform',
-                                expandedItems.includes(item.name) && 'rotate-180'
-                              )}
-                            />
-                          )}
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      
-                      {state === "expanded" && (
-                        <CollapsibleContent className="ml-6 space-y-1">
-                          {item.children.map((child) => (
-                            <SidebarMenuButton key={child.href} asChild size="sm">
-                              <NavLink
-                                to={child.href}
-                                className={({ isActive }) =>
-                                  cn(
-                                    'block text-sm',
-                                    isActive && 'bg-accent text-accent-foreground'
-                                  )
-                                }
-                              >
-                                {child.name}
-                              </NavLink>
-                            </SidebarMenuButton>
-                          ))}
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  {item.items ? (
+                    <Collapsible asChild defaultOpen={item.title === "Studio Management"}>
+                      <SidebarMenuItem>
+                        <CollapsibleTrigger asChild>
+                          <SidebarMenuButton tooltip={item.title}>
+                            {item.icon && <item.icon />}
+                            <span>{item.title}</span>
+                            <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                          </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <SidebarMenuSub>
+                            {item.items.map((subItem) => (
+                              <SidebarMenuSubItem key={subItem.title}>
+                                <SidebarMenuSubButton asChild>
+                                  <a href={subItem.url}>
+                                    <subItem.icon />
+                                    <span>{subItem.title}</span>
+                                  </a>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            ))}
+                          </SidebarMenuSub>
                         </CollapsibleContent>
-                      )}
+                      </SidebarMenuItem>
                     </Collapsible>
                   ) : (
-                    <SidebarMenuButton asChild isActive={isActive(item.href)}>
-                      <NavLink to={item.href}>
-                        <item.icon className="h-4 w-4" />
-                        {state === "expanded" && <span>{item.name}</span>}
-                      </NavLink>
+                    <SidebarMenuButton asChild tooltip={item.title}>
+                      <a href={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </a>
                     </SidebarMenuButton>
                   )}
                 </SidebarMenuItem>
