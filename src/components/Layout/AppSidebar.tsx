@@ -105,6 +105,13 @@ export function AppSidebar() {
               url: "/studio/services",
               icon: Settings,
             },
+           
+          ],
+        },
+        {
+          title: "Transactions",
+          icon: CreditCard,
+          items: [
             {
               title: "Bookings",
               url: "/studio/bookings",
@@ -114,32 +121,6 @@ export function AppSidebar() {
               title: "Walk-in Sessions",
               url: "/studio/walkin-sessions",
               icon: UserCheck,
-            },
-            {
-              title: "Booking Logs",
-              url: "/studio/booking-logs",
-              icon: BookOpen,
-            },
-            {
-              title: "Offline Transactions",
-              url: "/studio/offline-transactions",
-              icon: Wallet,
-            },
-          ],
-        },
-        {
-          title: "Transactions",
-          icon: CreditCard,
-          items: [
-            {
-              title: "All Transactions",
-              url: "/transactions",
-              icon: CreditCard,
-            },
-            {
-              title: "Reports",
-              url: "/transactions/reports",
-              icon: FileText,
             },
             {
               title: "Online Bookings",
@@ -158,9 +139,14 @@ export function AppSidebar() {
           icon: FileText,
           items: [
             {
-              title: "Monthly Recaps",
-              url: "/recaps",
+              title: "Monthly",
+              url: "/transactions/reports",
               icon: FileText,
+            },
+            {
+              title: "Booking Logs",
+              url: "/studio/booking-logs",
+              icon: BookOpen,
             },
           ],
         },
@@ -169,7 +155,7 @@ export function AppSidebar() {
           icon: Users,
           items: [
             {
-              title: "Staff Users",
+              title: "Accounts",
               url: "/admin/users",
               icon: Users,
             },
