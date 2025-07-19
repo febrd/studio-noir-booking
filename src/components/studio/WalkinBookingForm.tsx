@@ -141,10 +141,8 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       const selectedPackage = packages?.find(p => p.id === data.package_id);
       const totalAmount = selectedPackage?.price || 0;
 
-      // Map payment method for database compatibility
-      const dbPaymentMethod = ['cash', 'debit', 'credit', 'qris', 'transfer'].includes(data.payment_method) 
-        ? 'offline' 
-        : data.payment_method;
+      // Map payment method for database - all offline payment methods map to 'offline'
+      const dbPaymentMethod = 'offline';
 
       if (booking) {
         // Update existing booking

@@ -179,7 +179,12 @@ function App() {
                 path="/admin" 
                 element={
                   <JWTProtectedRoute allowedRoles={['admin', 'owner']}>
-                    <AdminLayout />
+                    <AdminLayout>
+                      <div className="p-6">
+                        <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
+                        <p>Welcome to the admin panel. Use the navigation to access different sections.</p>
+                      </div>
+                    </AdminLayout>
                   </JWTProtectedRoute>
                 } 
               />
@@ -187,7 +192,9 @@ function App() {
                 path="/admin/users" 
                 element={
                   <JWTProtectedRoute allowedRoles={['admin', 'owner']}>
-                    <Users />
+                    <AdminLayout>
+                      <Users />
+                    </AdminLayout>
                   </JWTProtectedRoute>
                 } 
               />
@@ -195,7 +202,9 @@ function App() {
                 path="/admin/customers" 
                 element={
                   <JWTProtectedRoute allowedRoles={['admin', 'owner']}>
-                    <Customers />
+                    <AdminLayout>
+                      <Customers />
+                    </AdminLayout>
                   </JWTProtectedRoute>
                 } 
               />
@@ -203,7 +212,9 @@ function App() {
                 path="/admin/payment-providers" 
                 element={
                   <JWTProtectedRoute allowedRoles={['admin', 'owner']}>
-                    <PaymentProviders />
+                    <AdminLayout>
+                      <PaymentProviders />
+                    </AdminLayout>
                   </JWTProtectedRoute>
                 } 
               />
