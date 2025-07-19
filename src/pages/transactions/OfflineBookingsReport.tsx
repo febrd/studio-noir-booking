@@ -1,3 +1,4 @@
+
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,7 +27,6 @@ interface BookingData {
   end_time: string;
   additional_time_minutes: number;
   created_at: string;
-  performed_by: string | null;
   users: { name: string; email: string };
   studios: { name: string; type: string };
   studio_packages: { title: string; price: number };
@@ -68,34 +68,6 @@ const OfflineBookingsReport = () => {
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
       return data as unknown as BookingData[];
-    }
-  });
-
-  // Get operators performance data - fix the query to use correct column names
-  const { data: operatorData } = useQuery({
-    queryKey: ['operator-performance', dateRange],
-    queryFn: async () => {
-      let query = supabase
-        .from('bookings')
-        .select(`
-          performed_by,
-          total_amount,
-          status,
-          performed_by_user:users!bookings_performed_by_fkey (name)
-        `)
-        .eq('payment_method', 'offline')
-        .not('performed_by', 'is', null);
-
-      if (dateRange?.from) {
-        query = query.gte('created_at', dateRange.from.toISOString());
-      }
-      if (dateRange?.to) {
-        query = query.lte('created_at', dateRange.to.toISOString());
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
     }
   });
 
@@ -142,29 +114,6 @@ const OfflineBookingsReport = () => {
       };
     }, { totalInstallmentRevenue: 0, averageInstallmentPerBooking: 0, totalInstallments: 0 });
 
-    // Operator performance analysis - fix the data access
-    const operatorPerformance = operatorData?.reduce((acc, booking) => {
-      const operatorId = booking.performed_by;
-      if (!operatorId) return acc;
-      
-      if (!acc[operatorId]) {
-        acc[operatorId] = {
-          name: booking.performed_by_user?.name || 'Unknown',
-          totalRevenue: 0,
-          totalBookings: 0,
-          completedBookings: 0
-        };
-      }
-      
-      acc[operatorId].totalRevenue += booking.total_amount || 0;
-      acc[operatorId].totalBookings += 1;
-      if (booking.status === 'completed' || booking.status === 'paid') {
-        acc[operatorId].completedBookings += 1;
-      }
-      
-      return acc;
-    }, {} as Record<string, { name: string; totalRevenue: number; totalBookings: number; completedBookings: number }>) || {};
-
     return {
       totalRevenue,
       averageBookingValue,
@@ -174,10 +123,9 @@ const OfflineBookingsReport = () => {
       totalDuration,
       averageDuration,
       averageExtraTime,
-      installmentStats,
-      operatorPerformance
+      installmentStats
     };
-  }, [bookingsData, operatorData]);
+  }, [bookingsData]);
 
   const chartData = useMemo(() => {
     if (!bookingsData || !analytics) return {};
@@ -199,13 +147,6 @@ const OfflineBookingsReport = () => {
       fill: getStatusColor(status)
     }));
 
-    const operatorChartData = Object.entries(analytics.operatorPerformance).map(([id, data]) => ({
-      name: data.name,
-      revenue: data.totalRevenue,
-      bookings: data.totalBookings,
-      successRate: (data.completedBookings / data.totalBookings * 100).toFixed(1)
-    })).sort((a, b) => b.revenue - a.revenue);
-
     const installmentTrendData = bookingsData
       .flatMap(booking => booking.installments || [])
       .reduce((acc, installment) => {
@@ -222,7 +163,6 @@ const OfflineBookingsReport = () => {
     return {
       dailyRevenueData,
       statusChartData,
-      operatorChartData,
       installmentTrendChartData
     };
   }, [bookingsData, analytics]);
@@ -252,7 +192,7 @@ const OfflineBookingsReport = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Offline Bookings Report</h1>
-          <p className="text-muted-foreground">Analisis komprehensif booking offline & performa operator</p>
+          <p className="text-muted-foreground">Analisis komprehensif booking offline</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm">
@@ -368,7 +308,6 @@ const OfflineBookingsReport = () => {
         <TabsList>
           <TabsTrigger value="revenue">Tren Revenue</TabsTrigger>
           <TabsTrigger value="status">Status Distribution</TabsTrigger>
-          <TabsTrigger value="operators">Performa Operator</TabsTrigger>
           <TabsTrigger value="installments">Tren Cicilan</TabsTrigger>
         </TabsList>
 
@@ -438,48 +377,6 @@ const OfflineBookingsReport = () => {
                     </Pie>
                     <ChartTooltip />
                   </PieChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="operators" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Leaderboard Performa Operator</CardTitle>
-              <CardDescription>Total revenue dan jumlah booking per operator</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer
-                config={{
-                  revenue: {
-                    label: "Revenue",
-                    color: "hsl(var(--chart-1))",
-                  },
-                  bookings: {
-                    label: "Bookings",
-                    color: "hsl(var(--chart-2))",
-                  },
-                }}
-                className="h-[300px]"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData.operatorChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis yAxisId="left" />
-                    <YAxis yAxisId="right" orientation="right" />
-                    <ChartTooltip
-                      content={<ChartTooltipContent />}
-                      formatter={(value, name) => [
-                        name === 'revenue' ? `Rp ${Number(value).toLocaleString('id-ID')}` : value,
-                        name === 'revenue' ? 'Revenue' : 'Bookings'
-                      ]}
-                    />
-                    <Bar yAxisId="left" dataKey="revenue" fill="var(--color-revenue)" />
-                    <Bar yAxisId="right" dataKey="bookings" fill="var(--color-bookings)" />
-                  </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
             </CardContent>
