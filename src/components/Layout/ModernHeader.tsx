@@ -86,13 +86,13 @@ export function ModernHeader() {
                       <NavigationMenuContent>
                         <div className="grid w-[400px] gap-1 p-2">
                           {item.children.map((child) => (
-                            <NavigationMenuLink key={child.title} asChild>
+                            <NavigationMenuLink key={child.name} asChild>
                               <Link
                                 to={child.href}
                                 className="flex items-center space-x-2 rounded-md p-3 text-sm leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                               >
                                 <child.icon className="h-4 w-4" />
-                                <span>{child.title}</span>
+                                <span>{child.name}</span>
                               </Link>
                             </NavigationMenuLink>
                           ))}
