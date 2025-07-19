@@ -21,6 +21,15 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Payment Gateway', href: '/payment-gateway', icon: CreditCard },
   { name: 'Users', href: '/admin/users', icon: Users },
+  { name: 'Users', 
+    href: '/admin',
+     icon: Users, 
+     children: [
+      { name: 'Accounts', href: '/admin/users' },
+      { name: 'Customer Profiles', href: '/admins/customers' },
+    ],
+    
+    },
   {
     name: 'Studio Management',
     href: '/studio',
@@ -41,7 +50,7 @@ const navigation = [
       { name: 'Reports', href: '/transactions/reports' },
     ],
   },
-  { name: 'Customers', href: '/customers', icon: Calendar },
+  
 ];
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
