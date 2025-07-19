@@ -12,6 +12,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, Users, DollarSign, Activity, Target, Calendar, Building2 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, addDays, subDays } from 'date-fns';
+import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
 import { toast } from 'sonner';
 import { ExportButtons } from '@/components/ExportButtons';
