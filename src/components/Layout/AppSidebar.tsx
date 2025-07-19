@@ -81,11 +81,6 @@ export function AppSidebar() {
           icon: Building2,
           items: [
             {
-              title: "Dashboard",
-              url: "/studio",
-              icon: BarChart3,
-            },
-            {
               title: "Studios",
               url: "/studio/studios",
               icon: Camera,
