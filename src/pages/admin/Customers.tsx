@@ -32,6 +32,7 @@ const Customers = () => {
   const { userProfile } = useJWTAuth();
   const queryClient = useQueryClient();
   const [editingCustomer, setEditingCustomer] = useState<CustomerProfile | null>(null);
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [genderFilter, setGenderFilter] = useState('all');
@@ -154,10 +155,10 @@ const Customers = () => {
             </p>
           </div>
           
-          <AddCustomerForm onSuccess={() => {
-            refetch();
-            queryClient.invalidateQueries({ queryKey: ['customers'] });
-          }} />
+          <Button onClick={() => setAddCustomerOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Tambah Customer
+          </Button>
         </div>
 
         {/* Filter and Search Section */}
@@ -337,15 +338,25 @@ const Customers = () => {
                   }
                 </p>
                 {!searchTerm && statusFilter === 'all' && genderFilter === 'all' && (
-                  <AddCustomerForm onSuccess={() => {
-                    refetch();
-                    queryClient.invalidateQueries({ queryKey: ['customers'] });
-                  }} />
+                  <Button onClick={() => setAddCustomerOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Tambah Customer Pertama
+                  </Button>
                 )}
               </CardContent>
             </Card>
           )}
         </div>
+
+        <AddCustomerForm 
+          open={addCustomerOpen}
+          onOpenChange={setAddCustomerOpen}
+          onSuccess={() => {
+            setAddCustomerOpen(false);
+            refetch();
+            queryClient.invalidateQueries({ queryKey: ['customers'] });
+          }}
+        />
 
         {editingCustomer && (
           <EditCustomerForm 
