@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
-import { Download, Target, TrendingUp, Calendar, DollarSign } from 'lucide-react';
+import { Download, Target, TrendingUp, Calendar, DollarSign, Building2 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, addDays, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -29,6 +29,13 @@ interface MonthlyDetail {
   revenue: number;
   avg_transaction_item: number;
   avg_transaction_category: number;
+}
+
+interface StudioRevenue {
+  studio_name: string;
+  studio_type: string;
+  revenue: number;
+  sessions_count: number;
 }
 
 const RecapsPage = () => {
@@ -208,6 +215,33 @@ const RecapsPage = () => {
       };
     });
 
+    // Studio revenue calculation for Top 10
+    const studioStats = bookingsData.reduce((acc, booking) => {
+      const studioName = booking.studios?.name || 'Unknown Studio';
+      const studioType = booking.studios?.type || 'Unknown';
+      const bookingAmount = booking.total_amount || 0;
+      const installmentAmount = booking.installments?.reduce((instSum: number, inst: any) => instSum + (inst.amount || 0), 0) || 0;
+      const revenue = Math.max(bookingAmount, installmentAmount);
+
+      if (!acc[studioName]) {
+        acc[studioName] = {
+          studio_name: studioName,
+          studio_type: studioType,
+          revenue: 0,
+          sessions_count: 0
+        };
+      }
+
+      acc[studioName].revenue += revenue;
+      acc[studioName].sessions_count += 1;
+
+      return acc;
+    }, {} as Record<string, StudioRevenue>);
+
+    const topStudios = Object.values(studioStats)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+
     const currentTarget = monthlyTarget?.target_amount || targetAmount;
     const achievementPercentage = (totalRevenue / currentTarget) * 100;
 
@@ -215,6 +249,7 @@ const RecapsPage = () => {
       weeklyRevenue,
       totalRevenue,
       monthlyDetails,
+      topStudios,
       currentTarget,
       achievementPercentage
     };
@@ -424,6 +459,44 @@ const RecapsPage = () => {
                 <ChartTooltip
                   content={<ChartTooltipContent />}
                   formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pendapatan']}
+                />
+                <Bar dataKey="revenue" fill="var(--color-revenue)" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+
+      {/* Top 10 Studios Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Top 10 Studios Berdasarkan Revenue
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer
+            config={{
+              revenue: {
+                label: "Revenue",
+                color: "hsl(var(--chart-2))",
+              },
+            }}
+            className="h-[400px]"
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={analytics?.topStudios || []} layout="horizontal" margin={{ left: 100 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" />
+                <YAxis type="category" dataKey="studio_name" width={100} />
+                <ChartTooltip
+                  content={<ChartTooltipContent />}
+                  formatter={(value, name, props) => [
+                    `Rp ${Number(value).toLocaleString('id-ID')}`,
+                    'Revenue',
+                    `${props.payload.sessions_count} Sesi`
+                  ]}
                 />
                 <Bar dataKey="revenue" fill="var(--color-revenue)" />
               </BarChart>
