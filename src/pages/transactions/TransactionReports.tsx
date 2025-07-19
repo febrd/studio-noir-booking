@@ -12,7 +12,6 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, Users, DollarSign, Activity, Target, Calendar, Building2 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, addDays, subDays } from 'date-fns';
-import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
 import { toast } from 'sonner';
 import { ExportButtons } from '@/components/ExportButtons';
@@ -724,264 +723,264 @@ const TransactionReports = () => {
                 </CardContent>
               </Card>
             </TabsContent>
-          </TabsContent>
+          </Tabs>
+        </TabsContent>
 
-          <TabsContent value="recaps" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-bold">Monthly Recaps</h2>
-                <p className="text-muted-foreground">
-                  Periode: {format(startDate, 'dd MMMM yyyy', { locale: id })} - {format(endDate, 'dd MMMM yyyy', { locale: id })}
-                </p>
-              </div>
-              <ExportButtons exportData={recapsExportData} />
+        <TabsContent value="recaps" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold">Monthly Recaps</h2>
+              <p className="text-muted-foreground">
+                Periode: {format(startDate, 'dd MMMM yyyy', { locale: id })} - {format(endDate, 'dd MMMM yyyy', { locale: id })}
+              </p>
             </div>
+            <ExportButtons exportData={recapsExportData} />
+          </div>
 
-            {/* Period Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Pilih Periode</CardTitle>
-              </CardHeader>
-              <CardContent className="flex gap-4">
-                <div className="flex flex-col space-y-2">
-                  <Label>Bulan</Label>
-                  <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => (
-                        <SelectItem key={i + 1} value={(i + 1).toString()}>
-                          {format(new Date(2024, i), 'MMMM', { locale: id })}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col space-y-2">
-                  <Label>Tahun</Label>
-                  <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 5 }, (_, i) => (
-                        <SelectItem key={2024 + i} value={(2024 + i).toString()}>
-                          {2024 + i}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Period Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Pilih Periode</CardTitle>
+            </CardHeader>
+            <CardContent className="flex gap-4">
+              <div className="flex flex-col space-y-2">
+                <Label>Bulan</Label>
+                <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <SelectItem key={i + 1} value={(i + 1).toString()}>
+                        {format(new Date(2024, i), 'MMMM', { locale: id })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col space-y-2">
+                <Label>Tahun</Label>
+                <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <SelectItem key={2024 + i} value={(2024 + i).toString()}>
+                        {2024 + i}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Target & Achievement */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5" />
-                  Target Pendapatan Bulanan
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>Target Bulanan</Label>
-                    {isEditingTarget ? (
-                      <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          value={targetAmount}
-                          onChange={(e) => setTargetAmount(Number(e.target.value))}
-                          className="flex-1"
-                        />
-                        <Button onClick={handleSaveTarget} size="sm">
-                          Simpan
-                        </Button>
-                        <Button onClick={() => setIsEditingTarget(false)} variant="outline" size="sm">
-                          Batal
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl font-bold">
-                          Rp {(monthlyTarget?.target_amount || targetAmount).toLocaleString('id-ID')}
-                        </span>
-                        <Button onClick={() => setIsEditingTarget(true)} variant="outline" size="sm">
-                          Edit
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Total Pendapatan</Label>
-                    <div className="text-2xl font-bold text-primary">
-                      Rp {recapsAnalytics?.totalRevenue.toLocaleString('id-ID') || '0'}
+          {/* Target & Achievement */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                Target Pendapatan Bulanan
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Target Bulanan</Label>
+                  {isEditingTarget ? (
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        value={targetAmount}
+                        onChange={(e) => setTargetAmount(Number(e.target.value))}
+                        className="flex-1"
+                      />
+                      <Button onClick={handleSaveTarget} size="sm">
+                        Simpan
+                      </Button>
+                      <Button onClick={() => setIsEditingTarget(false)} variant="outline" size="sm">
+                        Batal
+                      </Button>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Persentase Achievement</Label>
-                    <div className={`text-2xl font-bold ${recapsAnalytics && recapsAnalytics.achievementPercentage >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
-                      {recapsAnalytics?.achievementPercentage.toFixed(1)}%
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl font-bold">
+                        Rp {(monthlyTarget?.target_amount || targetAmount).toLocaleString('id-ID')}
+                      </span>
+                      <Button onClick={() => setIsEditingTarget(true)} variant="outline" size="sm">
+                        Edit
+                      </Button>
                     </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Total Pendapatan</Label>
+                  <div className="text-2xl font-bold text-primary">
+                    Rp {recapsAnalytics?.totalRevenue.toLocaleString('id-ID') || '0'}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="space-y-2">
+                  <Label>Persentase Achievement</Label>
+                  <div className={`text-2xl font-bold ${recapsAnalytics && recapsAnalytics.achievementPercentage >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
+                    {recapsAnalytics?.achievementPercentage.toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Weekly Revenue Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Pendapatan Mingguan</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-200">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-200 p-3 text-left">Minggu 1</th>
-                        <th className="border border-gray-200 p-3 text-left">Minggu 2</th>
-                        <th className="border border-gray-200 p-3 text-left">Minggu 3</th>
-                        <th className="border border-gray-200 p-3 text-left">Minggu 4</th>
-                        <th className="border border-gray-200 p-3 text-left font-bold">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        {recapsAnalytics?.weeklyRevenue.map((week, index) => (
-                          <td key={index} className="border border-gray-200 p-3">
-                            <div className="text-sm text-gray-600">{week.period}</div>
-                            <div className="font-semibold">Rp {week.revenue.toLocaleString('id-ID')}</div>
-                          </td>
-                        ))}
-                        <td className="border border-gray-200 p-3 bg-blue-50">
-                          <div className="font-bold text-primary">
-                            Rp {recapsAnalytics?.totalRevenue.toLocaleString('id-ID')}
-                          </div>
+          {/* Weekly Revenue Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Pendapatan Mingguan</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="border border-gray-200 p-3 text-left">Minggu 1</th>
+                      <th className="border border-gray-200 p-3 text-left">Minggu 2</th>
+                      <th className="border border-gray-200 p-3 text-left">Minggu 3</th>
+                      <th className="border border-gray-200 p-3 text-left">Minggu 4</th>
+                      <th className="border border-gray-200 p-3 text-left font-bold">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      {recapsAnalytics?.weeklyRevenue.map((week, index) => (
+                        <td key={index} className="border border-gray-200 p-3">
+                          <div className="text-sm text-gray-600">{week.period}</div>
+                          <div className="font-semibold">Rp {week.revenue.toLocaleString('id-ID')}</div>
+                        </td>
+                      ))}
+                      <td className="border border-gray-200 p-3 bg-blue-50">
+                        <div className="font-bold text-primary">
+                          Rp {recapsAnalytics?.totalRevenue.toLocaleString('id-ID')}
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Weekly Revenue Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Grafik Pendapatan Mingguan</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={{
+                  revenue: {
+                    label: "Pendapatan",
+                    color: "hsl(var(--chart-1))",
+                  },
+                }}
+                className="h-[300px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={[...(recapsAnalytics?.weeklyRevenue || []), { week: 'Total', revenue: recapsAnalytics?.totalRevenue || 0, period: 'Keseluruhan' }]}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="week" />
+                    <YAxis />
+                    <ChartTooltip
+                      content={<ChartTooltipContent />}
+                      formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pendapatan']}
+                    />
+                    <Bar dataKey="revenue" fill="var(--color-revenue)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          {/* Top 10 Studios Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Top 10 Studios Berdasarkan Revenue
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer
+                config={{
+                  revenue: {
+                    label: "Revenue",
+                    color: "hsl(var(--foreground))",
+                  },
+                }}
+                className="h-[400px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={recapsAnalytics?.topStudios || []} layout="horizontal" margin={{ left: 100 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis type="category" dataKey="studio_name" width={100} />
+                    <ChartTooltip
+                      content={<ChartTooltipContent />}
+                      formatter={(value, name, props) => [
+                        `Rp ${Number(value).toLocaleString('id-ID')}`,
+                        'Revenue',
+                        `${props.payload.sessions_count} Sesi`
+                      ]}
+                    />
+                    <Bar dataKey="revenue" fill="hsl(var(--foreground))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          {/* Detail Pendapatan Bulanan */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Detail Pendapatan Bulanan</CardTitle>
+              <CardDescription>
+                Rincian pendapatan berdasarkan item dan kategori paket
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="border border-gray-200 p-3 text-left">Item</th>
+                      <th className="border border-gray-200 p-3 text-left">Kategori Paket</th>
+                      <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Item)</th>
+                      <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Paket)</th>
+                      <th className="border border-gray-200 p-3 text-left">Omset</th>
+                      <th className="border border-gray-200 p-3 text-left">Rata-rata Transaksi (Item)</th>
+                      <th className="border border-gray-200 p-3 text-left">Rata-rata Transaksi (Kategori)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recapsAnalytics?.monthlyDetails.map((detail, index) => (
+                      <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="border border-gray-200 p-3 font-medium">{detail.item}</td>
+                        <td className="border border-gray-200 p-3">{detail.category}</td>
+                        <td className="border border-gray-200 p-3">{detail.sessions_count}</td>
+                        <td className="border border-gray-200 p-3">{detail.sessions_per_package.toFixed(1)} / hari</td>
+                        <td className="border border-gray-200 p-3 font-semibold">
+                          Rp {detail.revenue.toLocaleString('id-ID')}
+                        </td>
+                        <td className="border border-gray-200 p-3">
+                          Rp {detail.avg_transaction_item.toLocaleString('id-ID')}
+                        </td>
+                        <td className="border border-gray-200 p-3">
+                          Rp {detail.avg_transaction_category.toLocaleString('id-ID')}
                         </td>
                       </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Weekly Revenue Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Grafik Pendapatan Mingguan</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    revenue: {
-                      label: "Pendapatan",
-                      color: "hsl(var(--chart-1))",
-                    },
-                  }}
-                  className="h-[300px]"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={[...(recapsAnalytics?.weeklyRevenue || []), { week: 'Total', revenue: recapsAnalytics?.totalRevenue || 0, period: 'Keseluruhan' }]}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="week" />
-                      <YAxis />
-                      <ChartTooltip
-                        content={<ChartTooltipContent />}
-                        formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pendapatan']}
-                      />
-                      <Bar dataKey="revenue" fill="var(--color-revenue)" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-
-            {/* Top 10 Studios Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Top 10 Studios Berdasarkan Revenue
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer
-                  config={{
-                    revenue: {
-                      label: "Revenue",
-                      color: "hsl(var(--foreground))",
-                    },
-                  }}
-                  className="h-[400px]"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={recapsAnalytics?.topStudios || []} layout="horizontal" margin={{ left: 100 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis type="category" dataKey="studio_name" width={100} />
-                      <ChartTooltip
-                        content={<ChartTooltipContent />}
-                        formatter={(value, name, props) => [
-                          `Rp ${Number(value).toLocaleString('id-ID')}`,
-                          'Revenue',
-                          `${props.payload.sessions_count} Sesi`
-                        ]}
-                      />
-                      <Bar dataKey="revenue" fill="hsl(var(--foreground))" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-
-            {/* Detail Pendapatan Bulanan */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Detail Pendapatan Bulanan</CardTitle>
-                <CardDescription>
-                  Rincian pendapatan berdasarkan item dan kategori paket
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-200">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-200 p-3 text-left">Item</th>
-                        <th className="border border-gray-200 p-3 text-left">Kategori Paket</th>
-                        <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Item)</th>
-                        <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Paket)</th>
-                        <th className="border border-gray-200 p-3 text-left">Omset</th>
-                        <th className="border border-gray-200 p-3 text-left">Rata-rata Transaksi (Item)</th>
-                        <th className="border border-gray-200 p-3 text-left">Rata-rata Transaksi (Kategori)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recapsAnalytics?.monthlyDetails.map((detail, index) => (
-                        <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="border border-gray-200 p-3 font-medium">{detail.item}</td>
-                          <td className="border border-gray-200 p-3">{detail.category}</td>
-                          <td className="border border-gray-200 p-3">{detail.sessions_count}</td>
-                          <td className="border border-gray-200 p-3">{detail.sessions_per_package.toFixed(1)} / hari</td>
-                          <td className="border border-gray-200 p-3 font-semibold">
-                            Rp {detail.revenue.toLocaleString('id-ID')}
-                          </td>
-                          <td className="border border-gray-200 p-3">
-                            Rp {detail.avg_transaction_item.toLocaleString('id-ID')}
-                          </td>
-                          <td className="border border-gray-200 p-3">
-                            Rp {detail.avg_transaction_category.toLocaleString('id-ID')}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
