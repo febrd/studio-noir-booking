@@ -38,9 +38,23 @@ export const navigationConfig: NavigationItem[] = [
   },
   {
     name: 'Users',
-    href: '/admin/users',
+    href: '/admin',
     icon: Users,
-    allowedRoles: ['owner', 'admin']
+    allowedRoles: ['owner', 'admin'],
+    children: [
+      {
+        name: 'Accounts',
+        href: '/admin/users',
+        icon: Users,
+        allowedRoles: ['owner', 'admin']
+      },
+      {
+        name: 'Customer Profiles',
+        href: '/admins/customers',
+        icon: Users,
+        allowedRoles: ['owner', 'admin']
+      }
+    ]
   },
   {
     name: 'Studio Management',
