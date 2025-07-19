@@ -31,7 +31,7 @@ const isValidUUID = (uuid: string): boolean => {
   return uuidRegex.test(uuid);
 };
 
-// WITA timezone utilities - Keep times in WITA throughout the process
+// WITA timezone utilities - WITA is GMT+8 (Waktu Indonesia Tengah - Central Indonesia Time)
 const formatDatetimeLocalWITA = (dateTimeString: string): string => {
   if (!dateTimeString) return '';
   
@@ -40,9 +40,9 @@ const formatDatetimeLocalWITA = (dateTimeString: string): string => {
     return dateTimeString;
   }
   
-  // Parse the datetime and format for local input
+  // Parse the datetime and format for local input (treating as WITA)
   const date = new Date(dateTimeString);
-  // Adjust for WITA timezone (UTC+8)
+  // WITA is GMT+8, so we add 8 hours to get the local WITA time for display
   const witaOffset = 8 * 60; // 8 hours in minutes
   const witaTime = new Date(date.getTime() + (witaOffset * 60000));
   
@@ -54,9 +54,24 @@ const parseWITADateTime = (dateTimeString: string): Date => {
   
   // Create date object treating the input as WITA time
   const date = new Date(dateTimeString);
-  // Subtract 8 hours to get the actual UTC time that represents this WITA time
+  // Subtract 8 hours to convert WITA to UTC for storage
   const witaOffset = 8 * 60; // 8 hours in minutes
   return new Date(date.getTime() - (witaOffset * 60000));
+};
+
+const formatDateTimeWITA = (dateTimeString: string) => {
+  if (!dateTimeString) return '';
+  const date = new Date(dateTimeString);
+  // Format in WITA timezone (GMT+8)
+  return new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Makassar', // WITA timezone
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date);
 };
 
 const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
@@ -254,15 +269,15 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         throw new Error('User ID tidak valid atau kosong');
       }
 
-      // Parse start time as WITA and keep it as WITA for storage
+      // Parse start time as WITA and convert to UTC for storage
       const startTimeWITA = parseWITADateTime(data.start_time);
       const totalMinutes = (selectedPackage?.base_time_minutes || 0) + (data.additional_time_minutes || 0);
       const endTimeWITA = new Date(startTimeWITA.getTime() + (totalMinutes * 60 * 1000));
 
       console.log('🔧 WITA Times:', {
         startInput: data.start_time,
-        startTimeWITA: startTimeWITA.toISOString(),
-        endTimeWITA: endTimeWITA.toISOString(),
+        startTimeUTC: startTimeWITA.toISOString(),
+        endTimeUTC: endTimeWITA.toISOString(),
         totalMinutes
       });
 
@@ -538,20 +553,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }).format(price);
   };
 
-  const formatDateTimeWITA = (dateTimeString: string) => {
-    if (!dateTimeString) return '';
-    const date = new Date(dateTimeString);
-    // Format in WITA timezone
-    return new Intl.DateTimeFormat('id-ID', {
-      timeZone: 'Asia/Makassar',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
-  };
-
   const selectedUser = users?.find(u => u.id === formData.user_id);
 
   return (
@@ -709,7 +710,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         </Select>
       </div>
 
-      {/* Date and Time - WITA timezone */}
+      {/* Date and Time - WITA timezone (Waktu Indonesia Tengah - GMT+8) */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="start_time">Tanggal & Waktu Mulai (WITA) *</Label>
@@ -720,7 +721,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
             onChange={(e) => handleInputChange('start_time', e.target.value)}
             required
           />
-          <p className="text-xs text-gray-500">Waktu Indonesia Timur (GMT+8)</p>
+          <p className="text-xs text-gray-500">Waktu Indonesia Tengah (GMT+8) - Central Indonesia Time</p>
         </div>
         
         <div className="space-y-2">

@@ -16,15 +16,30 @@ import { format, startOfDay, endOfDay, addMinutes } from 'date-fns';
 import { WalkinTimeExtensionManager } from './WalkinTimeExtensionManager';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 
-// WITA timezone utilities - Consistent with BookingForm
+// WITA timezone utilities - WITA is GMT+8 (Waktu Indonesia Tengah - Central Indonesia Time)
 const parseWITADateTime = (dateTimeString: string): Date => {
   if (!dateTimeString) return new Date();
   
   // Create date object treating the input as WITA time
   const date = new Date(dateTimeString);
-  // Subtract 8 hours to get the actual UTC time that represents this WITA time
+  // Subtract 8 hours to convert WITA to UTC for storage
   const witaOffset = 8 * 60; // 8 hours in minutes
   return new Date(date.getTime() - (witaOffset * 60000));
+};
+
+const formatDateTimeWITA = (dateTimeString: string) => {
+  if (!dateTimeString) return '';
+  const date = new Date(dateTimeString);
+  // Format in WITA timezone (GMT+8)
+  return new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Makassar', // WITA timezone
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date);
 };
 
 const walkinBookingSchema = z.object({
@@ -225,8 +240,8 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
 
       console.log('🔧 Walk-in WITA Times:', {
         startInput: startTimeString,
-        startDateTime: startDateTime.toISOString(),
-        endDateTime: endDateTime.toISOString(),
+        startDateTimeUTC: startDateTime.toISOString(),
+        endDateTimeUTC: endDateTime.toISOString(),
         totalMinutes
       });
 
@@ -552,7 +567,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
                   type="time"
                   {...form.register('start_time')}
                 />
-                <p className="text-xs text-gray-500 mt-1">Waktu Indonesia Timur</p>
+                <p className="text-xs text-gray-500 mt-1">Waktu Indonesia Tengah (GMT+8)</p>
                 {form.formState.errors.start_time && (
                   <p className="text-sm text-red-600">{form.formState.errors.start_time.message}</p>
                 )}
