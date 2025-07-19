@@ -26,6 +26,7 @@ interface MonthlyDetail {
   category: string;
   sessions_count: number;
   sessions_per_day: number;
+  sessions_per_package: number;
   revenue: number;
   avg_transaction_item: number;
   avg_transaction_category: number;
@@ -177,38 +178,50 @@ const RecapsPage = () => {
 
     const totalRevenue = weeklyRevenue.reduce((sum, week) => sum + week.revenue, 0);
 
-    // Monthly details by category
+    // Monthly details by category and package
     const categoryStats = bookingsData.reduce((acc, booking) => {
       const category = booking.package_categories?.name || booking.studios?.type || 'Unknown';
+      const packageTitle = booking.studio_packages?.title || 'Unknown Package';
+      const key = `${category}-${packageTitle}`;
+      
       const bookingAmount = booking.total_amount || 0;
       const installmentAmount = booking.installments?.reduce((instSum: number, inst: any) => instSum + (inst.amount || 0), 0) || 0;
       const revenue = Math.max(bookingAmount, installmentAmount);
 
-      if (!acc[category]) {
-        acc[category] = {
+      if (!acc[key]) {
+        acc[key] = {
+          item: category,
+          category: packageTitle,
           sessions_count: 0,
           revenue: 0,
           transactions: []
         };
       }
 
-      acc[category].sessions_count += 1;
-      acc[category].revenue += revenue;
-      acc[category].transactions.push(revenue);
+      acc[key].sessions_count += 1;
+      acc[key].revenue += revenue;
+      acc[key].transactions.push(revenue);
 
       return acc;
-    }, {} as Record<string, { sessions_count: number; revenue: number; transactions: number[] }>);
+    }, {} as Record<string, { item: string; category: string; sessions_count: number; revenue: number; transactions: number[] }>);
 
-    const monthlyDetails: MonthlyDetail[] = Object.entries(categoryStats).map(([category, stats]) => {
+    const monthlyDetails: MonthlyDetail[] = Object.entries(categoryStats).map(([key, stats]) => {
       const daysInPeriod = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       const sessionsPerDay = stats.sessions_count / daysInPeriod;
       const avgTransactionItem = stats.revenue / stats.sessions_count;
 
+      // Calculate sessions per package (average daily sessions for this category)
+      const categoryBookings = bookingsData.filter(b => 
+        (b.package_categories?.name || b.studios?.type) === stats.item
+      );
+      const sessionsPerPackage = categoryBookings.length / daysInPeriod;
+
       return {
-        item: category,
-        category: category,
+        item: stats.item,
+        category: stats.category,
         sessions_count: stats.sessions_count,
         sessions_per_day: sessionsPerDay,
+        sessions_per_package: sessionsPerPackage,
         revenue: stats.revenue,
         avg_transaction_item: avgTransactionItem,
         avg_transaction_category: avgTransactionItem
@@ -262,7 +275,7 @@ const RecapsPage = () => {
       'Item',
       'Kategori Paket',
       'Jumlah Sesi (per Item)',
-      'Jumlah Sesi (per Hari)',
+      'Jumlah Sesi (per Paket)',
       'Omset',
       'Rata-rata Transaksi (Item)',
       'Rata-rata Transaksi (Kategori)'
@@ -272,7 +285,7 @@ const RecapsPage = () => {
       detail.item,
       detail.category,
       detail.sessions_count.toString(),
-      `${detail.sessions_per_day.toFixed(1)} / hari`,
+      `${detail.sessions_per_package.toFixed(1)} / hari`,
       `Rp ${detail.revenue.toLocaleString('id-ID')}`,
       `Rp ${detail.avg_transaction_item.toLocaleString('id-ID')}`,
       `Rp ${detail.avg_transaction_category.toLocaleString('id-ID')}`
@@ -505,10 +518,13 @@ const RecapsPage = () => {
         </CardContent>
       </Card>
 
-      {/* Monthly Details */}
+      {/* Detail Pendapatan Bulanan */}
       <Card>
         <CardHeader>
           <CardTitle>Detail Pendapatan Bulanan</CardTitle>
+          <CardDescription>
+            Rincian pendapatan berdasarkan item dan kategori paket
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -518,7 +534,7 @@ const RecapsPage = () => {
                   <th className="border border-gray-200 p-3 text-left">Item</th>
                   <th className="border border-gray-200 p-3 text-left">Kategori Paket</th>
                   <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Item)</th>
-                  <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Hari)</th>
+                  <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Paket)</th>
                   <th className="border border-gray-200 p-3 text-left">Omset</th>
                   <th className="border border-gray-200 p-3 text-left">Rata-rata Transaksi (Item)</th>
                   <th className="border border-gray-200 p-3 text-left">Rata-rata Transaksi (Kategori)</th>
@@ -530,7 +546,7 @@ const RecapsPage = () => {
                     <td className="border border-gray-200 p-3 font-medium">{detail.item}</td>
                     <td className="border border-gray-200 p-3">{detail.category}</td>
                     <td className="border border-gray-200 p-3">{detail.sessions_count}</td>
-                    <td className="border border-gray-200 p-3">{detail.sessions_per_day.toFixed(1)} / hari</td>
+                    <td className="border border-gray-200 p-3">{detail.sessions_per_package.toFixed(1)} / hari</td>
                     <td className="border border-gray-200 p-3 font-semibold">
                       Rp {detail.revenue.toLocaleString('id-ID')}
                     </td>

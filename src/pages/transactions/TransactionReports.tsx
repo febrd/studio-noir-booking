@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -144,6 +143,42 @@ const TransactionReports = () => {
     };
   }, [combinedData]);
 
+  // Add export data for Transaction Reports
+  const exportData = useMemo(() => {
+    if (!combinedData) return undefined;
+
+    const headers = [
+      'Tanggal',
+      'Customer',
+      'Email',
+      'Studio',
+      'Paket',
+      'Tipe',
+      'Payment Method',
+      'Status',
+      'Total Amount'
+    ];
+
+    const data = combinedData.map(booking => [
+      format(new Date(booking.created_at), 'dd/MM/yyyy HH:mm', { locale: id }),
+      booking.users?.name || '-',
+      booking.users?.email || '-',
+      booking.studios?.name || '-',
+      booking.studio_packages?.title || '-',
+      booking.type || '-',
+      booking.payment_method || '-',
+      booking.status || '-',
+      `Rp ${(booking.total_amount || 0).toLocaleString('id-ID')}`
+    ]);
+
+    return {
+      title: `Laporan Transaksi ${dateRange?.from ? format(dateRange.from, 'dd/MM/yyyy') : 'Semua'} - ${dateRange?.to ? format(dateRange.to, 'dd/MM/yyyy') : 'Sekarang'}`,
+      headers,
+      data,
+      filename: `transaction-reports-${dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : 'all'}-${dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : 'now'}`
+    };
+  }, [combinedData, dateRange]);
+
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
   }
@@ -159,7 +194,7 @@ const TransactionReports = () => {
           <h1 className="text-3xl font-bold">Transaction Reports</h1>
           <p className="text-muted-foreground">Laporan komprehensif semua transaksi online & offline</p>
         </div>
-        <ExportButtons />
+        <ExportButtons exportData={exportData} />
       </div>
 
       <Card>
