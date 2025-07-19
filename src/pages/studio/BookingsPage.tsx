@@ -541,11 +541,19 @@ const BookingsPage = () => {
                           <p className="text-blue-600">
                             Dibayar: {formatPrice(totalPaid)}
                           </p>
-                          <p className="text-orange-600">
-                            Sisa: {formatPrice(remainingAmount)}
-                          </p>
+
+                          {remainingAmount > 0 ? (
+                            <p className="text-orange-600">
+                              Sisa: {formatPrice(remainingAmount)}
+                            </p>
+                          ) : (
+                            <p className="text-green-600">
+                              Sisa tagihan: -
+                            </p>
+                          )}
                         </>
                       )}
+
                     </div>
                   </div>
                   <Badge className={getStatusColor(actualStatus)}>
