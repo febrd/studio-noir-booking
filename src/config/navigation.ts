@@ -95,7 +95,7 @@ export const navigationConfig: NavigationItem[] = [
     ]
   },
   {
-    name: 'Reports',
+    name: 'Report',
     href: '/transactions',
     icon: Receipt,
     allowedRoles: ['owner', 'admin', 'keuangan'],
