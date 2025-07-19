@@ -1,309 +1,269 @@
 
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ModernLayout } from '@/components/Layout/ModernLayout';
-import { Camera, Clock, Search, ArrowLeft, Star, Heart, Users, User } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Input } from '@/components/ui/input';
+import { ArrowLeft, Search, Users, Heart, Users2, Baby, Camera, Clock, MapPin } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
+
+interface Package {
+  id: string;
+  name: string;
+  price: number;
+  duration: number;
+  description: string;
+  category: {
+    name: string;
+    id: string;
+  };
+  studio: {
+    name: string;
+    id: string;
+  };
+}
 
 const RegularPackagesPage = () => {
-  const [searchParams] = useSearchParams();
-  const category = searchParams.get('category');
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('popular');
-  const [selectedCategory, setSelectedCategory] = useState(category || 'all');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const { data: packages = [], isLoading } = useQuery({
+  // Fetch packages from database
+  const { data: packages = [], isLoading, error } = useQuery({
     queryKey: ['regular-packages'],
     queryFn: async () => {
+      console.log('Fetching regular packages...');
       const { data, error } = await supabase
-        .from('studio_packages')
+        .from('packages')
         .select(`
-          *,
-          studios!inner (
-            id,
-            name,
-            type,
-            location
-          ),
-          package_categories (
-            name
-          )
+          id,
+          name,
+          price,
+          duration,
+          description,
+          category:package_categories(id, name),
+          studio:studios(id, name)
         `)
-        .eq('studios.type', 'regular')
-        .eq('studios.is_active', true);
-      
-      if (error) throw error;
-      return data || [];
-    }
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching packages:', error);
+        throw error;
+      }
+
+      console.log('Fetched packages:', data);
+      return data as Package[];
+    },
   });
 
-  const categories = [
-    { id: 'all', title: 'Semua', icon: Camera, color: 'from-gray-400 to-gray-500' },
-    { id: 'personal', title: 'Personal', icon: User, color: 'from-emerald-400 to-cyan-400' },
-    { id: 'couple', title: 'Couple', icon: Heart, color: 'from-rose-400 to-pink-500' },
-    { id: 'group', title: 'Group', icon: Users, color: 'from-violet-400 to-purple-500' },
-    { id: 'family', title: 'Family', icon: Users, color: 'from-amber-400 to-orange-500' }
-  ];
+  // Filter packages based on search and category
+  const filteredPackages = packages.filter(pkg => {
+    const matchesSearch = pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         pkg.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = !selectedCategory || pkg.category?.name === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
-  const filteredPackages = packages
-    .filter(pkg => {
-      const matchesSearch = pkg.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           pkg.studios?.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = selectedCategory === 'all' || 
-                             pkg.package_categories?.name.toLowerCase() === selectedCategory;
-      return matchesSearch && matchesCategory;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'price-low':
-          return a.price - b.price;
-        case 'price-high':
-          return b.price - a.price;
-        case 'duration':
-          return b.base_time_minutes - a.base_time_minutes;
-        default:
-          return 0;
-      }
-    });
+  // Get unique categories
+  const categories = Array.from(new Set(packages.map(pkg => pkg.category?.name).filter(Boolean)));
 
-  const getCategoryBadgeColor = (categoryName: string) => {
-    switch (categoryName?.toLowerCase()) {
-      case 'personal': return 'bg-emerald-100 text-emerald-800';
-      case 'couple': return 'bg-rose-100 text-rose-800';
-      case 'group': return 'bg-violet-100 text-violet-800';
-      case 'family': return 'bg-amber-100 text-amber-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const getCategoryIcon = (category: string) => {
+    switch (category.toLowerCase()) {
+      case 'personal':
+        return <Users className="h-5 w-5" />;
+      case 'couple':
+        return <Heart className="h-5 w-5" />;
+      case 'group':
+        return <Users2 className="h-5 w-5" />;
+      case 'family':
+        return <Baby className="h-5 w-5" />;
+      default:
+        return <Camera className="h-5 w-5" />;
     }
   };
 
-  if (isLoading) {
+  const getCategoryColor = (category: string) => {
+    switch (category.toLowerCase()) {
+      case 'personal':
+        return 'from-green-400 to-cyan-500';
+      case 'couple':
+        return 'from-red-400 to-pink-500';
+      case 'group':
+        return 'from-violet-400 to-purple-500';
+      case 'family':
+        return 'from-amber-400 to-orange-500';
+      default:
+        return 'from-blue-400 to-indigo-500';
+    }
+  };
+
+  const handlePackageSelect = (packageId: string) => {
+    toast.success('Paket dipilih! Mengarahkan ke halaman booking...');
+    // Navigate to booking page with package ID
+    navigate(`/booking?package=${packageId}`);
+  };
+
+  if (error) {
     return (
-      <ModernLayout>
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background p-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center py-12">
+            <h2 className="text-2xl font-bold text-destructive mb-4">Error Loading Packages</h2>
+            <p className="text-muted-foreground">Please try again later</p>
+          </div>
         </div>
-      </ModernLayout>
+      </div>
     );
   }
 
   return (
-    <ModernLayout>
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          {/* Header */}
-          <div className="mb-8 animate-fade-in">
-            <div className="flex items-center gap-4 mb-6">
-              <Link to="/customer/booking-selection">
-                <Button variant="outline" size="sm" className="hover-scale">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Kembali
-                </Button>
-              </Link>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
-                  <Camera className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                    Studio Reguler
-                  </h1>
-                  <p className="text-muted-foreground">Sesi foto profesional dengan fotografer berpengalaman</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Category Filter */}
-            <div className="flex gap-3 mb-6 overflow-x-auto pb-2">
-              {categories.map((cat) => {
-                const IconComponent = cat.icon;
-                return (
-                  <Button
-                    key={cat.id}
-                    variant={selectedCategory === cat.id ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`whitespace-nowrap hover-scale ${
-                      selectedCategory === cat.id 
-                        ? `bg-gradient-to-r ${cat.color} text-white` 
-                        : ''
-                    }`}
-                  >
-                    <IconComponent className="h-4 w-4 mr-2" />
-                    {cat.title}
-                  </Button>
-                );
-              })}
-            </div>
-
-            {/* Search and Sort */}
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Cari paket atau studio..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant={sortBy === 'popular' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSortBy('popular')}
-                  className="hover-scale"
-                >
-                  <Star className="h-4 w-4 mr-2" />
-                  Populer
-                </Button>
-                <Button
-                  variant={sortBy === 'price-low' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSortBy('price-low')}
-                  className="hover-scale"
-                >
-                  Harga ↑
-                </Button>
-                <Button
-                  variant={sortBy === 'price-high' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSortBy('price-high')}
-                  className="hover-scale"
-                >
-                  Harga ↓
-                </Button>
-                <Button
-                  variant={sortBy === 'duration' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSortBy('duration')}
-                  className="hover-scale"
-                >
-                  <Clock className="h-4 w-4 mr-2" />
-                  Durasi
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Packages Grid */}
-          {filteredPackages.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredPackages.map((pkg, index) => (
-                <Card 
-                  key={pkg.id} 
-                  className={`group relative overflow-hidden hover:shadow-xl transition-all duration-500 transform hover:-translate-y-2 animate-scale-in border-0 bg-white/80 backdrop-blur-sm`}
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  
-                  <CardHeader className="relative z-10">
-                    <div className="flex justify-between items-start mb-3">
-                      <Badge className={getCategoryBadgeColor(pkg.package_categories?.name)}>
-                        {pkg.package_categories?.name || 'Reguler'}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-red-50"
-                      >
-                        <Heart className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                    
-                    <CardTitle className="text-xl group-hover:text-purple-600 transition-colors">
-                      {pkg.title}
-                    </CardTitle>
-                    <CardDescription className="text-sm">
-                      {pkg.studios?.name} • {pkg.studios?.location}
-                    </CardDescription>
-                  </CardHeader>
-
-                  <CardContent className="relative z-10 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span>{pkg.base_time_minutes} menit</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-yellow-600">
-                        <Star className="h-4 w-4 fill-current" />
-                        <span>4.8</span>
-                      </div>
-                    </div>
-                    
-                    {pkg.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {pkg.description}
-                      </p>
-                    )}
-                    
-                    <div className="flex items-center justify-between pt-4">
-                      <div>
-                        <p className="text-2xl font-bold text-purple-600">
-                          Rp {pkg.price.toLocaleString('id-ID')}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          ~Rp {Math.round(pkg.price / pkg.base_time_minutes).toLocaleString('id-ID')}/menit
-                        </p>
-                      </div>
-                      <Button 
-                        className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white transform hover:scale-105 transition-all duration-300"
-                        onClick={() => {
-                          // Navigate to booking form with this package
-                          console.log('Booking package:', pkg.id);
-                        }}
-                      >
-                        Pilih Paket
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16 animate-fade-in">
-              <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-r from-purple-100 to-pink-100 flex items-center justify-center">
-                <Camera className="h-12 w-12 text-purple-500" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-2">Paket Tidak Ditemukan</h3>
-              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                Maaf, tidak ada paket studio reguler yang sesuai dengan pencarian Anda. 
-                Coba ubah kata kunci atau filter pencarian.
-              </p>
-              <Button variant="outline" onClick={() => {
-                setSearchTerm('');
-                setSelectedCategory('all');
-              }} className="hover-scale">
-                Reset Pencarian
-              </Button>
-            </div>
-          )}
-
-          {/* Call to Action */}
-          <div className="mt-16 text-center animate-fade-in">
-            <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-8 text-white">
-              <h3 className="text-2xl font-bold mb-4">Konsultasi Gratis dengan Fotografer</h3>
-              <p className="text-lg mb-6 opacity-90">
-                Diskusikan konsep foto impian Anda sebelum sesi dimulai
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button variant="secondary" size="lg" className="hover-scale">
-                  Chat WhatsApp
-                </Button>
-                <Button variant="outline" size="lg" className="text-white border-white hover:bg-white hover:text-purple-600 hover-scale">
-                  Lihat Portfolio
-                </Button>
-              </div>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
+      {/* Header */}
+      <div className="bg-background/80 backdrop-blur-sm border-b sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-4">
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/customer/booking-selection')}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Kembali
+            </Button>
+            <h1 className="text-2xl font-bold text-elegant">Studio Reguler</h1>
+            <div className="w-20"></div>
           </div>
         </div>
       </div>
-    </ModernLayout>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Search and Filter */}
+        <div className="mb-8 space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Cari paket studio..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {/* Category Filter */}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={selectedCategory === null ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedCategory(null)}
+            >
+              Semua Kategori
+            </Button>
+            {categories.map((category) => (
+              <Button
+                key={category}
+                variant={selectedCategory === category ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedCategory(category)}
+                className="flex items-center gap-1"
+              >
+                {getCategoryIcon(category)}
+                {category}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <div className="h-48 bg-muted rounded-t-lg"></div>
+                <CardContent className="p-4">
+                  <div className="h-4 bg-muted rounded mb-2"></div>
+                  <div className="h-3 bg-muted rounded mb-4"></div>
+                  <div className="h-8 bg-muted rounded"></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Packages Grid */}
+        {!isLoading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredPackages.map((pkg) => (
+              <Card 
+                key={pkg.id} 
+                className="group glass-elegant hover-lift cursor-pointer transition-all duration-300 hover:shadow-xl"
+                onClick={() => handlePackageSelect(pkg.id)}
+              >
+                <div className={`h-48 bg-gradient-to-br ${getCategoryColor(pkg.category?.name || '')} rounded-t-lg relative overflow-hidden`}>
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                    <div className="text-white text-center">
+                      {getCategoryIcon(pkg.category?.name || '')}
+                      <p className="text-sm mt-2 font-medium">{pkg.category?.name}</p>
+                    </div>
+                  </div>
+                  <Badge className="absolute top-4 right-4 bg-white/20 text-white border-white/30">
+                    Populer
+                  </Badge>
+                </div>
+                
+                <CardHeader className="pb-3">
+                  <div className="flex justify-between items-start">
+                    <CardTitle className="text-lg font-semibold text-elegant group-hover:text-primary transition-colors">
+                      {pkg.name}
+                    </CardTitle>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-primary">
+                        Rp {pkg.price?.toLocaleString('id-ID')}
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                
+                <CardContent className="pt-0">
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {pkg.description || 'Paket studio profesional untuk hasil foto terbaik'}
+                    </p>
+                    
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        {pkg.duration} menit
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <MapPin className="h-4 w-4" />
+                        {pkg.studio?.name || 'Studio'}
+                      </div>
+                    </div>
+                    
+                    <Button className="w-full group-hover:bg-primary/90 transition-colors">
+                      Pilih Paket
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* No Results */}
+        {!isLoading && filteredPackages.length === 0 && (
+          <div className="text-center py-12">
+            <Camera className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Tidak ada paket ditemukan</h3>
+            <p className="text-muted-foreground">Coba ubah pencarian atau filter kategori</p>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

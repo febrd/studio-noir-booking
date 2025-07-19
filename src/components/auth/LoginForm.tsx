@@ -5,15 +5,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
+import { Navigate } from 'react-router-dom';
 
 interface LoginFormProps {
   onError: (error: string) => void;
 }
 
 export const LoginForm = ({ onError }: LoginFormProps) => {
-  const { signIn } = useJWTAuth();
+  const { signIn, userProfile } = useJWTAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+
+  // If user is already authenticated, redirect to dashboard
+  if (userProfile) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,9 +40,9 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
         console.error('Login failed:', result.error);
         onError(result.error || 'Login gagal. Periksa email dan password Anda.');
       } else {
-        console.log('Login successful');
-        // Success will redirect to main page automatically
-        window.location.href = '/';
+        console.log('Login successful, redirecting...');
+        // Force page reload to ensure clean state
+        window.location.href = '/dashboard';
       }
     } catch (err) {
       console.error('Unexpected login error:', err);
@@ -71,11 +77,6 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
           disabled={isSubmitting}
           autoComplete="current-password"
         />
-      </div>
-      
-      {/* Sample users info */}
-      <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
-      
       </div>
       
       <Button 

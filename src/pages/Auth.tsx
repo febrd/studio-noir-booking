@@ -14,9 +14,13 @@ const Auth = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  console.log('Auth page - userProfile:', userProfile);
+  console.log('Auth page - loading:', loading);
+
   // Redirect if already authenticated
   if (userProfile) {
-    return <Navigate to="/" replace />;
+    console.log('User is authenticated, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
   }
 
   if (loading) {
@@ -32,7 +36,7 @@ const Auth = () => {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-elegant">Masuk Studio</h1>
-          <p className="text-muted-foreground mt-2">Your Best Self, Captured. </p>
+          <p className="text-muted-foreground mt-2">Your Best Self, Captured</p>
         </div>
 
         <Card className="glass-elegant">
