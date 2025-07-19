@@ -39,8 +39,11 @@ const Users = () => {
         query = query.eq('role', roleFilter as 'owner' | 'admin' | 'keuangan' | 'pelanggan');
       }
 
-      // Apply status filter would go here if we had status column
-      // For now, we assume all users are active
+      // Apply status filter - now functional
+      if (statusFilter !== 'all') {
+        const isActive = statusFilter === 'active';
+        query = query.eq('is_active', isActive);
+      }
 
       const { data, error } = await query.order('created_at', { ascending: false });
       
@@ -207,8 +210,8 @@ const Users = () => {
                           <Badge className={getRoleColor(user.role)}>
                             {user.role}
                           </Badge>
-                          <Badge variant="outline" className="text-green-600">
-                            Aktif
+                          <Badge variant="outline" className={user.is_active ? "text-green-600" : "text-red-600"}>
+                            {user.is_active ? 'Aktif' : 'Tidak Aktif'}
                           </Badge>
                         </div>
                       </div>
@@ -254,7 +257,9 @@ const Users = () => {
                     </div>
                     <div>
                       <p className="font-medium text-muted-foreground">Status</p>
-                      <Badge variant="outline" className="text-green-600">Aktif</Badge>
+                      <Badge variant="outline" className={user.is_active ? "text-green-600" : "text-red-600"}>
+                        {user.is_active ? 'Aktif' : 'Tidak Aktif'}
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>
@@ -264,7 +269,7 @@ const Users = () => {
             <Card>
               <CardContent className="p-6 text-center">
                 <p className="text-muted-foreground mb-4">
-                  {searchTerm || roleFilter !== 'all' ? 'Tidak ada pengguna yang sesuai dengan filter' : 'Belum ada pengguna yang terdaftar'}
+                  {searchTerm || roleFilter !== 'all' || statusFilter !== 'all' ? 'Tidak ada pengguna yang sesuai dengan filter' : 'Belum ada pengguna yang terdaftar'}
                 </p>
                 {canManageUsers && !searchTerm && roleFilter === 'all' && (
                   <AddUserForm onSuccess={() => {

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,10 +34,8 @@ const TimeExtensionManager = ({
     
       const newEndTime = new Date(currentTime.getTime() + (additionalMinutes * 60 * 1000));
     
-      // 1. Hitung biaya tambahan per menit
-      const extensionCost = studioType === 'self_photo'
-        ? additionalMinutes * 5000
-        : additionalMinutes * 15000;
+      // 1. Hitung biaya tambahan per menit - sesuai tipe studio
+      const extensionCost = calculateExtensionCost(additionalMinutes);
     
       // 2. Ambil total_amount lama
       const { data: currentData, error: fetchError } = await supabase
@@ -81,11 +78,12 @@ const TimeExtensionManager = ({
   const calculateExtensionCost = (minutes: number) => {
     if (minutes <= 0) return 0;
     
+    // Biaya per 5 menit berdasarkan tipe studio
     const slots = Math.ceil(minutes / 5);
     if (studioType === 'self_photo') {
-      return slots * 5000;
+      return slots * 5000;  // Rp 5.000 per 5 menit untuk self photo
     } else {
-      return slots * 15000;
+      return slots * 15000; // Rp 15.000 per 5 menit untuk regular
     }
   };
 
@@ -165,7 +163,7 @@ const TimeExtensionManager = ({
             </p>
           </div>
 
-          {/* Cost Preview */}
+          {/* Cost Preview - now shows correct calculation */}
           {extensionMinutes > 0 && (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex justify-between items-center">
@@ -177,7 +175,7 @@ const TimeExtensionManager = ({
                 </span>
               </div>
               <p className="text-xs text-blue-600 mt-1">
-                {extensionMinutes} menit × {formatPrice(studioType === 'self_photo' ? 5000 : 15000)}
+                {Math.ceil(extensionMinutes / 5)} slot × {formatPrice(studioType === 'self_photo' ? 5000 : 15000)} = {extensionMinutes} menit
               </p>
             </div>
           )}
