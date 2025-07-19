@@ -32,10 +32,25 @@ import NotFound from './pages/NotFound';
 import BookingSelectionPage from './pages/customer/BookingSelectionPage';
 import SelfPhotoPackagesPage from './pages/customer/SelfPhotoPackagesPage';
 import RegularPackagesPage from './pages/customer/RegularPackagesPage';
+import { useEffect } from 'react';
 
 const queryClient = new QueryClient();
 
 function App() {
+
+  useEffect(() => {
+    document.title = 'Masuk Studio'; // Title
+  
+    const favicon = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+    if (favicon) {
+      favicon.href = 'https://masukstudio.com/static/icon.png'; // Ganti URL dengan favicon kamu
+    } else {
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.href = 'https://masukstudio.com/static/icon.png';
+      document.head.appendChild(link);
+    }
+  }, []);
   return (
     <QueryClientProvider client={queryClient}>
       <JWTAuthProvider>
