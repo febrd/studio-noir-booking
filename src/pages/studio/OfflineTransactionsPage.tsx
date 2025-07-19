@@ -29,6 +29,7 @@ const OfflineTransactionsPage = () => {
             id,
             user_id,
             studio_id,
+            status,
             users!inner(name, email),
             studios!inner(name)
           ),
@@ -96,7 +97,8 @@ const OfflineTransactionsPage = () => {
   const summary = transactions?.reduce((acc, transaction) => {
     acc.totalAmount += Number(transaction.amount);
     acc.totalTransactions += 1;
-    if (transaction.status === 'pending' || transaction.status === 'installment') {
+    // Check booking status for installment, not transaction status
+    if (transaction.bookings?.status === 'installment' || transaction.status === 'unpaid') {
       acc.installmentCount += 1;
     }
     return acc;

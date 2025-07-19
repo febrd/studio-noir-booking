@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -72,7 +71,7 @@ const OfflineBookingsReport = () => {
     }
   });
 
-  // Get operators performance data
+  // Get operators performance data - fix the query to use correct column names
   const { data: operatorData } = useQuery({
     queryKey: ['operator-performance', dateRange],
     queryFn: async () => {
@@ -82,7 +81,7 @@ const OfflineBookingsReport = () => {
           performed_by,
           total_amount,
           status,
-          users!bookings_performed_by_fkey (name)
+          performed_by_user:users!bookings_performed_by_fkey (name)
         `)
         .eq('payment_method', 'offline')
         .not('performed_by', 'is', null);
@@ -143,14 +142,14 @@ const OfflineBookingsReport = () => {
       };
     }, { totalInstallmentRevenue: 0, averageInstallmentPerBooking: 0, totalInstallments: 0 });
 
-    // Operator performance analysis
+    // Operator performance analysis - fix the data access
     const operatorPerformance = operatorData?.reduce((acc, booking) => {
       const operatorId = booking.performed_by;
       if (!operatorId) return acc;
       
       if (!acc[operatorId]) {
         acc[operatorId] = {
-          name: booking.users?.name || 'Unknown',
+          name: booking.performed_by_user?.name || 'Unknown',
           totalRevenue: 0,
           totalBookings: 0,
           completedBookings: 0
