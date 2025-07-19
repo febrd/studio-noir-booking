@@ -49,8 +49,16 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const parsed = JSON.parse(storedUser);
         console.log('JWT Auth: Parsed user profile:', parsed);
-        setUserProfile(parsed);
-        setIsAuthenticated(true);
+        
+        // Validate the parsed user has required fields
+        if (parsed && parsed.id && parsed.email && parsed.role) {
+          setUserProfile(parsed);
+          setIsAuthenticated(true);
+          console.log('JWT Auth: User authenticated from storage');
+        } else {
+          console.log('JWT Auth: Invalid stored user data, clearing');
+          localStorage.removeItem('jwt_user');
+        }
       } catch (error) {
         console.error('Error parsing stored user:', error);
         localStorage.removeItem('jwt_user');
@@ -62,6 +70,7 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string): Promise<AuthResult> => {
     try {
       console.log('JWT Auth: Attempting sign in with email:', email);
+      setLoading(true);
       
       const { data, error } = await supabase.rpc('login_user', {
         user_email: email,
@@ -70,6 +79,7 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error('JWT Auth sign in error:', error);
+        setLoading(false);
         return { success: false, error: error.message || 'Login gagal' };
       }
 
@@ -78,12 +88,14 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('JWT Auth: Login result:', result);
       
       if (!result || typeof result !== 'object' || !result.success) {
+        setLoading(false);
         return { success: false, error: result?.error || 'Login gagal' };
       }
 
       if (result.user) {
         // Check if user is active
         if (result.user.is_active === false) {
+          setLoading(false);
           return { success: false, error: 'Akun Anda telah dinonaktifkan. Silakan hubungi administrator.' };
         }
 
@@ -102,19 +114,23 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
           console.warn('Failed to sync with Supabase auth:', authError);
         }
         
+        setLoading(false);
         toast.success('Login berhasil!');
         return { success: true };
       }
 
+      setLoading(false);
       return { success: false, error: 'Data user tidak ditemukan' };
     } catch (error) {
       console.error('Unexpected JWT sign in error:', error);
+      setLoading(false);
       return { success: false, error: 'Terjadi kesalahan sistem' };
     }
   };
 
   const signUp = async (email: string, password: string, name: string): Promise<AuthResult> => {
     try {
+      setLoading(true);
       const { data, error } = await supabase.rpc('register_user', {
         user_name: name,
         user_email: email,
@@ -124,6 +140,7 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error('JWT Auth signup error:', error);
+        setLoading(false);
         return { success: false, error: error.message || 'Registrasi gagal' };
       }
 
@@ -131,13 +148,16 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
       const result = data as any;
       
       if (!result || typeof result !== 'object' || !result.success) {
+        setLoading(false);
         return { success: false, error: result?.error || 'Registrasi gagal' };
       }
 
+      setLoading(false);
       toast.success('Registrasi berhasil! Silakan login dengan akun baru Anda.');
       return { success: true };
     } catch (error) {
       console.error('Unexpected JWT signup error:', error);
+      setLoading(false);
       return { success: false, error: 'Terjadi kesalahan sistem' };
     }
   };
