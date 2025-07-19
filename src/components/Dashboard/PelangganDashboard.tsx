@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
@@ -12,7 +11,7 @@ import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
-const COLORS = ['#d30f0f', '#0060ad', '#FFD700', '#000000'];
+const COLORS = ['#dc2626', '#2563eb', '#eab308', '#000000'];
 
 export const PelangganDashboard = () => {
   const { userProfile } = useJWTAuth();
@@ -65,7 +64,7 @@ export const PelangganDashboard = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-white flex justify-center items-center">
-        <div className="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-8 h-8 border-2 border-gray-300 border-t-black rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -139,11 +138,11 @@ export const PelangganDashboard = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'confirmed': return 'bg-green-100 text-green-800 border border-green-300';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border border-yellow-300';
-      case 'completed': return 'bg-blue-100 text-blue-800 border border-blue-300';
-      case 'cancelled': return 'bg-red-100 text-red-800 border border-red-300';
-      default: return 'bg-gray-100 text-gray-800 border border-gray-300';
+      case 'confirmed': return 'bg-green-50 text-green-700 border border-green-200';
+      case 'pending': return 'bg-yellow-50 text-yellow-700 border border-yellow-200';
+      case 'completed': return 'bg-blue-50 text-blue-700 border border-blue-200';
+      case 'cancelled': return 'bg-red-50 text-red-700 border border-red-200';
+      default: return 'bg-gray-50 text-gray-700 border border-gray-200';
     }
   };
 
@@ -159,113 +158,95 @@ export const PelangganDashboard = () => {
 
   return (
     <div className="min-h-screen bg-white font-inter">
-      {/* Minimalist Hero Section */}
-      <div className="relative bg-white border-b-8 border-black">
-        {/* Geometric shapes */}
-        <div className="absolute top-8 left-8 w-16 h-16 bg-red-500"></div>
-        <div className="absolute top-8 right-8 w-12 h-12 bg-blue-600 rounded-full"></div>
-        <div className="absolute bottom-8 right-24 w-0 h-0 border-l-8 border-r-8 border-b-16 border-l-transparent border-r-transparent border-b-yellow-400"></div>
-        
-        <div className="relative px-8 py-24 z-10 max-w-6xl mx-auto">
-          <h1 className="text-8xl font-peace-sans font-black text-black mb-4 tracking-tight">
-            STUDIO
+      {/* Clean Hero Section */}
+      <div className="bg-white py-32 px-8">
+        <div className="max-w-6xl mx-auto text-center">
+          <h1 className="text-8xl font-peace-sans font-black text-black mb-8 tracking-tight leading-none">
+            Dashboard
           </h1>
-          <h2 className="text-3xl font-peace-sans font-bold mb-8 text-black">
-            DASHBOARD
-          </h2>
-          <p className="text-xl mb-12 max-w-xl font-inter text-gray-700">
-            Halo, {userProfile?.name}! Kelola semua aktivitas foto Anda di sini.
+          <p className="text-2xl font-inter font-light text-gray-600 mb-16 max-w-2xl mx-auto leading-relaxed">
+            Halo, {userProfile?.name}. Kelola semua aktivitas foto Anda dengan mudah.
           </p>
           <Link to="/customer/booking-selection">
-            <Button className="bg-red-500 hover:bg-red-600 text-white text-lg px-12 py-4 font-peace-sans font-bold tracking-wide border-4 border-black">
-              RESERVASI SEKARANG
-              <ChevronRight className="ml-2 h-6 w-6" />
+            <Button className="bg-black text-white hover:bg-gray-800 text-lg px-12 py-6 font-peace-sans font-bold tracking-wide rounded-none">
+              Reservasi Sekarang
+              <ChevronRight className="ml-3 h-6 w-6" />
             </Button>
           </Link>
         </div>
       </div>
 
-      <div className="space-y-16 p-8 max-w-6xl mx-auto">
-        {/* Statistics Grid - Clean Minimalist Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-16">
-          <Card className="border-4 border-black bg-white">
-            <CardHeader className="bg-red-500 text-white">
-              <CardTitle className="text-sm font-peace-sans font-black tracking-wide">TOTAL BOOKING</CardTitle>
-            </CardHeader>
-            <CardContent className="p-8">
-              <div className="text-6xl font-peace-sans font-black text-black mb-2">{totalBookings}</div>
-              <p className="text-sm font-inter text-gray-600">
-                {completedBookings} selesai
-              </p>
-            </CardContent>
-          </Card>
+      <div className="max-w-6xl mx-auto px-8 pb-32">
+        {/* Statistics - Clean Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-32">
+          <div className="text-center">
+            <div className="text-7xl font-peace-sans font-black text-black mb-6">{totalBookings}</div>
+            <h3 className="text-xl font-peace-sans font-bold text-gray-900 mb-2">Total Booking</h3>
+            <p className="text-gray-600 font-inter">{completedBookings} selesai</p>
+          </div>
 
-          <Card className="border-4 border-black bg-white">
-            <CardHeader className="bg-blue-600 text-white">
-              <CardTitle className="text-sm font-peace-sans font-black tracking-wide">MENDATANG</CardTitle>
-            </CardHeader>
-            <CardContent className="p-8">
-              <div className="text-6xl font-peace-sans font-black text-black mb-2">{upcomingBookings}</div>
-              <p className="text-sm font-inter text-gray-600">
-                Sudah dikonfirmasi
-              </p>
-            </CardContent>
-          </Card>
+          <div className="text-center">
+            <div className="text-7xl font-peace-sans font-black text-red-600 mb-6">{upcomingBookings}</div>
+            <h3 className="text-xl font-peace-sans font-bold text-gray-900 mb-2">Mendatang</h3>
+            <p className="text-gray-600 font-inter">Sudah dikonfirmasi</p>
+          </div>
 
-          <Card className="border-4 border-black bg-white">
-            <CardHeader className="bg-yellow-400 text-black">
-              <CardTitle className="text-sm font-peace-sans font-black tracking-wide">PENGELUARAN</CardTitle>
-            </CardHeader>
-            <CardContent className="p-8">
-              <div className="text-3xl font-peace-sans font-black text-black mb-2">Rp {totalSpent.toLocaleString('id-ID')}</div>
-              <p className="text-sm font-inter text-gray-600">
-                Rata-rata: Rp {totalBookings > 0 ? Math.round(totalSpent / totalBookings).toLocaleString('id-ID') : 0}
-              </p>
-            </CardContent>
-          </Card>
+          <div className="text-center">
+            <div className="text-4xl font-peace-sans font-black text-blue-600 mb-6">
+              Rp {totalSpent.toLocaleString('id-ID')}
+            </div>
+            <h3 className="text-xl font-peace-sans font-bold text-gray-900 mb-2">Total Pengeluaran</h3>
+            <p className="text-gray-600 font-inter">
+              Rata-rata: Rp {totalBookings > 0 ? Math.round(totalSpent / totalBookings).toLocaleString('id-ID') : 0}
+            </p>
+          </div>
 
-          <Card className="border-4 border-black bg-white">
-            <CardHeader className="bg-black text-white">
-              <CardTitle className="text-sm font-peace-sans font-black tracking-wide">STUDIO</CardTitle>
-            </CardHeader>
-            <CardContent className="p-8">
-              <div className="text-6xl font-peace-sans font-black text-black mb-2">{studios.length}</div>
-              <p className="text-sm font-inter text-gray-600">
-                Siap untuk booking
-              </p>
-            </CardContent>
-          </Card>
+          <div className="text-center">
+            <div className="text-7xl font-peace-sans font-black text-yellow-600 mb-6">{studios.length}</div>
+            <h3 className="text-xl font-peace-sans font-bold text-gray-900 mb-2">Studio Tersedia</h3>
+            <p className="text-gray-600 font-inter">Siap untuk booking</p>
+          </div>
         </div>
 
-        {/* Quick Actions - Geometric Grid */}
-        <div className="bg-gray-50 p-12 border-4 border-black">
-          <h3 className="text-4xl font-peace-sans font-black mb-12 tracking-wide text-center">AKSI CEPAT</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <Link to="/customer/booking-selection" className="block">
-              <div className="bg-red-500 text-white p-10 border-4 border-black hover:bg-red-600 transition-colors text-center">
-                <Plus className="h-16 w-16 mb-4 mx-auto" />
-                <span className="font-peace-sans font-black text-lg tracking-wide">BOOKING BARU</span>
+        {/* Quick Actions - Minimal Grid */}
+        <div className="mb-32">
+          <h2 className="text-5xl font-peace-sans font-black text-center mb-20 tracking-tight">
+            Aksi Cepat
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <Link to="/customer/booking-selection" className="group block text-center">
+              <div className="bg-white border border-gray-200 hover:border-red-300 p-12 transition-all duration-300 group-hover:shadow-lg">
+                <Plus className="h-12 w-12 mb-6 mx-auto text-red-600" />
+                <span className="font-peace-sans font-bold text-lg text-gray-900 group-hover:text-red-600 transition-colors">
+                  Booking Baru
+                </span>
               </div>
             </Link>
             
-            <Link to="/studio/booking-logs" className="block">
-              <div className="bg-blue-600 text-white p-10 border-4 border-black hover:bg-blue-700 transition-colors text-center">
-                <Calendar className="h-16 w-16 mb-4 mx-auto" />
-                <span className="font-peace-sans font-black text-lg tracking-wide">RIWAYAT</span>
+            <Link to="/studio/booking-logs" className="group block text-center">
+              <div className="bg-white border border-gray-200 hover:border-blue-300 p-12 transition-all duration-300 group-hover:shadow-lg">
+                <Calendar className="h-12 w-12 mb-6 mx-auto text-blue-600" />
+                <span className="font-peace-sans font-bold text-lg text-gray-900 group-hover:text-blue-600 transition-colors">
+                  Riwayat
+                </span>
               </div>
             </Link>
             
-            <Link to="/studio/studios" className="block">
-              <div className="bg-yellow-400 text-black p-10 border-4 border-black hover:bg-yellow-500 transition-colors text-center">
-                <Camera className="h-16 w-16 mb-4 mx-auto" />
-                <span className="font-peace-sans font-black text-lg tracking-wide">STUDIO</span>
+            <Link to="/studio/studios" className="group block text-center">
+              <div className="bg-white border border-gray-200 hover:border-yellow-400 p-12 transition-all duration-300 group-hover:shadow-lg">
+                <Camera className="h-12 w-12 mb-6 mx-auto text-yellow-600" />
+                <span className="font-peace-sans font-bold text-lg text-gray-900 group-hover:text-yellow-600 transition-colors">
+                  Studio
+                </span>
               </div>
             </Link>
             
-            <Link to="/studio/packages" className="block">
-              <div className="bg-black text-white p-10 border-4 border-black hover:bg-gray-800 transition-colors text-center">
-                <Star className="h-16 w-16 mb-4 mx-auto" />
-                <span className="font-peace-sans font-black text-lg tracking-wide">PAKET</span>
+            <Link to="/studio/packages" className="group block text-center">
+              <div className="bg-white border border-gray-200 hover:border-black p-12 transition-all duration-300 group-hover:shadow-lg">
+                <Star className="h-12 w-12 mb-6 mx-auto text-black" />
+                <span className="font-peace-sans font-bold text-lg text-gray-900 group-hover:text-black transition-colors">
+                  Paket
+                </span>
               </div>
             </Link>
           </div>
@@ -273,188 +254,177 @@ export const PelangganDashboard = () => {
 
         {/* Analytics Charts */}
         {totalBookings > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 mb-32">
             {/* Monthly Spending Trend */}
-            <Card className="border-4 border-black bg-white">
-              <CardHeader className="bg-black text-white">
-                <CardTitle className="font-peace-sans font-black tracking-wide">TREN PENGELUARAN</CardTitle>
-                <CardDescription className="text-gray-300 font-inter">6 bulan terakhir</CardDescription>
-              </CardHeader>
-              <CardContent className="p-8">
-                <ChartContainer
-                  config={{
-                    spending: { label: "Pengeluaran", color: "#d30f0f" }
-                  }}
-                  className="h-[300px]"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={monthlyTrend}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#000" />
-                      <XAxis dataKey="month" stroke="#000" className="font-inter" />
-                      <YAxis stroke="#000" className="font-inter" />
-                      <ChartTooltip 
-                        content={<ChartTooltipContent />}
-                        formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pengeluaran']}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="spending" 
-                        stroke="#d30f0f" 
-                        fill="#d30f0f" 
-                        fillOpacity={0.3}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-              </CardContent>
-            </Card>
+            <div className="bg-white border border-gray-200 p-12">
+              <h3 className="text-3xl font-peace-sans font-black mb-2">Tren Pengeluaran</h3>
+              <p className="text-gray-600 font-inter mb-12">6 bulan terakhir</p>
+              <ChartContainer
+                config={{
+                  spending: { label: "Pengeluaran", color: "#dc2626" }
+                }}
+                className="h-[300px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={monthlyTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                    <XAxis dataKey="month" stroke="#6b7280" className="font-inter text-sm" />
+                    <YAxis stroke="#6b7280" className="font-inter text-sm" />
+                    <ChartTooltip 
+                      content={<ChartTooltipContent />}
+                      formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pengeluaran']}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="spending" 
+                      stroke="#dc2626" 
+                      fill="#dc2626" 
+                      fillOpacity={0.1}
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </div>
 
             {/* Studio Preference */}
-            <Card className="border-4 border-black bg-white">
-              <CardHeader className="bg-blue-600 text-white">
-                <CardTitle className="font-peace-sans font-black tracking-wide">PREFERENSI STUDIO</CardTitle>
-                <CardDescription className="text-blue-100 font-inter">Studio favorit Anda</CardDescription>
-              </CardHeader>
-              <CardContent className="p-8">
-                <ChartContainer
-                  config={{
-                    value: { label: "Bookings" }
-                  }}
-                  className="h-[300px]"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={studioPreferenceData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, value, percent }) => 
-                          `${name}: ${value} (${(percent * 100).toFixed(1)}%)`
-                        }
-                        outerRadius={80}
-                        fill="#0060ad"
-                        dataKey="value"
-                      >
-                        {studioPreferenceData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-              </CardContent>
-            </Card>
+            <div className="bg-white border border-gray-200 p-12">
+              <h3 className="text-3xl font-peace-sans font-black mb-2">Studio Favorit</h3>
+              <p className="text-gray-600 font-inter mb-12">Preferensi studio Anda</p>
+              <ChartContainer
+                config={{
+                  value: { label: "Bookings" }
+                }}
+                className="h-[300px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={studioPreferenceData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, value, percent }) => 
+                        `${name}: ${value} (${(percent * 100).toFixed(1)}%)`
+                      }
+                      outerRadius={80}
+                      fill="#2563eb"
+                      dataKey="value"
+                    >
+                      {studioPreferenceData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </div>
           </div>
         )}
 
         {/* Recent Activity and Popular Packages */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
           {/* Recent Bookings */}
-          <Card className="border-4 border-black bg-white">
-            <CardHeader className="bg-red-500 text-white flex flex-row items-center justify-between">
+          <div className="bg-white border border-gray-200 p-12">
+            <div className="flex justify-between items-center mb-12">
               <div>
-                <CardTitle className="font-peace-sans font-black tracking-wide">BOOKING TERBARU</CardTitle>
-                <CardDescription className="text-red-100 font-inter">Aktivitas terkini</CardDescription>
+                <h3 className="text-3xl font-peace-sans font-black mb-2">Booking Terbaru</h3>
+                <p className="text-gray-600 font-inter">Aktivitas terkini</p>
               </div>
               <Link to="/studio/booking-logs">
-                <Button variant="outline" size="sm" className="border-2 border-white text-white hover:bg-white hover:text-red-500 font-peace-sans font-bold">
-                  LIHAT SEMUA
+                <Button variant="outline" size="sm" className="font-peace-sans font-bold border-black text-black hover:bg-black hover:text-white">
+                  Lihat Semua
                 </Button>
               </Link>
-            </CardHeader>
-            <CardContent className="p-8">
-              <div className="space-y-6">
-                {recentBookings.length > 0 ? (
-                  recentBookings.map((booking) => (
-                    <div key={booking.id} className="border-2 border-gray-300 p-6 bg-gray-50">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h4 className="font-peace-sans font-black text-xl">{booking.studios?.name}</h4>
-                          <p className="text-sm font-inter text-gray-600">
-                            {booking.studio_packages?.title}
-                          </p>
-                          <p className="text-xs font-inter text-gray-500 mt-1">
-                            {format(new Date(booking.start_time || booking.created_at), 'dd MMMM yyyy, HH:mm', { locale: id })}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <Badge className={getStatusColor(booking.status) + ' font-peace-sans font-bold'}>
-                            {getStatusText(booking.status)}
-                          </Badge>
-                          <p className="text-lg font-peace-sans font-black mt-1">
-                            Rp {(booking.total_amount || 0).toLocaleString('id-ID')}
-                          </p>
-                        </div>
+            </div>
+            <div className="space-y-8">
+              {recentBookings.length > 0 ? (
+                recentBookings.map((booking) => (
+                  <div key={booking.id} className="border-l-4 border-gray-200 pl-6">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className="font-peace-sans font-bold text-xl mb-1">{booking.studios?.name}</h4>
+                        <p className="text-gray-600 font-inter mb-2">
+                          {booking.studio_packages?.title}
+                        </p>
+                        <p className="text-sm text-gray-500 font-inter">
+                          {format(new Date(booking.start_time || booking.created_at), 'dd MMMM yyyy, HH:mm', { locale: id })}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <Badge className={getStatusColor(booking.status) + ' font-peace-sans font-bold mb-2'}>
+                          {getStatusText(booking.status)}
+                        </Badge>
+                        <p className="text-lg font-peace-sans font-black">
+                          Rp {(booking.total_amount || 0).toLocaleString('id-ID')}
+                        </p>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-16 border-2 border-dashed border-gray-300">
-                    <Camera className="h-20 w-20 text-gray-400 mx-auto mb-6" />
-                    <p className="text-gray-500 font-inter mb-6">Belum ada booking</p>
-                    <Link to="/customer/booking-selection">
-                      <Button className="bg-black text-white font-peace-sans font-bold border-2 border-black hover:bg-white hover:text-black">
-                        BUAT BOOKING PERTAMA
-                      </Button>
-                    </Link>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                ))
+              ) : (
+                <div className="text-center py-20">
+                  <Camera className="h-16 w-16 text-gray-300 mx-auto mb-6" />
+                  <p className="text-gray-500 font-inter mb-8">Belum ada booking</p>
+                  <Link to="/customer/booking-selection">
+                    <Button className="bg-black text-white font-peace-sans font-bold hover:bg-gray-800">
+                      Buat Booking Pertama
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Popular Packages */}
-          <Card className="border-4 border-black bg-white">
-            <CardHeader className="bg-yellow-400 text-black flex flex-row items-center justify-between">
+          <div className="bg-white border border-gray-200 p-12">
+            <div className="flex justify-between items-center mb-12">
               <div>
-                <CardTitle className="font-peace-sans font-black tracking-wide">PAKET POPULER</CardTitle>
-                <CardDescription className="text-gray-700 font-inter">Paket foto terfavorit</CardDescription>
+                <h3 className="text-3xl font-peace-sans font-black mb-2">Paket Populer</h3>
+                <p className="text-gray-600 font-inter">Paket foto terfavorit</p>
               </div>
               <Link to="/studio/packages">
-                <Button variant="outline" size="sm" className="border-2 border-black text-black hover:bg-black hover:text-white font-peace-sans font-bold">
-                  LIHAT SEMUA
+                <Button variant="outline" size="sm" className="font-peace-sans font-bold border-black text-black hover:bg-black hover:text-white">
+                  Lihat Semua
                 </Button>
               </Link>
-            </CardHeader>
-            <CardContent className="p-8">
-              <div className="space-y-4">
-                {popularPackages.length > 0 ? (
-                  popularPackages.map((pkg) => (
-                    <div key={pkg.id} className="border-2 border-gray-300 p-6 bg-gray-50">
-                      <div className="flex justify-between items-center">
-                        <div className="flex-1">
-                          <h4 className="font-peace-sans font-black text-xl">{pkg.title}</h4>
-                          <p className="text-sm font-inter text-gray-600">
-                            {pkg.package_categories?.name || 'Kategori tidak diketahui'}
-                          </p>
-                          <p className="text-xs font-inter text-gray-500">
-                            Durasi: {pkg.base_time_minutes} menit
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xl font-peace-sans font-black text-black">
-                            Rp {(pkg.price || 0).toLocaleString('id-ID')}
-                          </p>
-                          <Link to="/customer/booking-selection">
-                            <Button size="sm" className="mt-2 bg-black text-white font-peace-sans font-bold border-2 border-black hover:bg-white hover:text-black">
-                              BOOKING
-                            </Button>
-                          </Link>
-                        </div>
+            </div>
+            <div className="space-y-6">
+              {popularPackages.length > 0 ? (
+                popularPackages.map((pkg) => (
+                  <div key={pkg.id} className="border border-gray-200 p-6 hover:border-gray-300 transition-colors">
+                    <div className="flex justify-between items-center">
+                      <div className="flex-1">
+                        <h4 className="font-peace-sans font-bold text-xl mb-1">{pkg.title}</h4>
+                        <p className="text-gray-600 font-inter mb-1">
+                          {pkg.package_categories?.name || 'Kategori tidak diketahui'}
+                        </p>
+                        <p className="text-sm text-gray-500 font-inter">
+                          Durasi: {pkg.base_time_minutes} menit
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-peace-sans font-black text-black mb-3">
+                          Rp {(pkg.price || 0).toLocaleString('id-ID')}
+                        </p>
+                        <Link to="/customer/booking-selection">
+                          <Button size="sm" className="bg-black text-white font-peace-sans font-bold hover:bg-gray-800">
+                            Booking
+                          </Button>
+                        </Link>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-16 border-2 border-dashed border-gray-300">
-                    <Star className="h-20 w-20 text-gray-400 mx-auto mb-6" />
-                    <p className="text-gray-500 font-inter">Tidak ada paket tersedia</p>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                ))
+              ) : (
+                <div className="text-center py-20">
+                  <Star className="h-16 w-16 text-gray-300 mx-auto mb-6" />
+                  <p className="text-gray-500 font-inter">Tidak ada paket tersedia</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
