@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,13 +29,25 @@ interface BookingData {
   users: { name: string; email: string };
   studios: { name: string; type: string };
   studio_packages: { title: string; price: number };
-  installments: { amount: number; paid_at: string; payment_method: string; performed_by: string }[];
+  installments: { amount: number; paid_at: string; payment_method: string; performed_by?: string }[];
 }
 
 const OfflineBookingsReport = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const getStatusColor = (status: string) => {
+    const colors = {
+      'paid': '#22c55e',
+      'installment': '#f59e0b',
+      'pending': '#6b7280',
+      'cancelled': '#ef4444',
+      'confirmed': '#3b82f6',
+      'completed': '#10b981'
+    };
+    return colors[status as keyof typeof colors] || '#6b7280';
+  };
 
   const { data: bookingsData, isLoading } = useQuery({
     queryKey: ['offline-bookings', dateRange, typeFilter, statusFilter],
@@ -48,7 +59,7 @@ const OfflineBookingsReport = () => {
           users (name, email),
           studios (name, type),
           studio_packages (title, price),
-          installments (amount, paid_at, payment_method, performed_by)
+          installments (amount, paid_at, payment_method)
         `)
         .eq('payment_method', 'offline');
 
@@ -167,18 +178,6 @@ const OfflineBookingsReport = () => {
     };
   }, [bookingsData, analytics]);
 
-  const getStatusColor = (status: string) => {
-    const colors = {
-      'paid': '#22c55e',
-      'installment': '#f59e0b',
-      'pending': '#6b7280',
-      'cancelled': '#ef4444',
-      'confirmed': '#3b82f6',
-      'completed': '#10b981'
-    };
-    return colors[status as keyof typeof colors] || '#6b7280';
-  };
-
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
   }
@@ -206,7 +205,6 @@ const OfflineBookingsReport = () => {
         </div>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle>Filter Laporan</CardTitle>
@@ -244,7 +242,6 @@ const OfflineBookingsReport = () => {
         </CardContent>
       </Card>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -303,7 +300,6 @@ const OfflineBookingsReport = () => {
         </Card>
       </div>
 
-      {/* Charts */}
       <Tabs defaultValue="revenue" className="space-y-4">
         <TabsList>
           <TabsTrigger value="revenue">Tren Revenue</TabsTrigger>
