@@ -95,13 +95,13 @@ export const AddUserForm = ({ onSuccess }: AddUserFormProps) => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">Email/Whatsapp</Label>
             <Input
               id="email"
-              type="email"
+              type="text"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="email@contoh.com"
+              placeholder="Email/Whatsapp"
               required
             />
           </div>
