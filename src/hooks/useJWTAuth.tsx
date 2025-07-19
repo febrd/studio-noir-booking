@@ -8,6 +8,7 @@ interface UserProfile {
   name: string;
   email: string;
   role: 'owner' | 'admin' | 'keuangan' | 'pelanggan';
+  is_active: boolean;
 }
 
 interface AuthResult {
@@ -77,6 +78,11 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (result.user) {
+        // Check if user is active
+        if (result.user.is_active === false) {
+          return { success: false, error: 'Akun Anda telah dinonaktifkan. Silakan hubungi administrator.' };
+        }
+
         setUserProfile(result.user);
         setIsAuthenticated(true);
         localStorage.setItem('jwt_user', JSON.stringify(result.user));
