@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import WalkinBookingForm from '@/components/studio/WalkinBookingForm';
+import { ModernLayout } from '@/components/Layout/ModernLayout';
 
 const WalkinSessionsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -113,178 +113,180 @@ const WalkinSessionsPage = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Walk-in Sessions</h1>
-          <p className="text-muted-foreground">{format(today, 'dd MMMM yyyy')}</p>
+    <ModernLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Walk-in Sessions</h1>
+            <p className="text-muted-foreground">{format(today, 'dd MMMM yyyy')}</p>
+          </div>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setEditingSession(null)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Walk-in Session
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingSession ? 'Edit Walk-in Session' : 'Tambah Walk-in Session Baru'}
+                </DialogTitle>
+              </DialogHeader>
+              <WalkinBookingForm booking={editingSession} onSuccess={handleSuccess} />
+            </DialogContent>
+          </Dialog>
         </div>
-        
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setEditingSession(null)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Tambah Walk-in Session
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingSession ? 'Edit Walk-in Session' : 'Tambah Walk-in Session Baru'}
-              </DialogTitle>
-            </DialogHeader>
-            <WalkinBookingForm booking={editingSession} onSuccess={handleSuccess} />
-          </DialogContent>
-        </Dialog>
-      </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-5 w-5 text-blue-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">Total Sessions</p>
-                <p className="text-xl font-bold">{sessions?.length || 0}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Clock className="h-5 w-5 text-green-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">Confirmed</p>
-                <p className="text-xl font-bold">
-                  {sessions?.filter(s => s.status === 'confirmed').length || 0}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <User className="h-5 w-5 text-purple-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">Completed</p>
-                <p className="text-xl font-bold">
-                  {sessions?.filter(s => s.status === 'completed').length || 0}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <MapPin className="h-5 w-5 text-orange-500" />
-              <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-xl font-bold">
-                  Rp {sessions?.reduce((total, session) => total + (session.total_amount || 0), 0).toLocaleString('id-ID')}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Sessions List */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-        {sessions?.map((session: any) => (
-          <Card key={session.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{session.users?.name}</CardTitle>
-                {getStatusBadge(session.status)}
-              </div>
-              <p className="text-sm text-muted-foreground">{session.users?.email}</p>
-            </CardHeader>
-            
-            <CardContent className="space-y-3">
-              <div className="flex items-center text-sm">
-                <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                <span>{session.studios?.name}</span>
-                <Badge variant="outline" className="ml-2 text-xs">
-                  {session.studios?.type === 'self_photo' ? 'Self Photo' : 'Regular'}
-                </Badge>
-              </div>
-              
-              <div className="flex items-center text-sm">
-                <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                <span>
-                  {format(new Date(session.start_time), 'HH:mm')} - {format(new Date(session.end_time), 'HH:mm')}
-                </span>
-              </div>
-              
-              <div className="text-sm">
-                <p className="font-medium">{session.studio_packages?.title}</p>
-                {session.package_categories && (
-                  <p className="text-muted-foreground">{session.package_categories.name}</p>
-                )}
-                <p className="text-green-600 font-medium">
-                  Rp {(session.total_amount || 0).toLocaleString('id-ID')}
-                </p>
-              </div>
-
-              {session.booking_additional_services && session.booking_additional_services.length > 0 && (
-                <div className="text-sm">
-                  <p className="font-medium text-muted-foreground">Additional Services:</p>
-                  {session.booking_additional_services.map((service: any, index: number) => (
-                    <p key={index} className="text-xs">
-                      • {service.additional_services.name} (x{service.quantity})
-                    </p>
-                  ))}
+        {/* Summary Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-5 w-5 text-blue-500" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Sessions</p>
+                  <p className="text-xl font-bold">{sessions?.length || 0}</p>
                 </div>
-              )}
-
-              {session.additional_time_minutes && session.additional_time_minutes > 0 && (
-                <div className="text-sm">
-                  <p className="text-orange-600">
-                    +{session.additional_time_minutes} menit tambahan
-                  </p>
-                </div>
-              )}
-
-              <div className="flex justify-end space-x-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleEdit(session)}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDelete(session.id)}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-5 w-5 text-green-500" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Confirmed</p>
+                  <p className="text-xl font-bold">
+                    {sessions?.filter(s => s.status === 'confirmed').length || 0}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <User className="h-5 w-5 text-purple-500" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Completed</p>
+                  <p className="text-xl font-bold">
+                    {sessions?.filter(s => s.status === 'completed').length || 0}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <MapPin className="h-5 w-5 text-orange-500" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Revenue</p>
+                  <p className="text-xl font-bold">
+                    Rp {sessions?.reduce((total, session) => total + (session.total_amount || 0), 0).toLocaleString('id-ID')}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      {(!sessions || sessions.length === 0) && (
-        <Card>
-          <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">Belum ada walk-in session hari ini</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Klik "Tambah Walk-in Session" untuk menambah session baru
-            </p>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+        {/* Sessions List */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          {sessions?.map((session: any) => (
+            <Card key={session.id} className="hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{session.users?.name}</CardTitle>
+                  {getStatusBadge(session.status)}
+                </div>
+                <p className="text-sm text-muted-foreground">{session.users?.email}</p>
+              </CardHeader>
+              
+              <CardContent className="space-y-3">
+                <div className="flex items-center text-sm">
+                  <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span>{session.studios?.name}</span>
+                  <Badge variant="outline" className="ml-2 text-xs">
+                    {session.studios?.type === 'self_photo' ? 'Self Photo' : 'Regular'}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center text-sm">
+                  <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span>
+                    {format(new Date(session.start_time), 'HH:mm')} - {format(new Date(session.end_time), 'HH:mm')}
+                  </span>
+                </div>
+                
+                <div className="text-sm">
+                  <p className="font-medium">{session.studio_packages?.title}</p>
+                  {session.package_categories && (
+                    <p className="text-muted-foreground">{session.package_categories.name}</p>
+                  )}
+                  <p className="text-green-600 font-medium">
+                    Rp {(session.total_amount || 0).toLocaleString('id-ID')}
+                  </p>
+                </div>
+
+                {session.booking_additional_services && session.booking_additional_services.length > 0 && (
+                  <div className="text-sm">
+                    <p className="font-medium text-muted-foreground">Additional Services:</p>
+                    {session.booking_additional_services.map((service: any, index: number) => (
+                      <p key={index} className="text-xs">
+                        • {service.additional_services.name} (x{service.quantity})
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {session.additional_time_minutes && session.additional_time_minutes > 0 && (
+                  <div className="text-sm">
+                    <p className="text-orange-600">
+                      +{session.additional_time_minutes} menit tambahan
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEdit(session)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDelete(session.id)}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {(!sessions || sessions.length === 0) && (
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-muted-foreground">Belum ada walk-in session hari ini</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Klik "Tambah Walk-in Session" untuk menambah session baru
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </ModernLayout>
   );
 };
 

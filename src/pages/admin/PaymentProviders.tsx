@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AddPaymentProviderForm } from '@/components/PaymentGateway/AddPaymentProviderForm';
@@ -8,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ModernLayout } from '@/components/Layout/ModernLayout';
 
 interface PaymentProvider {
   id: string;
@@ -117,47 +117,49 @@ const PaymentProviders = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
-          <p className="text-muted-foreground">
-            Kelola provider pembayaran untuk sistem booking
-          </p>
+    <ModernLayout>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
+            <p className="text-muted-foreground">
+              Kelola provider pembayaran untuk sistem booking
+            </p>
+          </div>
+          
+          <AddPaymentProviderForm onSuccess={handleAddSuccess} />
         </div>
-        
-        <AddPaymentProviderForm onSuccess={handleAddSuccess} />
+
+        {providers && providers.length === 0 ? (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-semibold mb-2">Belum ada payment provider</h3>
+            <p className="text-muted-foreground mb-4">
+              Tambahkan payment provider pertama Anda untuk mulai menerima pembayaran
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {providers?.map((provider) => (
+              <PaymentProviderCard
+                key={provider.id}
+                provider={provider}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        )}
+
+        {selectedProvider && (
+          <EditPaymentProviderForm
+            provider={selectedProvider}
+            open={isEditModalOpen}
+            onOpenChange={setIsEditModalOpen}
+            onSuccess={handleEditSuccess}
+          />
+        )}
       </div>
-
-      {providers && providers.length === 0 ? (
-        <div className="text-center py-12">
-          <h3 className="text-lg font-semibold mb-2">Belum ada payment provider</h3>
-          <p className="text-muted-foreground mb-4">
-            Tambahkan payment provider pertama Anda untuk mulai menerima pembayaran
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {providers?.map((provider) => (
-            <PaymentProviderCard
-              key={provider.id}
-              provider={provider}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-      )}
-
-      {selectedProvider && (
-        <EditPaymentProviderForm
-          provider={selectedProvider}
-          open={isEditModalOpen}
-          onOpenChange={setIsEditModalOpen}
-          onSuccess={handleEditSuccess}
-        />
-      )}
-    </div>
+    </ModernLayout>
   );
 };
 

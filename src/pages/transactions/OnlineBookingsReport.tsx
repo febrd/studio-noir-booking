@@ -9,6 +9,7 @@ import { Calendar, Search, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { ExportButtons } from '@/components/ExportButtons';
+import { ModernLayout } from '@/components/Layout/ModernLayout';
 
 const OnlineBookingsReport = () => {
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -104,142 +105,144 @@ const OnlineBookingsReport = () => {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Laporan Transaksi Online</h1>
-          <p className="text-muted-foreground">
-            Laporan transaksi booking online
-          </p>
+    <ModernLayout>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Laporan Transaksi Online</h1>
+            <p className="text-muted-foreground">
+              Laporan transaksi booking online
+            </p>
+          </div>
+          <ExportButtons exportData={exportData} />
         </div>
-        <ExportButtons exportData={exportData} />
-      </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filter Data
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Tanggal Mulai</Label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Tanggal Akhir</Label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Pencarian</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        {/* Filters */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Filter Data
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Tanggal Mulai</Label>
                 <Input
-                  placeholder="Cari customer, email, studio..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Tanggal Akhir</Label>
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Pencarian</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari customer, email, studio..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-2xl font-bold">{filteredData?.length || 0}</div>
+              <p className="text-muted-foreground">Total Transaksi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-2xl font-bold text-green-600">
+                Rp {totalAmount.toLocaleString('id-ID')}
+              </div>
+              <p className="text-muted-foreground">Total Pendapatan</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-2xl font-bold text-blue-600">
+                {filteredData?.filter(b => b.status === 'confirmed').length || 0}
+              </div>
+              <p className="text-muted-foreground">Transaksi Berhasil</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Data Table */}
         <Card>
-          <CardContent className="p-6">
-            <div className="text-2xl font-bold">{filteredData?.length || 0}</div>
-            <p className="text-muted-foreground">Total Transaksi</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-2xl font-bold text-green-600">
-              Rp {totalAmount.toLocaleString('id-ID')}
+          <CardHeader>
+            <CardTitle>Data Transaksi</CardTitle>
+            <CardDescription>
+              Daftar transaksi online periode {format(new Date(startDate), 'dd MMMM yyyy', { locale: id })} - {format(new Date(endDate), 'dd MMMM yyyy', { locale: id })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="border border-gray-200 p-3 text-left">Tanggal</th>
+                    <th className="border border-gray-200 p-3 text-left">Customer</th>
+                    <th className="border border-gray-200 p-3 text-left">Studio</th>
+                    <th className="border border-gray-200 p-3 text-left">Paket</th>
+                    <th className="border border-gray-200 p-3 text-left">Status</th>
+                    <th className="border border-gray-200 p-3 text-left">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredData?.map((booking) => (
+                    <tr key={booking.id} className="hover:bg-gray-50">
+                      <td className="border border-gray-200 p-3">
+                        {format(new Date(booking.created_at), 'dd/MM/yyyy HH:mm', { locale: id })}
+                      </td>
+                      <td className="border border-gray-200 p-3">
+                        <div>
+                          <div className="font-medium">{booking.users?.name}</div>
+                          <div className="text-sm text-gray-600">{booking.users?.email}</div>
+                        </div>
+                      </td>
+                      <td className="border border-gray-200 p-3">{booking.studios?.name}</td>
+                      <td className="border border-gray-200 p-3">{booking.studio_packages?.title}</td>
+                      <td className="border border-gray-200 p-3">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          booking.status === 'confirmed' 
+                            ? 'bg-green-100 text-green-800' 
+                            : booking.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {booking.status}
+                        </span>
+                      </td>
+                      <td className="border border-gray-200 p-3 font-semibold">
+                        Rp {booking.total_amount?.toLocaleString('id-ID')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <p className="text-muted-foreground">Total Pendapatan</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-2xl font-bold text-blue-600">
-              {filteredData?.filter(b => b.status === 'confirmed').length || 0}
-            </div>
-            <p className="text-muted-foreground">Transaksi Berhasil</p>
           </CardContent>
         </Card>
       </div>
-
-      {/* Data Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Data Transaksi</CardTitle>
-          <CardDescription>
-            Daftar transaksi online periode {format(new Date(startDate), 'dd MMMM yyyy', { locale: id })} - {format(new Date(endDate), 'dd MMMM yyyy', { locale: id })}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-200">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="border border-gray-200 p-3 text-left">Tanggal</th>
-                  <th className="border border-gray-200 p-3 text-left">Customer</th>
-                  <th className="border border-gray-200 p-3 text-left">Studio</th>
-                  <th className="border border-gray-200 p-3 text-left">Paket</th>
-                  <th className="border border-gray-200 p-3 text-left">Status</th>
-                  <th className="border border-gray-200 p-3 text-left">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredData?.map((booking) => (
-                  <tr key={booking.id} className="hover:bg-gray-50">
-                    <td className="border border-gray-200 p-3">
-                      {format(new Date(booking.created_at), 'dd/MM/yyyy HH:mm', { locale: id })}
-                    </td>
-                    <td className="border border-gray-200 p-3">
-                      <div>
-                        <div className="font-medium">{booking.users?.name}</div>
-                        <div className="text-sm text-gray-600">{booking.users?.email}</div>
-                      </div>
-                    </td>
-                    <td className="border border-gray-200 p-3">{booking.studios?.name}</td>
-                    <td className="border border-gray-200 p-3">{booking.studio_packages?.title}</td>
-                    <td className="border border-gray-200 p-3">
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        booking.status === 'confirmed' 
-                          ? 'bg-green-100 text-green-800' 
-                          : booking.status === 'pending'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {booking.status}
-                      </span>
-                    </td>
-                    <td className="border border-gray-200 p-3 font-semibold">
-                      Rp {booking.total_amount?.toLocaleString('id-ID')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    </ModernLayout>
   );
 };
 

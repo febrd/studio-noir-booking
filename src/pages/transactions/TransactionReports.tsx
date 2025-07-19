@@ -17,6 +17,7 @@ import { DateRange } from 'react-day-picker';
 import { toast } from 'sonner';
 import { ExportButtons } from '@/components/ExportButtons';
 import { MonthlyRevenueDetails } from '@/components/MonthlyRevenueDetails';
+import { ModernLayout } from '@/components/Layout/ModernLayout';
 
 interface WeeklyRevenue {
   week: string;
@@ -481,504 +482,506 @@ const TransactionReports = () => {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Comprehensive Transaction Reports</h1>
-          <p className="text-muted-foreground">Laporan transaksi lengkap dan rekapitulasi bulanan</p>
+    <ModernLayout>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Comprehensive Transaction Reports</h1>
+            <p className="text-muted-foreground">Laporan transaksi lengkap dan rekapitulasi bulanan</p>
+          </div>
         </div>
-      </div>
 
-      <Tabs defaultValue="transactions" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="transactions">Transaction Reports</TabsTrigger>
-          <TabsTrigger value="recaps">Monthly Recaps</TabsTrigger>
-        </TabsList>
+        <Tabs defaultValue="transactions" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="transactions">Transaction Reports</TabsTrigger>
+            <TabsTrigger value="recaps">Monthly Recaps</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="transactions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Filter Laporan</CardTitle>
-              <ExportButtons exportData={exportData} />
-            </CardHeader>
-            <CardContent>
-              <DatePickerWithRange
-                value={dateRange}
-                onChange={setDateRange}
-                placeholder="Pilih rentang tanggal"
-              />
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <TabsContent value="transactions" className="space-y-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardHeader>
+                <CardTitle>Filter Laporan</CardTitle>
+                <ExportButtons exportData={exportData} />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  Rp {analytics?.totalRevenue.toLocaleString('id-ID')}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Online: {analytics && analytics.totalRevenue > 0 ? ((analytics.onlineRevenue / analytics.totalRevenue) * 100).toFixed(1) : 0}% | 
-                  Offline: {analytics && analytics.totalRevenue > 0 ? ((analytics.offlineRevenue / analytics.totalRevenue) * 100).toFixed(1) : 0}%
-                </p>
+                <DatePickerWithRange
+                  value={dateRange}
+                  onChange={setDateRange}
+                  placeholder="Pilih rentang tanggal"
+                />
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Online Revenue</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  Rp {analytics?.onlineRevenue.toLocaleString('id-ID')}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {analytics?.onlineBookings} bookings
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Offline Revenue</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  Rp {analytics?.offlineRevenue.toLocaleString('id-ID')}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {analytics?.offlineBookings} bookings
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{analytics?.totalBookings}</div>
-                <p className="text-xs text-muted-foreground">
-                  Rata-rata: Rp {analytics && analytics.totalBookings > 0 ? Math.round(analytics.totalRevenue / analytics.totalBookings).toLocaleString('id-ID') : 0}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Tabs defaultValue="comparison" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="comparison">Perbandingan Online vs Offline</TabsTrigger>
-              <TabsTrigger value="distribution">Distribusi Payment Method</TabsTrigger>
-              <TabsTrigger value="types">Analisis per Tipe</TabsTrigger>
-              <TabsTrigger value="studios">Top Studios</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="comparison" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card>
-                <CardHeader>
-                  <CardTitle>Perbandingan Revenue Harian</CardTitle>
-                  <CardDescription>Grafik perbandingan pemasukan online vs offline per hari</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer
-                    config={{
-                      online: {
-                        label: "Online",
-                        color: "hsl(var(--chart-1))",
-                      },
-                      offline: {
-                        label: "Offline",
-                        color: "hsl(var(--chart-2))",
-                      },
-                    }}
-                    className="h-[300px]"
-                  >
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={analytics?.dailyComparisonData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <ChartTooltip
-                          content={<ChartTooltipContent />}
-                        />
-                        <Bar dataKey="online" fill="hsl(var(--chart-1))" />
-                        <Bar dataKey="offline" fill="hsl(var(--chart-2))" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartContainer>
+                  <div className="text-2xl font-bold">
+                    Rp {analytics?.totalRevenue.toLocaleString('id-ID')}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Online: {analytics && analytics.totalRevenue > 0 ? ((analytics.onlineRevenue / analytics.totalRevenue) * 100).toFixed(1) : 0}% | 
+                    Offline: {analytics && analytics.totalRevenue > 0 ? ((analytics.offlineRevenue / analytics.totalRevenue) * 100).toFixed(1) : 0}%
+                  </p>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="distribution" className="space-y-4">
               <Card>
-                <CardHeader>
-                  <CardTitle>Distribusi Metode Pembayaran</CardTitle>
-                  <CardDescription>Persentase revenue berdasarkan metode pembayaran</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Online Revenue</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer
-                    config={{
-                      revenue: {
-                        label: "Revenue",
-                      },
-                    }}
-                    className="h-[300px]"
-                  >
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={analytics?.paymentMethodDistribution}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ method, revenue, percent }) => 
-                            `${method}: Rp ${revenue.toLocaleString('id-ID')} (${(percent * 100).toFixed(1)}%)`
-                          }
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="revenue"
-                        >
-                          <Cell fill="#3b82f6" />
-                          <Cell fill="#f59e0b" />
-                        </Pie>
-                        <ChartTooltip
-                          formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Revenue']}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </ChartContainer>
+                  <div className="text-2xl font-bold">
+                    Rp {analytics?.onlineRevenue.toLocaleString('id-ID')}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {analytics?.onlineBookings} bookings
+                  </p>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="types" className="space-y-4">
               <Card>
-                <CardHeader>
-                  <CardTitle>Revenue per Tipe Booking</CardTitle>
-                  <CardDescription>Perbandingan revenue online vs offline per tipe booking</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Offline Revenue</CardTitle>
+                  <Activity className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer
-                    config={{
-                      online: {
-                        label: "Online",
-                        color: "hsl(var(--chart-1))",
-                      },
-                      offline: {
-                        label: "Offline",
-                        color: "hsl(var(--chart-2))",
-                      },
-                    }}
-                    className="h-[300px]"
-                  >
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={analytics?.typeComparisonData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="type" />
-                        <YAxis />
-                        <ChartTooltip
-                          content={<ChartTooltipContent />}
-                          formatter={(value, name) => [`Rp ${Number(value).toLocaleString('id-ID')}`, name]}
-                        />
-                        <Bar dataKey="online" fill="var(--color-online)" />
-                        <Bar dataKey="offline" fill="var(--color-offline)" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartContainer>
+                  <div className="text-2xl font-bold">
+                    Rp {analytics?.offlineRevenue.toLocaleString('id-ID')}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {analytics?.offlineBookings} bookings
+                  </p>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="studios" className="space-y-4">
               <Card>
-                <CardHeader>
-                  <CardTitle>Top 10 Studios Berdasarkan Revenue</CardTitle>
-                  <CardDescription>Studio dengan performa terbaik</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer
-                    config={{
-                      revenue: {
-                        label: "Revenue",
-                        color: "hsl(var(--foreground))",
-                      },
-                    }}
-                    className="h-[400px]"
-                  >
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={analytics?.topStudios}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, revenue, percent }) => 
-                            `${name}: Rp ${revenue.toLocaleString('id-ID')} (${(percent * 100).toFixed(1)}%)`
-                          }
-                          outerRadius={120}
-                          fill="#8884d8"
-                          dataKey="revenue"
-                        >
-                          {analytics?.topStudios.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <ChartTooltip
-                          formatter={(value, name, props) => [
-                            `Rp ${Number(value).toLocaleString('id-ID')}`,
-                            'Revenue',
-                            `${props.payload.bookings} Bookings`
-                          ]}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </ChartContainer>
+                  <div className="text-2xl font-bold">{analytics?.totalBookings}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Rata-rata: Rp {analytics && analytics.totalBookings > 0 ? Math.round(analytics.totalRevenue / analytics.totalBookings).toLocaleString('id-ID') : 0}
+                  </p>
                 </CardContent>
               </Card>
-            </TabsContent>
-          </Tabs>
-        </TabsContent>
-
-        <TabsContent value="recaps" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold">Monthly Recaps</h2>
-              <p className="text-muted-foreground">
-                Periode: {format(startDate, 'dd MMMM yyyy', { locale: id })} - {format(endDate, 'dd MMMM yyyy', { locale: id })}
-              </p>
             </div>
-            <ExportButtons exportData={recapsExportData} />
-          </div>
 
-          {/* Period Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Pilih Periode</CardTitle>
-            </CardHeader>
-            <CardContent className="flex gap-4">
-              <div className="flex flex-col space-y-2">
-                <Label>Bulan</Label>
-                <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => (
-                      <SelectItem key={i + 1} value={(i + 1).toString()}>
-                        {format(new Date(2024, i), 'MMMM', { locale: id })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col space-y-2">
-                <Label>Tahun</Label>
-                <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 5 }, (_, i) => (
-                      <SelectItem key={2024 + i} value={(2024 + i).toString()}>
-                        {2024 + i}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+            <Tabs defaultValue="comparison" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="comparison">Perbandingan Online vs Offline</TabsTrigger>
+                <TabsTrigger value="distribution">Distribusi Payment Method</TabsTrigger>
+                <TabsTrigger value="types">Analisis per Tipe</TabsTrigger>
+                <TabsTrigger value="studios">Top Studios</TabsTrigger>
+              </TabsList>
 
-          {/* Target & Achievement */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Target Pendapatan Bulanan
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Target Bulanan</Label>
-                  {isEditingTarget ? (
-                    <div className="flex gap-2">
-                      <Input
-                        type="number"
-                        value={targetAmount}
-                        onChange={(e) => setTargetAmount(Number(e.target.value))}
-                        className="flex-1"
-                      />
-                      <Button onClick={handleSaveTarget} size="sm">
-                        Simpan
-                      </Button>
-                      <Button onClick={() => setIsEditingTarget(false)} variant="outline" size="sm">
-                        Batal
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl font-bold">
-                        Rp {(monthlyTarget?.target_amount || targetAmount).toLocaleString('id-ID')}
-                      </span>
-                      <Button onClick={() => setIsEditingTarget(true)} variant="outline" size="sm">
-                        Edit
-                      </Button>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Total Pendapatan</Label>
-                  <div className="text-2xl font-bold text-primary">
-                    Rp {recapsAnalytics?.totalRevenue.toLocaleString('id-ID') || '0'}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Persentase Achievement</Label>
-                  <div className={`text-2xl font-bold ${recapsAnalytics && recapsAnalytics.achievementPercentage >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
-                    {recapsAnalytics?.achievementPercentage.toFixed(1)}%
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Weekly Revenue Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Pendapatan Mingguan</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-gray-200">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="border border-gray-200 p-3 text-left">Minggu 1</th>
-                      <th className="border border-gray-200 p-3 text-left">Minggu 2</th>
-                      <th className="border border-gray-200 p-3 text-left">Minggu 3</th>
-                      <th className="border border-gray-200 p-3 text-left">Minggu 4</th>
-                      <th className="border border-gray-200 p-3 text-left font-bold">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      {recapsAnalytics?.weeklyRevenue.map((week, index) => (
-                        <td key={index} className="border border-gray-200 p-3">
-                          <div className="text-sm text-gray-600">{week.period}</div>
-                          <div className="font-semibold">Rp {week.revenue.toLocaleString('id-ID')}</div>
-                        </td>
-                      ))}
-                      <td className="border border-gray-200 p-3 bg-blue-50">
-                        <div className="font-bold text-primary">
-                          Rp {recapsAnalytics?.totalRevenue.toLocaleString('id-ID')}
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Weekly Revenue Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Grafik Pendapatan Mingguan</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer
-                config={{
-                  revenue: {
-                    label: "Pendapatan",
-                    color: "hsl(var(--chart-1))",
-                  },
-                }}
-                className="h-[300px]"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={[...(recapsAnalytics?.weeklyRevenue || []), { week: 'Total', revenue: recapsAnalytics?.totalRevenue || 0, period: 'Keseluruhan' }]}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="week" />
-                    <YAxis />
-                    <ChartTooltip
-                      content={<ChartTooltipContent />}
-                      formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pendapatan']}
-                    />
-                    <Bar dataKey="revenue" fill="var(--color-revenue)" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </CardContent>
-          </Card>
-
-          {/* Top 10 Studios Pie Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Top 10 Studios Berdasarkan Revenue
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ChartContainer
-                config={{
-                  revenue: {
-                    label: "Revenue",
-                    color: "hsl(var(--foreground))",
-                  },
-                }}
-                className="h-[400px]"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={recapsAnalytics?.topStudios || []}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ studio_name, revenue, percent }) => 
-                        `${studio_name}: Rp ${revenue.toLocaleString('id-ID')} (${(percent * 100).toFixed(1)}%)`
-                      }
-                      outerRadius={120}
-                      fill="#8884d8"
-                      dataKey="revenue"
+              <TabsContent value="comparison" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Perbandingan Revenue Harian</CardTitle>
+                    <CardDescription>Grafik perbandingan pemasukan online vs offline per hari</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer
+                      config={{
+                        online: {
+                          label: "Online",
+                          color: "hsl(var(--chart-1))",
+                        },
+                        offline: {
+                          label: "Offline",
+                          color: "hsl(var(--chart-2))",
+                        },
+                      }}
+                      className="h-[300px]"
                     >
-                      {recapsAnalytics?.topStudios.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <ChartTooltip
-                      content={<ChartTooltipContent />}
-                      formatter={(value, name, props) => [
-                        `Rp ${Number(value).toLocaleString('id-ID')}`,
-                        'Revenue',
-                        `${props.payload.sessions_count} Sesi`
-                      ]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </CardContent>
-          </Card>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analytics?.dailyComparisonData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" />
+                          <YAxis />
+                          <ChartTooltip
+                            content={<ChartTooltipContent />}
+                          />
+                          <Bar dataKey="online" fill="hsl(var(--chart-1))" />
+                          <Bar dataKey="offline" fill="hsl(var(--chart-2))" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-          {/* Detail Pendapatan Bulanan */}
-          {recapsAnalytics && (
-            <MonthlyRevenueDetails 
-              monthlyDetails={recapsAnalytics.monthlyDetails}
-              startDate={startDate}
-              endDate={endDate}
-            />
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
+              <TabsContent value="distribution" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribusi Metode Pembayaran</CardTitle>
+                    <CardDescription>Persentase revenue berdasarkan metode pembayaran</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer
+                      config={{
+                        revenue: {
+                          label: "Revenue",
+                        },
+                      }}
+                      className="h-[300px]"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={analytics?.paymentMethodDistribution}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ method, revenue, percent }) => 
+                              `${method}: Rp ${revenue.toLocaleString('id-ID')} (${(percent * 100).toFixed(1)}%)`
+                            }
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="revenue"
+                          >
+                            <Cell fill="#3b82f6" />
+                            <Cell fill="#f59e0b" />
+                          </Pie>
+                          <ChartTooltip
+                            formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Revenue']}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="types" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Revenue per Tipe Booking</CardTitle>
+                    <CardDescription>Perbandingan revenue online vs offline per tipe booking</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer
+                      config={{
+                        online: {
+                          label: "Online",
+                          color: "hsl(var(--chart-1))",
+                        },
+                        offline: {
+                          label: "Offline",
+                          color: "hsl(var(--chart-2))",
+                        },
+                      }}
+                      className="h-[300px]"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analytics?.typeComparisonData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="type" />
+                          <YAxis />
+                          <ChartTooltip
+                            content={<ChartTooltipContent />}
+                            formatter={(value, name) => [`Rp ${Number(value).toLocaleString('id-ID')}`, name]}
+                          />
+                          <Bar dataKey="online" fill="var(--color-online)" />
+                          <Bar dataKey="offline" fill="var(--color-offline)" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="studios" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Top 10 Studios Berdasarkan Revenue</CardTitle>
+                    <CardDescription>Studio dengan performa terbaik</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer
+                      config={{
+                        revenue: {
+                          label: "Revenue",
+                          color: "hsl(var(--foreground))",
+                        },
+                      }}
+                      className="h-[400px]"
+                    >
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={analytics?.topStudios}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, revenue, percent }) => 
+                              `${name}: Rp ${revenue.toLocaleString('id-ID')} (${(percent * 100).toFixed(1)}%)`
+                            }
+                            outerRadius={120}
+                            fill="#8884d8"
+                            dataKey="revenue"
+                          >
+                            {analytics?.topStudios.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <ChartTooltip
+                            formatter={(value, name, props) => [
+                              `Rp ${Number(value).toLocaleString('id-ID')}`,
+                              'Revenue',
+                              `${props.payload.bookings} Bookings`
+                            ]}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+
+          <TabsContent value="recaps" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">Monthly Recaps</h2>
+                <p className="text-muted-foreground">
+                  Periode: {format(startDate, 'dd MMMM yyyy', { locale: id })} - {format(endDate, 'dd MMMM yyyy', { locale: id })}
+                </p>
+              </div>
+              <ExportButtons exportData={recapsExportData} />
+            </div>
+
+            {/* Period Selection */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Pilih Periode</CardTitle>
+              </CardHeader>
+              <CardContent className="flex gap-4">
+                <div className="flex flex-col space-y-2">
+                  <Label>Bulan</Label>
+                  <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => (
+                        <SelectItem key={i + 1} value={(i + 1).toString()}>
+                          {format(new Date(2024, i), 'MMMM', { locale: id })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col space-y-2">
+                  <Label>Tahun</Label>
+                  <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <SelectItem key={2024 + i} value={(2024 + i).toString()}>
+                          {2024 + i}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Target & Achievement */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5" />
+                  Target Pendapatan Bulanan
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Target Bulanan</Label>
+                    {isEditingTarget ? (
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          value={targetAmount}
+                          onChange={(e) => setTargetAmount(Number(e.target.value))}
+                          className="flex-1"
+                        />
+                        <Button onClick={handleSaveTarget} size="sm">
+                          Simpan
+                        </Button>
+                        <Button onClick={() => setIsEditingTarget(false)} variant="outline" size="sm">
+                          Batal
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold">
+                          Rp {(monthlyTarget?.target_amount || targetAmount).toLocaleString('id-ID')}
+                        </span>
+                        <Button onClick={() => setIsEditingTarget(true)} variant="outline" size="sm">
+                          Edit
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Total Pendapatan</Label>
+                    <div className="text-2xl font-bold text-primary">
+                      Rp {recapsAnalytics?.totalRevenue.toLocaleString('id-ID') || '0'}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Persentase Achievement</Label>
+                    <div className={`text-2xl font-bold ${recapsAnalytics && recapsAnalytics.achievementPercentage >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
+                      {recapsAnalytics?.achievementPercentage.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Weekly Revenue Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Pendapatan Mingguan</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 p-3 text-left">Minggu 1</th>
+                        <th className="border border-gray-200 p-3 text-left">Minggu 2</th>
+                        <th className="border border-gray-200 p-3 text-left">Minggu 3</th>
+                        <th className="border border-gray-200 p-3 text-left">Minggu 4</th>
+                        <th className="border border-gray-200 p-3 text-left font-bold">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        {recapsAnalytics?.weeklyRevenue.map((week, index) => (
+                          <td key={index} className="border border-gray-200 p-3">
+                            <div className="text-sm text-gray-600">{week.period}</div>
+                            <div className="font-semibold">Rp {week.revenue.toLocaleString('id-ID')}</div>
+                          </td>
+                        ))}
+                        <td className="border border-gray-200 p-3 bg-blue-50">
+                          <div className="font-bold text-primary">
+                            Rp {recapsAnalytics?.totalRevenue.toLocaleString('id-ID')}
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Weekly Revenue Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Grafik Pendapatan Mingguan</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{
+                    revenue: {
+                      label: "Pendapatan",
+                      color: "hsl(var(--chart-1))",
+                    },
+                  }}
+                  className="h-[300px]"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={[...(recapsAnalytics?.weeklyRevenue || []), { week: 'Total', revenue: recapsAnalytics?.totalRevenue || 0, period: 'Keseluruhan' }]}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="week" />
+                      <YAxis />
+                      <ChartTooltip
+                        content={<ChartTooltipContent />}
+                        formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pendapatan']}
+                      />
+                      <Bar dataKey="revenue" fill="var(--color-revenue)" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            {/* Top 10 Studios Pie Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Top 10 Studios Berdasarkan Revenue
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{
+                    revenue: {
+                      label: "Revenue",
+                      color: "hsl(var(--foreground))",
+                    },
+                  }}
+                  className="h-[400px]"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={recapsAnalytics?.topStudios || []}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ studio_name, revenue, percent }) => 
+                          `${studio_name}: Rp ${revenue.toLocaleString('id-ID')} (${(percent * 100).toFixed(1)}%)`
+                        }
+                        outerRadius={120}
+                        fill="#8884d8"
+                        dataKey="revenue"
+                      >
+                        {recapsAnalytics?.topStudios.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <ChartTooltip
+                        content={<ChartTooltipContent />}
+                        formatter={(value, name, props) => [
+                          `Rp ${Number(value).toLocaleString('id-ID')}`,
+                          'Revenue',
+                          `${props.payload.sessions_count} Sesi`
+                        ]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            {/* Detail Pendapatan Bulanan */}
+            {recapsAnalytics && (
+              <MonthlyRevenueDetails 
+                monthlyDetails={recapsAnalytics.monthlyDetails}
+                startDate={startDate}
+                endDate={endDate}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+    </ModernLayout>
   );
 };
 

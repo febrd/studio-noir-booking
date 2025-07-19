@@ -14,6 +14,7 @@ import { id } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { ExportButtons } from '@/components/ExportButtons';
 import { MonthlyRevenueDetails } from '@/components/MonthlyRevenueDetails';
+import { ModernLayout } from '@/components/Layout/ModernLayout';
 
 interface WeeklyRevenue {
   week: string;
@@ -323,225 +324,227 @@ const RecapsPage = () => {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Recaps - Rekapitulasi Bulanan</h1>
-          <p className="text-muted-foreground">
-            Periode: {format(startDate, 'dd MMMM yyyy', { locale: id })} - {format(endDate, 'dd MMMM yyyy', { locale: id })}
-          </p>
+    <ModernLayout>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Recaps - Rekapitulasi Bulanan</h1>
+            <p className="text-muted-foreground">
+              Periode: {format(startDate, 'dd MMMM yyyy', { locale: id })} - {format(endDate, 'dd MMMM yyyy', { locale: id })}
+            </p>
+          </div>
+          <ExportButtons exportData={exportData} />
         </div>
-        <ExportButtons exportData={exportData} />
-      </div>
 
-      {/* Period Selection */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pilih Periode</CardTitle>
-        </CardHeader>
-        <CardContent className="flex gap-4">
-          <div className="flex flex-col space-y-2">
-            <Label>Bulan</Label>
-            <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 12 }, (_, i) => (
-                  <SelectItem key={i + 1} value={(i + 1).toString()}>
-                    {format(new Date(2024, i), 'MMMM', { locale: id })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col space-y-2">
-            <Label>Tahun</Label>
-            <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: 5 }, (_, i) => (
-                  <SelectItem key={2024 + i} value={(2024 + i).toString()}>
-                    {2024 + i}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Target & Achievement */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5" />
-            Target Pendapatan Bulanan
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Target Bulanan</Label>
-              {isEditingTarget ? (
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    value={targetAmount}
-                    onChange={(e) => setTargetAmount(Number(e.target.value))}
-                    className="flex-1"
-                  />
-                  <Button onClick={handleSaveTarget} size="sm">
-                    Simpan
-                  </Button>
-                  <Button onClick={() => setIsEditingTarget(false)} variant="outline" size="sm">
-                    Batal
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold">
-                    Rp {(monthlyTarget?.target_amount || targetAmount).toLocaleString('id-ID')}
-                  </span>
-                  <Button onClick={() => setIsEditingTarget(true)} variant="outline" size="sm">
-                    Edit
-                  </Button>
-                </div>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>Total Pendapatan</Label>
-              <div className="text-2xl font-bold text-primary">
-                Rp {analytics?.totalRevenue.toLocaleString('id-ID') || '0'}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Persentase Achievement</Label>
-              <div className={`text-2xl font-bold ${analytics && analytics.achievementPercentage >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
-                {analytics?.achievementPercentage.toFixed(1)}%
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Weekly Revenue Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pendapatan Mingguan</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-200">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="border border-gray-200 p-3 text-left">Minggu 1</th>
-                  <th className="border border-gray-200 p-3 text-left">Minggu 2</th>
-                  <th className="border border-gray-200 p-3 text-left">Minggu 3</th>
-                  <th className="border border-gray-200 p-3 text-left">Minggu 4</th>
-                  <th className="border border-gray-200 p-3 text-left font-bold">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  {analytics?.weeklyRevenue.map((week, index) => (
-                    <td key={index} className="border border-gray-200 p-3">
-                      <div className="text-sm text-gray-600">{week.period}</div>
-                      <div className="font-semibold">Rp {week.revenue.toLocaleString('id-ID')}</div>
-                    </td>
+        {/* Period Selection */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Pilih Periode</CardTitle>
+          </CardHeader>
+          <CardContent className="flex gap-4">
+            <div className="flex flex-col space-y-2">
+              <Label>Bulan</Label>
+              <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <SelectItem key={i + 1} value={(i + 1).toString()}>
+                      {format(new Date(2024, i), 'MMMM', { locale: id })}
+                    </SelectItem>
                   ))}
-                  <td className="border border-gray-200 p-3 bg-blue-50">
-                    <div className="font-bold text-primary">
-                      Rp {analytics?.totalRevenue.toLocaleString('id-ID')}
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col space-y-2">
+              <Label>Tahun</Label>
+              <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <SelectItem key={2024 + i} value={(2024 + i).toString()}>
+                      {2024 + i}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Weekly Revenue Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Grafik Pendapatan Mingguan</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer
-            config={{
-              revenue: {
-                label: "Pendapatan",
-                color: "hsl(var(--chart-1))",
-              },
-            }}
-            className="h-[300px]"
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={[...analytics?.weeklyRevenue || [], { week: 'Total', revenue: analytics?.totalRevenue || 0, period: 'Keseluruhan' }]}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" />
-                <YAxis />
-                <ChartTooltip
-                  content={<ChartTooltipContent />}
-                  formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pendapatan']}
-                />
-                <Bar dataKey="revenue" fill="var(--color-revenue)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-        </CardContent>
-      </Card>
+        {/* Target & Achievement */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5" />
+              Target Pendapatan Bulanan
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Target Bulanan</Label>
+                {isEditingTarget ? (
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      value={targetAmount}
+                      onChange={(e) => setTargetAmount(Number(e.target.value))}
+                      className="flex-1"
+                    />
+                    <Button onClick={handleSaveTarget} size="sm">
+                      Simpan
+                    </Button>
+                    <Button onClick={() => setIsEditingTarget(false)} variant="outline" size="sm">
+                      Batal
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold">
+                      Rp {(monthlyTarget?.target_amount || targetAmount).toLocaleString('id-ID')}
+                    </span>
+                    <Button onClick={() => setIsEditingTarget(true)} variant="outline" size="sm">
+                      Edit
+                    </Button>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Total Pendapatan</Label>
+                <div className="text-2xl font-bold text-primary">
+                  Rp {analytics?.totalRevenue.toLocaleString('id-ID') || '0'}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Persentase Achievement</Label>
+                <div className={`text-2xl font-bold ${analytics && analytics.achievementPercentage >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
+                  {analytics?.achievementPercentage.toFixed(1)}%
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Top 10 Studios Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            Top 10 Studios Berdasarkan Revenue
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer
-            config={{
-              revenue: {
-                label: "Revenue",
-                color: "hsl(var(--chart-2))",
-              },
-            }}
-            className="h-[400px]"
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={analytics?.topStudios || []} layout="horizontal" margin={{ left: 100 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis type="category" dataKey="studio_name" width={100} />
-                <ChartTooltip
-                  content={<ChartTooltipContent />}
-                  formatter={(value, name, props) => [
-                    `Rp ${Number(value).toLocaleString('id-ID')}`,
-                    'Revenue',
-                    `${props.payload.sessions_count} Sesi`
-                  ]}
-                />
-                <Bar dataKey="revenue" fill="var(--color-revenue)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-        </CardContent>
-      </Card>
+        {/* Weekly Revenue Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Pendapatan Mingguan</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="border border-gray-200 p-3 text-left">Minggu 1</th>
+                    <th className="border border-gray-200 p-3 text-left">Minggu 2</th>
+                    <th className="border border-gray-200 p-3 text-left">Minggu 3</th>
+                    <th className="border border-gray-200 p-3 text-left">Minggu 4</th>
+                    <th className="border border-gray-200 p-3 text-left font-bold">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    {analytics?.weeklyRevenue.map((week, index) => (
+                      <td key={index} className="border border-gray-200 p-3">
+                        <div className="text-sm text-gray-600">{week.period}</div>
+                        <div className="font-semibold">Rp {week.revenue.toLocaleString('id-ID')}</div>
+                      </td>
+                    ))}
+                    <td className="border border-gray-200 p-3 bg-blue-50">
+                      <div className="font-bold text-primary">
+                        Rp {analytics?.totalRevenue.toLocaleString('id-ID')}
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* New Monthly Revenue Details Component */}
-      {analytics && (
-        <MonthlyRevenueDetails 
-          monthlyDetails={analytics.monthlyDetails}
-          startDate={startDate}
-          endDate={endDate}
-        />
-      )}
-    </div>
+        {/* Weekly Revenue Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Grafik Pendapatan Mingguan</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer
+              config={{
+                revenue: {
+                  label: "Pendapatan",
+                  color: "hsl(var(--chart-1))",
+                },
+              }}
+              className="h-[300px]"
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={[...analytics?.weeklyRevenue || [], { week: 'Total', revenue: analytics?.totalRevenue || 0, period: 'Keseluruhan' }]}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="week" />
+                  <YAxis />
+                  <ChartTooltip
+                    content={<ChartTooltipContent />}
+                    formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pendapatan']}
+                  />
+                  <Bar dataKey="revenue" fill="var(--color-revenue)" />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Top 10 Studios Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Top 10 Studios Berdasarkan Revenue
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer
+              config={{
+                revenue: {
+                  label: "Revenue",
+                  color: "hsl(var(--chart-2))",
+                },
+              }}
+              className="h-[400px]"
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={analytics?.topStudios || []} layout="horizontal" margin={{ left: 100 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis type="category" dataKey="studio_name" width={100} />
+                  <ChartTooltip
+                    content={<ChartTooltipContent />}
+                    formatter={(value, name, props) => [
+                      `Rp ${Number(value).toLocaleString('id-ID')}`,
+                      'Revenue',
+                      `${props.payload.sessions_count} Sesi`
+                    ]}
+                  />
+                  <Bar dataKey="revenue" fill="var(--color-revenue)" />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* New Monthly Revenue Details Component */}
+        {analytics && (
+          <MonthlyRevenueDetails 
+            monthlyDetails={analytics.monthlyDetails}
+            startDate={startDate}
+            endDate={endDate}
+          />
+        )}
+      </div>
+    </ModernLayout>
   );
 };
 
