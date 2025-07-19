@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, Calendar, Clock, User, DollarSign, Search, Filter } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, Clock, User, DollarSign, Search, Filter, CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -15,6 +15,9 @@ import InstallmentManager from '@/components/studio/InstallmentManager';
 import TimeExtensionManager from '@/components/studio/TimeExtensionManager';
 import { useDebounce } from '@/hooks/useDebounce';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { DatePickerWithRange } from '@/components/ui/date-picker';
+import { DateRange } from 'react-day-picker';
+import { format, startOfDay, endOfDay } from 'date-fns';
 
 type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'paid' | 'expired' | 'failed' | 'installment';
 
@@ -57,6 +60,10 @@ const BookingsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all'>('all');
   const [studioFilter, setStudioFilter] = useState<string | 'all'>('all');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfDay(new Date()),
+    to: endOfDay(new Date())
+  });
   
   // Debounced search for better performance
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -78,14 +85,15 @@ const BookingsPage = () => {
     }
   });
 
-  // Enhanced query with explicit joins
+  // Enhanced query with date filtering
   const { data: bookings, isLoading } = useQuery({
-    queryKey: ['bookings-enhanced', debouncedSearchQuery, statusFilter, studioFilter],
+    queryKey: ['bookings-enhanced', debouncedSearchQuery, statusFilter, studioFilter, dateRange],
     queryFn: async () => {
       console.log('Fetching bookings with filters:', { 
         searchQuery: debouncedSearchQuery, 
         statusFilter, 
-        studioFilter 
+        studioFilter,
+        dateRange 
       });
       
       let query = supabase
@@ -107,6 +115,14 @@ const BookingsPage = () => {
           updated_at
         `)
         .order('created_at', { ascending: false });
+
+      // Apply date range filter
+      if (dateRange?.from) {
+        query = query.gte('created_at', dateRange.from.toISOString());
+      }
+      if (dateRange?.to) {
+        query = query.lte('created_at', dateRange.to.toISOString());
+      }
 
       // Apply status filter (exclude 'all' option)
       if (statusFilter && statusFilter !== 'all') {
@@ -348,6 +364,10 @@ const BookingsPage = () => {
     setSearchQuery('');
     setStatusFilter('all');
     setStudioFilter('all');
+    setDateRange({
+      from: startOfDay(new Date()),
+      to: endOfDay(new Date())
+    });
   };
 
   if (isLoading) {
@@ -386,7 +406,7 @@ const BookingsPage = () => {
         </Dialog>
       </div>
 
-      {/* Enhanced search and filter section with realtime search */}
+      {/* Enhanced search and filter section with date range */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -395,7 +415,17 @@ const BookingsPage = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Rentang Tanggal</label>
+              <DatePickerWithRange
+                value={dateRange}
+                onChange={setDateRange}
+                placeholder="Pilih tanggal"
+                className="w-full"
+              />
+            </div>
+            
             <div className="space-y-2">
               <label className="text-sm font-medium">Cari Customer (Realtime)</label>
               <div className="relative">

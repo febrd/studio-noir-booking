@@ -1,177 +1,119 @@
+
 import { 
-  Home, 
-  CreditCard, 
-  Users, 
+  LayoutDashboard, 
   Building2, 
-  Receipt, 
-  Calendar,
+  Package, 
+  Calendar, 
+  Users, 
+  CreditCard, 
+  FileText, 
+  BarChart3, 
   Settings,
-  Package,
-  FolderOpen,
-  BarChart3,
-  Tags,
-  Plus,
-  DollarSign,
-  Activity
+  Clock,
+  UserPlus
 } from 'lucide-react';
 
-export interface NavigationItem {
-  name: string;
-  href: string;
-  icon: any;
-  allowedRoles: ('owner' | 'admin' | 'keuangan' | 'pelanggan')[];
-  children?: NavigationItem[];
-}
-
-export const navigationConfig: NavigationItem[] = [
+export const navigationItems = [
   {
-    name: 'Dashboard',
-    href: '/',
-    icon: Home,
-    allowedRoles: ['owner', 'admin', 'keuangan', 'pelanggan']
+    title: 'Dashboard',
+    icon: LayoutDashboard,
+    href: '/dashboard',
+    roles: ['admin', 'owner', 'keuangan', 'pelanggan']
   },
   {
-    name: 'Payment Gateway',
-    href: '/payment-gateway',
-    icon: CreditCard,
-    allowedRoles: ['owner', 'admin', 'keuangan']
-  },
-  {
-    name: 'Users',
-    href: '/admin',
-    icon: Users,
-    allowedRoles: ['owner', 'admin'],
-    children: [
-      {
-        name: 'Accounts',
-        href: '/admin/users',
-        icon: Users,
-        allowedRoles: ['owner', 'admin']
-      },
-      {
-        name: 'Customer Profiles',
-        href: '/admin/customers',
-        icon: Users,
-        allowedRoles: ['owner', 'admin']
-      }
-    ]
-  },
-  {
-    name: 'Studio Management',
-    href: '/studio',
+    title: 'Studio Management',
     icon: Building2,
-    allowedRoles: ['owner', 'admin'],
-    children: [
-      {
-        name: 'Studios',
-        href: '/studio/studios',
-        icon: Building2,
-        allowedRoles: ['owner', 'admin']
-      },
-      {
-        name: 'Package Categories',
-        href: '/studio/categories',
-        icon: FolderOpen,
-        allowedRoles: ['owner', 'admin']
-      },
-      {
-        name: 'Packages',
-        href: '/studio/packages',
-        icon: Package,
-        allowedRoles: ['owner', 'admin']
-      },
-      {
-        name: 'Additional Services',
-        href: '/studio/services',
-        icon: Settings,
-        allowedRoles: ['owner', 'admin']
-      },
-      {
-        name: 'Transactions',
-        href: '/studio/bookings',
-        icon: Calendar,
-        allowedRoles: ['owner', 'admin']
-      }
-    ]
+    href: '/studio/studios',
+    roles: ['admin', 'owner']
   },
   {
-    name: 'Report',
+    title: 'Package Categories',
+    icon: Package,
+    href: '/studio/package-categories',
+    roles: ['admin', 'owner']
+  },
+  {
+    title: 'Packages',
+    icon: Package,
+    href: '/studio/packages',
+    roles: ['admin', 'owner']
+  },
+  {
+    title: 'Additional Services',
+    icon: Settings,
+    href: '/studio/services',
+    roles: ['admin', 'owner']
+  },
+  {
+    title: 'Bookings Transaction',
+    icon: Calendar,
+    href: '/studio/bookings',
+    roles: ['admin', 'owner', 'keuangan']
+  },
+  {
+    title: 'Walk-in Sessions',
+    icon: Clock,
+    href: '/studio/walkin-sessions',
+    roles: ['admin', 'owner', 'keuangan']
+  },
+  {
+    title: 'Booking Logs',
+    icon: FileText,
+    href: '/studio/booking-logs',
+    roles: ['admin', 'owner']
+  },
+  {
+    title: 'Offline Transactions',
+    icon: CreditCard,
+    href: '/studio/offline-transactions',
+    roles: ['admin', 'owner', 'keuangan']
+  },
+  {
+    title: 'Transaction Reports',
+    icon: BarChart3,
+    href: '/transactions/reports',
+    roles: ['admin', 'owner', 'keuangan']
+  },
+  {
+    title: 'Online Bookings Report',
+    icon: FileText,
+    href: '/transactions/online-bookings',
+    roles: ['admin', 'owner', 'keuangan']
+  },
+  {
+    title: 'Offline Bookings Report',
+    icon: FileText,
+    href: '/transactions/offline-bookings',
+    roles: ['admin', 'owner', 'keuangan']
+  },
+  {
+    title: 'Transaction History',
+    icon: CreditCard,
     href: '/transactions',
-    icon: Receipt,
-    allowedRoles: ['owner', 'admin', 'keuangan'],
-    children: [
-      {
-        name: 'Online Transactions',
-        href: '/transactions/online',
-        icon: Receipt,
-        allowedRoles: ['owner', 'admin', 'keuangan']
-      },
-      {
-        name: 'Offline Transactions',
-        href: '/transactions/offline',
-        icon: Receipt,
-        allowedRoles: ['owner', 'admin', 'keuangan']
-      },
-      {
-        name: 'Recaps',
-        href: '/transactions/reports',
-        icon: Receipt,
-        allowedRoles: ['owner', 'admin', 'keuangan']
-      }
-    ]
+    roles: ['admin', 'owner', 'keuangan']
+  },
+  {
+    title: 'Monthly Recaps',
+    icon: BarChart3,
+    href: '/recaps',
+    roles: ['admin', 'owner', 'keuangan']
+  },
+  {
+    title: 'Customer Management',
+    icon: Users,
+    href: '/admin/customers',
+    roles: ['admin', 'owner']
+  },
+  {
+    title: 'User Management',
+    icon: UserPlus,
+    href: '/admin/users',
+    roles: ['admin', 'owner']
+  },
+  {
+    title: 'Payment Providers',
+    icon: CreditCard,
+    href: '/admin/payment-providers',
+    roles: ['admin', 'owner']
   }
 ];
-
-export const studioManagementItems = [
-  {
-    title: "Dashboard",
-    url: "/studio",
-    icon: BarChart3,
-  },
-  {
-    title: "Studios",
-    url: "/studio/studios",
-    icon: Building2,
-  },
-  {
-    title: "Kategori Paket",
-    url: "/studio/categories",
-    icon: Tags,
-  },
-  {
-    title: "Paket Studio",
-    url: "/studio/packages",
-    icon: Package,
-  },
-  {
-    title: "Layanan Tambahan",
-    url: "/studio/services",
-    icon: Plus,
-  },
-  {
-    title: "Bookings",
-    url: "/studio/bookings",
-    icon: Calendar,
-  },
-  {
-    title: "Transaksi Offline",
-    url: "/studio/transactions",
-    icon: DollarSign,
-  },
-  {
-    title: "Log Aktivitas",
-    url: "/studio/logs",
-    icon: Activity,
-  },
-];
-
-export const getAccessibleNavigation = (userRole: string): NavigationItem[] => {
-  return navigationConfig.filter(item => 
-    item.allowedRoles.includes(userRole as any)
-  ).map(item => ({
-    ...item,
-    children: item.children?.filter(child => 
-      child.allowedRoles.includes(userRole as any)
-    )
-  }));
-};
