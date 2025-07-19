@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfDay, endOfDay, addMinutes } from 'date-fns';
@@ -23,7 +24,8 @@ const walkinBookingSchema = z.object({
   package_id: z.string().min(1, 'Package wajib dipilih'),
   start_time: z.string().min(1, 'Waktu mulai wajib diisi'),
   payment_method: z.enum(['cash', 'debit', 'credit', 'qris', 'transfer']),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  additional_services: z.array(z.string()).optional()
 });
 
 type WalkinBookingFormData = z.infer<typeof walkinBookingSchema>;
@@ -36,6 +38,7 @@ interface WalkinBookingFormProps {
 const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [additionalTime, setAdditionalTime] = useState(0);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const queryClient = useQueryClient();
   
   const today = new Date();
@@ -51,7 +54,8 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       package_id: booking?.studio_package_id || '',
       start_time: booking?.start_time ? format(new Date(booking.start_time), 'HH:mm') : '',
       payment_method: booking?.payment_method || 'cash',
-      notes: ''
+      notes: '',
+      additional_services: []
     }
   });
 
@@ -119,6 +123,24 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
     enabled: !!selectedStudioId && (!isRegularStudio || !!selectedCategoryId)
   });
 
+  // Fetch additional services for selected studio
+  const { data: additionalServices } = useQuery({
+    queryKey: ['additional-services-by-studio', selectedStudioId],
+    queryFn: async () => {
+      if (!selectedStudioId) return [];
+      
+      const { data, error } = await supabase
+        .from('additional_services')
+        .select('id, name, price, description')
+        .eq('studio_id', selectedStudioId)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedStudioId
+  });
+
   // Get selected package details
   const selectedPackageId = form.watch('package_id');
   const selectedPackage = packages?.find(pkg => pkg.id === selectedPackageId);
@@ -128,7 +150,13 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
     const packagePrice = selectedPackage?.price || 0;
     const extensionCost = additionalTime > 0 ? 
       Math.ceil(additionalTime / 5) * (isRegularStudio ? 15000 : 5000) : 0;
-    return packagePrice + extensionCost;
+    
+    const servicesTotal = selectedServices.reduce((total, serviceId) => {
+      const service = additionalServices?.find(s => s.id === serviceId);
+      return total + (service?.price || 0);
+    }, 0);
+    
+    return packagePrice + extensionCost + servicesTotal;
   };
 
   // Auto-calculate end time
@@ -146,12 +174,22 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
     return format(endDate, 'HH:mm');
   };
 
+  // Handle service selection
+  const handleServiceToggle = (serviceId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedServices(prev => [...prev, serviceId]);
+    } else {
+      setSelectedServices(prev => prev.filter(id => id !== serviceId));
+    }
+  };
+
   // Reset category and package when studio changes
   useEffect(() => {
     if (selectedStudioId) {
       form.setValue('category_id', '');
       form.setValue('package_id', '');
       setAdditionalTime(0);
+      setSelectedServices([]);
     }
   }, [selectedStudioId, form]);
 
@@ -167,21 +205,37 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
   const createMutation = useMutation({
     mutationFn: async (data: WalkinBookingFormData) => {
       const startDateTime = new Date(`${todayString}T${data.start_time}:00`);
-      const totalMinutes = selectedPackage?.base_time_minutes + additionalTime;
+      const totalMinutes = (selectedPackage?.base_time_minutes || 0) + additionalTime;
       const endDateTime = addMinutes(startDateTime, totalMinutes);
 
-      // Check for conflicts
+      // Check for conflicts with more specific query - exclude walking sessions
       const { data: conflicts } = await supabase
         .from('bookings')
-        .select('id')
+        .select('id, start_time, end_time')
         .eq('studio_id', data.studio_id)
+        .eq('is_walking_session', false) // Only check against regular bookings
         .not('status', 'in', '(cancelled,failed)')
         .gte('start_time', startOfDay(today).toISOString())
-        .lte('start_time', endOfDay(today).toISOString())
-        .or(`and(start_time.lte.${startDateTime.toISOString()},end_time.gt.${startDateTime.toISOString()}),and(start_time.lt.${endDateTime.toISOString()},end_time.gte.${endDateTime.toISOString()}),and(start_time.gte.${startDateTime.toISOString()},end_time.lte.${endDateTime.toISOString()})`);
+        .lte('start_time', endOfDay(today).toISOString());
 
-      if (conflicts && conflicts.length > 0 && (!booking || !conflicts.some(c => c.id === booking.id))) {
-        throw new Error('Waktu tersebut sudah dipesan untuk studio ini');
+      if (conflicts && conflicts.length > 0) {
+        // Check for actual time overlap
+        const hasConflict = conflicts.some(conflict => {
+          if (booking && conflict.id === booking.id) return false;
+          
+          const conflictStart = new Date(conflict.start_time);
+          const conflictEnd = new Date(conflict.end_time);
+          
+          return (
+            (startDateTime >= conflictStart && startDateTime < conflictEnd) ||
+            (endDateTime > conflictStart && endDateTime <= conflictEnd) ||
+            (startDateTime <= conflictStart && endDateTime >= conflictEnd)
+          );
+        });
+        
+        if (hasConflict) {
+          throw new Error('Waktu tersebut sudah dipesan untuk studio ini');
+        }
       }
 
       // Create or get customer
@@ -227,11 +281,31 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
             additional_time_minutes: additionalTime > 0 ? additionalTime : null,
             payment_method: 'offline',
             total_amount: totalAmount,
+            is_walking_session: true,
             updated_at: new Date().toISOString()
           })
           .eq('id', booking.id);
 
         if (error) throw error;
+
+        // Delete existing additional services
+        await supabase
+          .from('booking_additional_services')
+          .delete()
+          .eq('booking_id', booking.id);
+
+        // Add selected additional services
+        if (selectedServices.length > 0) {
+          const servicesToAdd = selectedServices.map(serviceId => ({
+            booking_id: booking.id,
+            additional_service_id: serviceId,
+            quantity: 1
+          }));
+
+          await supabase
+            .from('booking_additional_services')
+            .insert(servicesToAdd);
+        }
 
         // Create transaction record
         await supabase
@@ -261,12 +335,26 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
             payment_method: 'offline',
             type: 'self_photo',
             status: 'confirmed',
-            total_amount: totalAmount
+            total_amount: totalAmount,
+            is_walking_session: true
           })
           .select('id')
           .single();
 
         if (error) throw error;
+
+        // Add selected additional services
+        if (selectedServices.length > 0) {
+          const servicesToAdd = selectedServices.map(serviceId => ({
+            booking_id: newBooking.id,
+            additional_service_id: serviceId,
+            quantity: 1
+          }));
+
+          await supabase
+            .from('booking_additional_services')
+            .insert(servicesToAdd);
+        }
 
         // Create transaction record
         await supabase
@@ -458,6 +546,27 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
               )}
             </div>
 
+            {/* Additional Services */}
+            {additionalServices && additionalServices.length > 0 && (
+              <div>
+                <Label>Additional Services</Label>
+                <div className="mt-2 space-y-2 max-h-32 overflow-y-auto">
+                  {additionalServices.map((service) => (
+                    <div key={service.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={service.id}
+                        checked={selectedServices.includes(service.id)}
+                        onCheckedChange={(checked) => handleServiceToggle(service.id, !!checked)}
+                      />
+                      <Label htmlFor={service.id} className="text-sm">
+                        {service.name} - Rp {service.price.toLocaleString('id-ID')}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <Label htmlFor="notes">Catatan</Label>
               <Textarea
@@ -496,6 +605,15 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
                 <div className="flex justify-between text-sm">
                   <span>Tambahan Waktu:</span>
                   <span>Rp {(Math.ceil(additionalTime / 5) * (isRegularStudio ? 15000 : 5000)).toLocaleString('id-ID')}</span>
+                </div>
+              )}
+              {selectedServices.length > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span>Additional Services:</span>
+                  <span>Rp {selectedServices.reduce((total, serviceId) => {
+                    const service = additionalServices?.find(s => s.id === serviceId);
+                    return total + (service?.price || 0);
+                  }, 0).toLocaleString('id-ID')}</span>
                 </div>
               )}
               <div className="border-t pt-2">

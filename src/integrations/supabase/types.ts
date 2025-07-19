@@ -172,6 +172,7 @@ export type Database = {
           created_at: string
           end_time: string | null
           id: string
+          is_walking_session: boolean
           package_category_id: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           performed_by: string | null
@@ -189,6 +190,7 @@ export type Database = {
           created_at?: string
           end_time?: string | null
           id?: string
+          is_walking_session?: boolean
           package_category_id?: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           performed_by?: string | null
@@ -206,6 +208,7 @@ export type Database = {
           created_at?: string
           end_time?: string | null
           id?: string
+          is_walking_session?: boolean
           package_category_id?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           performed_by?: string | null
