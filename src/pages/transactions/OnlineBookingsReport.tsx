@@ -146,7 +146,9 @@ const OnlineBookingsReport = () => {
       totalBookings: bookingsData.length,
       statusDistribution,
       typeDistribution,
-      installmentStats
+      installmentStats,
+      averageDuration,
+      averageExtraTime
     };
   }, [bookingsData]);
 
@@ -193,7 +195,8 @@ const OnlineBookingsReport = () => {
     return {
       dailyRevenueData,
       statusChartData,
-      typeChartData
+      typeChartData,
+      durationPriceData
     };
   }, [bookingsData, analytics]);
 
@@ -390,7 +393,7 @@ const OnlineBookingsReport = () => {
                       fill="#8884d8"
                       dataKey="count"
                     >
-                      {chartData.statusChartData.map((entry, index) => (
+                      {chartData.statusChartData?.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>

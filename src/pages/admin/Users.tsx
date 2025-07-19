@@ -1,4 +1,3 @@
-
 import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +36,7 @@ const Users = () => {
 
       // Apply role filter
       if (roleFilter !== 'all') {
-        query = query.eq('role', roleFilter);
+        query = query.eq('role', roleFilter as 'owner' | 'admin' | 'keuangan' | 'pelanggan');
       }
 
       // Apply status filter would go here if we had status column

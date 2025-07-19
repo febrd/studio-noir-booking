@@ -41,7 +41,7 @@ const Customers = () => {
     queryFn: async () => {
       console.log('Fetching customers...');
       let query = supabase
-        .from('customer_profiles' as any)
+        .from('customer_profiles')
         .select('*');
 
       // Apply search filter
@@ -70,7 +70,7 @@ const Customers = () => {
   const deleteCustomerMutation = useMutation({
     mutationFn: async (customerId: string) => {
       const { error } = await supabase
-        .from('customer_profiles' as any)
+        .from('customer_profiles')
         .delete()
         .eq('id', customerId);
 
