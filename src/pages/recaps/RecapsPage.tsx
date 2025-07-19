@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -220,6 +219,37 @@ const RecapsPage = () => {
     };
   }, [bookingsData, weeklyPeriods, monthlyTarget, targetAmount, startDate, endDate]);
 
+  const exportData = useMemo(() => {
+    if (!analytics) return undefined;
+
+    const headers = [
+      'Item',
+      'Kategori Paket',
+      'Jumlah Sesi (per Item)',
+      'Jumlah Sesi (per Hari)',
+      'Omset',
+      'Rata-rata Transaksi (Item)',
+      'Rata-rata Transaksi (Kategori)'
+    ];
+
+    const data = analytics.monthlyDetails.map(detail => [
+      detail.item,
+      detail.category,
+      detail.sessions_count.toString(),
+      `${detail.sessions_per_day.toFixed(1)} / hari`,
+      `Rp ${detail.revenue.toLocaleString('id-ID')}`,
+      `Rp ${detail.avg_transaction_item.toLocaleString('id-ID')}`,
+      `Rp ${detail.avg_transaction_category.toLocaleString('id-ID')}`
+    ]);
+
+    return {
+      title: `Rekapitulasi Bulanan ${format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: id })}`,
+      headers,
+      data,
+      filename: `recaps-${selectedMonth}-${selectedYear}`
+    };
+  }, [analytics, selectedMonth, selectedYear]);
+
   const handleSaveTarget = () => {
     updateTargetMutation.mutate(targetAmount);
   };
@@ -237,7 +267,7 @@ const RecapsPage = () => {
             Periode: {format(startDate, 'dd MMMM yyyy', { locale: id })} - {format(endDate, 'dd MMMM yyyy', { locale: id })}
           </p>
         </div>
-        <ExportButtons />
+        <ExportButtons exportData={exportData} />
       </div>
 
       {/* Period Selection */}

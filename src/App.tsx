@@ -12,6 +12,7 @@ import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 import TransactionsPage from "./pages/transactions/TransactionsPage";
 import RecapsPage from "./pages/recaps/RecapsPage";
+import PaymentGateway from "./pages/PaymentGateway";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { JWTProtectedRoute } from "./components/auth/JWTProtectedRoute";
 
@@ -40,6 +41,11 @@ const App = () => (
           <Route path="/recaps" element={
             <JWTProtectedRoute>
               <RecapsPage />
+            </JWTProtectedRoute>
+          } />
+          <Route path="/payment-gateway" element={
+            <JWTProtectedRoute>
+              <PaymentGateway />
             </JWTProtectedRoute>
           } />
           <Route path="/unauthorized" element={<Unauthorized />} />
