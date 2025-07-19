@@ -87,7 +87,7 @@ export const navigationConfig: NavigationItem[] = [
         allowedRoles: ['owner', 'admin']
       },
       {
-        name: 'Bookings',
+        name: 'Transactions',
         href: '/studio/bookings',
         icon: Calendar,
         allowedRoles: ['owner', 'admin']
@@ -95,25 +95,25 @@ export const navigationConfig: NavigationItem[] = [
     ]
   },
   {
-    name: 'Transactions',
+    name: 'Reports',
     href: '/transactions',
     icon: Receipt,
     allowedRoles: ['owner', 'admin', 'keuangan'],
     children: [
       {
-        name: 'Online Bookings',
+        name: 'Online Transactions',
         href: '/transactions/online',
         icon: Receipt,
         allowedRoles: ['owner', 'admin', 'keuangan']
       },
       {
-        name: 'Offline Bookings',
+        name: 'Offline Transactions',
         href: '/transactions/offline',
         icon: Receipt,
         allowedRoles: ['owner', 'admin', 'keuangan']
       },
       {
-        name: 'Reports',
+        name: 'Recaps',
         href: '/transactions/reports',
         icon: Receipt,
         allowedRoles: ['owner', 'admin', 'keuangan']
