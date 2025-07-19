@@ -3,9 +3,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./hooks/useJWTAuth";
-import ProtectedRoute from "./components/auth/ProtectedRoute";
-import JWTProtectedRoute from "./components/auth/JWTProtectedRoute";
+import { JWTAuthProvider } from "./hooks/useJWTAuth";
+import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { JWTProtectedRoute } from "./components/auth/JWTProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import JWTAuth from "./pages/JWTAuth";
@@ -32,7 +32,7 @@ import OnlineBookingsReport from "./pages/transactions/OnlineBookingsReport";
 import OfflineBookingsReport from "./pages/transactions/OfflineBookingsReport";
 
 // Admin pages
-import AdminLayout from "./pages/admin/Layout";
+import { AdminLayout } from "./pages/admin/Layout";
 import Users from "./pages/admin/Users";
 import Customers from "./pages/admin/Customers";
 import PaymentProviders from "./pages/admin/PaymentProviders";
@@ -45,7 +45,7 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+      <JWTAuthProvider>
         <TooltipProvider>
           <Toaster />
           <BrowserRouter>
@@ -222,7 +222,7 @@ function App() {
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
-      </AuthProvider>
+      </JWTAuthProvider>
     </QueryClientProvider>
   );
 }

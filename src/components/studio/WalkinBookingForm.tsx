@@ -141,6 +141,11 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       const selectedPackage = packages?.find(p => p.id === data.package_id);
       const totalAmount = selectedPackage?.price || 0;
 
+      // Map payment method for database compatibility
+      const dbPaymentMethod = ['cash', 'debit', 'credit', 'qris', 'transfer'].includes(data.payment_method) 
+        ? 'offline' 
+        : data.payment_method;
+
       if (booking) {
         // Update existing booking
         const { error } = await supabase
@@ -150,7 +155,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
             studio_package_id: data.package_id,
             start_time: startDateTime.toISOString(),
             end_time: endDateTime.toISOString(),
-            payment_method: data.payment_method,
+            payment_method: dbPaymentMethod,
             total_amount: totalAmount,
             updated_at: new Date().toISOString()
           })
@@ -168,7 +173,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
             studio_package_id: data.package_id,
             start_time: startDateTime.toISOString(),
             end_time: endDateTime.toISOString(),
-            payment_method: data.payment_method,
+            payment_method: dbPaymentMethod,
             type: 'self_photo',
             status: 'confirmed',
             total_amount: totalAmount

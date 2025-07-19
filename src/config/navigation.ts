@@ -117,3 +117,15 @@ export const navigationItems = [
     roles: ['admin', 'owner']
   }
 ];
+
+// Helper function to get accessible navigation based on user role
+export const getAccessibleNavigation = (userRole: string) => {
+  return navigationItems
+    .filter(item => item.roles.includes(userRole as any))
+    .map(item => ({
+      name: item.title,
+      href: item.href,
+      icon: item.icon,
+      children: [] // For future use if we add nested navigation
+    }));
+};

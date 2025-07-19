@@ -12,7 +12,7 @@ import { Plus, Edit, Trash2, Clock, User, DollarSign, Search, Filter, Calendar }
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import BookingForm from '@/components/studio/BookingForm';
+import WalkinBookingForm from '@/components/studio/WalkinBookingForm';
 import InstallmentManager from '@/components/studio/InstallmentManager';
 import TimeExtensionManager from '@/components/studio/TimeExtensionManager';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -354,11 +354,6 @@ const WalkinSessionsPage = () => {
     }).format(price);
   };
 
-  const formatDateTime = (dateTimeString: string) => {
-    if (!dateTimeString) return '';
-    return new Date(dateTimeString).toLocaleString('id-ID');
-  };
-
   const formatTime = (dateTimeString: string) => {
     if (!dateTimeString) return '';
     return format(new Date(dateTimeString), 'HH:mm');
@@ -402,7 +397,7 @@ const WalkinSessionsPage = () => {
             <DialogHeader>
               <DialogTitle>Tambah Walk-in Session Baru</DialogTitle>
             </DialogHeader>
-            <BookingForm onSuccess={handleCreateSuccess} isWalkinMode={true} />
+            <WalkinBookingForm onSuccess={handleCreateSuccess} />
           </DialogContent>
         </Dialog>
       </div>
@@ -648,10 +643,9 @@ const WalkinSessionsPage = () => {
             <DialogTitle>Edit Walk-in Session</DialogTitle>
           </DialogHeader>
           {editingSession && (
-            <BookingForm 
+            <WalkinBookingForm 
               booking={editingSession} 
               onSuccess={handleEditSuccess}
-              isWalkinMode={true}
             />
           )}
         </DialogContent>
