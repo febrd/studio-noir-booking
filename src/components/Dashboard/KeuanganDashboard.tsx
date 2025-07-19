@@ -1,8 +1,7 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { DollarSign, TrendingUp, CreditCard, Target, Calendar, AlertCircle } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths, eachDayOfInterval } from 'date-fns';
@@ -95,7 +94,7 @@ export const KeuanganDashboard = () => {
     ...data
   }));
 
-  // Daily revenue trend for current month
+  // Daily revenue trend for current month - Composed Chart data
   const monthStart = startOfMonth(new Date());
   const monthEnd = endOfMonth(new Date());
   const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -119,7 +118,6 @@ export const KeuanganDashboard = () => {
     };
   });
 
-  // Installment analysis
   const installmentAnalysis = {
     totalInstallments: installments?.length || 0,
     totalInstallmentAmount: installments?.reduce((sum, inst) => sum + (inst.amount || 0), 0) || 0,
@@ -127,7 +125,6 @@ export const KeuanganDashboard = () => {
     offlineInstallments: installments?.filter(inst => inst.payment_method === 'offline').length || 0
   };
 
-  // Outstanding payments (bookings with remaining balance)
   const outstandingPayments = currentBookings?.filter(booking => {
     const totalAmount = booking.total_amount || 0;
     const paidAmount = booking.installments?.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0) || 0;
@@ -140,7 +137,6 @@ export const KeuanganDashboard = () => {
     return sum + (totalAmount - paidAmount);
   }, 0);
 
-  // Target analysis
   const currentTarget = targets?.[0]?.target_amount || 20000000;
   const targetAchievement = (currentRevenue / currentTarget) * 100;
 
@@ -214,7 +210,7 @@ export const KeuanganDashboard = () => {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Daily Revenue Trend */}
+        {/* Daily Revenue Trend - Composed Chart */}
         <Card>
           <CardHeader>
             <CardTitle>Tren Revenue Harian</CardTitle>
@@ -223,21 +219,27 @@ export const KeuanganDashboard = () => {
           <CardContent>
             <ChartContainer
               config={{
-                revenue: { label: "Revenue", color: "hsl(var(--chart-1))" }
+                revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
+                bookings: { label: "Bookings", color: "hsl(var(--chart-2))" }
               }}
               className="h-[300px]"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={dailyRevenue}>
+                <ComposedChart data={dailyRevenue}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="day" />
-                  <YAxis />
+                  <YAxis yAxisId="left" />
+                  <YAxis yAxisId="right" orientation="right" />
                   <ChartTooltip 
                     content={<ChartTooltipContent />}
-                    formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Revenue']}
+                    formatter={(value, name) => [
+                      name === 'revenue' ? `Rp ${Number(value).toLocaleString('id-ID')}` : value,
+                      name === 'revenue' ? 'Revenue' : 'Bookings'
+                    ]}
                   />
-                  <Line type="monotone" dataKey="revenue" stroke="hsl(var(--chart-1))" strokeWidth={2} />
-                </LineChart>
+                  <Bar yAxisId="left" dataKey="revenue" fill="hsl(var(--chart-1))" />
+                  <Line yAxisId="right" type="monotone" dataKey="bookings" stroke="hsl(var(--chart-2))" strokeWidth={2} />
+                </ComposedChart>
               </ResponsiveContainer>
             </ChartContainer>
           </CardContent>

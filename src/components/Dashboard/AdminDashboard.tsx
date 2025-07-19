@@ -1,12 +1,13 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Users, Calendar, Building2, TrendingUp, BookOpen, DollarSign } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
 import { id } from 'date-fns/locale';
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
 export const AdminDashboard = () => {
   const { data: dashboardData, isLoading } = useQuery({
@@ -73,7 +74,7 @@ export const AdminDashboard = () => {
     };
   });
 
-  // Studio utilization
+  // Studio utilization for pie chart
   const studioUtilization = studios?.map(studio => {
     const studioBookings = bookings?.filter(b => b.studio_id === studio.id) || [];
     return {
@@ -81,7 +82,7 @@ export const AdminDashboard = () => {
       bookings: studioBookings.length,
       type: studio.type
     };
-  }) || [];
+  }).filter(s => s.bookings > 0) || [];
 
   // User activity
   const userActivity = {
@@ -143,7 +144,7 @@ export const AdminDashboard = () => {
           <CardContent>
             <div className="text-2xl font-bold">{studios?.length || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {studioUtilization.filter(s => s.bookings > 0).length} studio dengan booking
+              {studioUtilization.length} studio dengan booking
             </p>
           </CardContent>
         </Card>
@@ -164,7 +165,7 @@ export const AdminDashboard = () => {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Daily Bookings Trend */}
+        {/* Daily Bookings Trend - Area Chart */}
         <Card>
           <CardHeader>
             <CardTitle>Tren Booking Harian</CardTitle>
@@ -179,19 +180,31 @@ export const AdminDashboard = () => {
               className="h-[300px]"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={dailyBookings}>
+                <AreaChart data={dailyBookings}>
+                  <defs>
+                    <linearGradient id="colorBookings" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.1}/>
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="day" />
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line type="monotone" dataKey="bookings" stroke="hsl(var(--chart-1))" strokeWidth={2} />
-                </LineChart>
+                  <Area 
+                    type="monotone" 
+                    dataKey="bookings" 
+                    stroke="hsl(var(--chart-1))" 
+                    fillOpacity={1} 
+                    fill="url(#colorBookings)" 
+                  />
+                </AreaChart>
               </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
         </Card>
 
-        {/* Studio Utilization */}
+        {/* Studio Utilization - Pie Chart */}
         <Card>
           <CardHeader>
             <CardTitle>Utilitas Studio</CardTitle>
@@ -205,13 +218,25 @@ export const AdminDashboard = () => {
               className="h-[300px]"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={studioUtilization}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
-                  <YAxis />
+                <PieChart>
+                  <Pie
+                    data={studioUtilization}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, bookings, percent }) => 
+                      `${name}: ${bookings} (${(percent * 100).toFixed(1)}%)`
+                    }
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="bookings"
+                  >
+                    {studioUtilization.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="bookings" fill="hsl(var(--chart-1))" />
-                </BarChart>
+                </PieChart>
               </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
