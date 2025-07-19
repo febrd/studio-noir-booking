@@ -36,8 +36,7 @@ const BookingLogsPage = () => {
             status,
             users!inner(name, email),
             studios!inner(name)
-          ),
-          performed_by_user:users!performed_by(name, email)
+          )
         `)
         .order('created_at', { ascending: false });
 
@@ -309,7 +308,7 @@ const BookingLogsPage = () => {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        {log.performed_by_user?.name || 'System'}
+                        System
                       </div>
                     </TableCell>
                     <TableCell>
@@ -348,7 +347,7 @@ const BookingLogsPage = () => {
                                 </div>
                                 <div>
                                   <label className="text-sm font-medium text-gray-500">Dilakukan Oleh</label>
-                                  <p>{selectedLog.performed_by_user?.name || 'System'}</p>
+                                  <p>System</p>
                                 </div>
                               </div>
                               
