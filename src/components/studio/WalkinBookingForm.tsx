@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfDay, endOfDay, addMinutes } from 'date-fns';
 import { WalkinTimeExtensionManager } from './WalkinTimeExtensionManager';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 
 // WITA timezone utilities - Consistent with BookingForm
 const parseWITADateTime = (dateTimeString: string): Date => {
@@ -53,6 +54,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
   
   const today = new Date();
   const todayString = format(today, 'yyyy-MM-dd');
+  const { userProfile } = useJWTAuth();
 
   const form = useForm<WalkinBookingFormData>({
     resolver: zodResolver(walkinBookingSchema),
@@ -354,7 +356,8 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
             payment_type: 'offline',
             type: 'offline',
             status: 'paid',
-            description: `Walk-in session payment - ${data.payment_method}`
+            description: `Walk-in session payment - ${data.payment_method}`,
+            performed_by: userProfile.id
           });
 
         return { id: booking.id };
@@ -374,6 +377,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
             type: 'self_photo',
             status: 'confirmed',
             total_amount: totalAmount,
+            performed_by: userProfile.id,
             is_walking_session: true
           })
           .select('id')
@@ -403,7 +407,8 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
             payment_type: 'offline',
             type: 'offline',
             status: 'paid',
-            description: `Walk-in session payment - ${data.payment_method}`
+            description: `Walk-in session payment - ${data.payment_method}`,
+            performed_by: userProfile.id
           });
 
         return newBooking;
