@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -47,8 +46,17 @@ const TransactionReports = () => {
     const onlineBookings = combinedData.filter(b => b.payment_method === 'online');
     const offlineBookings = combinedData.filter(b => b.payment_method === 'offline');
 
-    const onlineRevenue = onlineBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
-    const offlineRevenue = offlineBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
+    // Calculate revenue including installments
+    const calculateRevenue = (bookings: any[]) => {
+      return bookings.reduce((sum, booking) => {
+        const bookingAmount = booking.total_amount || 0;
+        const installmentAmount = booking.installments?.reduce((instSum: number, inst: any) => instSum + (inst.amount || 0), 0) || 0;
+        return sum + Math.max(bookingAmount, installmentAmount);
+      }, 0);
+    };
+
+    const onlineRevenue = calculateRevenue(onlineBookings);
+    const offlineRevenue = calculateRevenue(offlineBookings);
     const totalRevenue = onlineRevenue + offlineRevenue;
 
     const paymentMethodDistribution = [
@@ -62,10 +70,14 @@ const TransactionReports = () => {
         acc[date] = { date, online: 0, offline: 0 };
       }
       
+      const bookingRevenue = booking.total_amount || 0;
+      const installmentRevenue = booking.installments?.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0) || 0;
+      const totalBookingRevenue = Math.max(bookingRevenue, installmentRevenue);
+      
       if (booking.payment_method === 'online') {
-        acc[date].online += booking.total_amount || 0;
+        acc[date].online += totalBookingRevenue;
       } else {
-        acc[date].offline += booking.total_amount || 0;
+        acc[date].offline += totalBookingRevenue;
       }
       
       return acc;
@@ -73,21 +85,19 @@ const TransactionReports = () => {
 
     const dailyComparisonData = Object.values(dailyComparison).sort((a, b) => a.date.localeCompare(b.date));
 
-    const statusComparison = combinedData.reduce((acc, booking) => {
-      const key = `${booking.status}_${booking.payment_method}`;
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
     const typeComparison = combinedData.reduce((acc, booking) => {
       if (!acc[booking.type]) {
         acc[booking.type] = { online: 0, offline: 0 };
       }
       
+      const bookingRevenue = booking.total_amount || 0;
+      const installmentRevenue = booking.installments?.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0) || 0;
+      const totalBookingRevenue = Math.max(bookingRevenue, installmentRevenue);
+      
       if (booking.payment_method === 'online') {
-        acc[booking.type].online += booking.total_amount || 0;
+        acc[booking.type].online += totalBookingRevenue;
       } else {
-        acc[booking.type].offline += booking.total_amount || 0;
+        acc[booking.type].offline += totalBookingRevenue;
       }
       
       return acc;
@@ -105,7 +115,11 @@ const TransactionReports = () => {
       if (!acc[studioName]) {
         acc[studioName] = { revenue: 0, bookings: 0 };
       }
-      acc[studioName].revenue += booking.total_amount || 0;
+      const bookingRevenue = booking.total_amount || 0;
+      const installmentRevenue = booking.installments?.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0) || 0;
+      const totalBookingRevenue = Math.max(bookingRevenue, installmentRevenue);
+      
+      acc[studioName].revenue += totalBookingRevenue;
       acc[studioName].bookings += 1;
       return acc;
     }, {} as Record<string, { revenue: number; bookings: number }>);
@@ -124,7 +138,6 @@ const TransactionReports = () => {
       offlineBookings: offlineBookings.length,
       paymentMethodDistribution,
       dailyComparisonData,
-      statusComparison,
       typeComparisonData,
       topStudios
     };
@@ -157,7 +170,6 @@ const TransactionReports = () => {
         </div>
       </div>
 
-      {/* Date Filter */}
       <Card>
         <CardHeader>
           <CardTitle>Filter Laporan</CardTitle>
@@ -171,7 +183,6 @@ const TransactionReports = () => {
         </CardContent>
       </Card>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -233,7 +244,6 @@ const TransactionReports = () => {
         </Card>
       </div>
 
-      {/* Charts */}
       <Tabs defaultValue="comparison" className="space-y-4">
         <TabsList>
           <TabsTrigger value="comparison">Perbandingan Online vs Offline</TabsTrigger>
@@ -269,10 +279,9 @@ const TransactionReports = () => {
                     <YAxis />
                     <ChartTooltip
                       content={<ChartTooltipContent />}
-                      formatter={(value, name) => [`Rp ${Number(value).toLocaleString('id-ID')}`, name]}
                     />
-                    <Bar dataKey="online" fill="var(--color-online)" />
-                    <Bar dataKey="offline" fill="var(--color-offline)" />
+                    <Bar dataKey="online" fill="hsl(var(--chart-1))" />
+                    <Bar dataKey="offline" fill="hsl(var(--chart-2))" />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>

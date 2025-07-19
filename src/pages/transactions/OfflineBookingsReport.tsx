@@ -29,7 +29,7 @@ interface BookingData {
   users: { name: string; email: string };
   studios: { name: string; type: string };
   studio_packages: { title: string; price: number };
-  installments: { amount: number; paid_at: string; payment_method: string; performed_by?: string }[];
+  installments: { amount: number; paid_at: string; payment_method: string }[];
 }
 
 const OfflineBookingsReport = () => {
@@ -85,7 +85,17 @@ const OfflineBookingsReport = () => {
   const analytics = useMemo(() => {
     if (!bookingsData) return null;
 
-    const totalRevenue = bookingsData.reduce((sum, booking) => sum + (booking.total_amount || 0), 0);
+    // Calculate revenue including installments properly
+    const calculateTotalRevenue = (bookings: BookingData[]) => {
+      return bookings.reduce((sum, booking) => {
+        const bookingAmount = booking.total_amount || 0;
+        const installmentAmount = booking.installments?.reduce((instSum, inst) => instSum + (inst.amount || 0), 0) || 0;
+        // Use the higher value between booking amount and total installments
+        return sum + Math.max(bookingAmount, installmentAmount);
+      }, 0);
+    };
+
+    const totalRevenue = calculateTotalRevenue(bookingsData);
     const averageBookingValue = totalRevenue / bookingsData.length || 0;
     
     const statusDistribution = bookingsData.reduce((acc, booking) => {
@@ -94,10 +104,14 @@ const OfflineBookingsReport = () => {
     }, {} as Record<string, number>);
 
     const typeDistribution = bookingsData.reduce((acc, booking) => {
+      const bookingAmount = booking.total_amount || 0;
+      const installmentAmount = booking.installments?.reduce((instSum, inst) => instSum + (inst.amount || 0), 0) || 0;
+      const actualRevenue = Math.max(bookingAmount, installmentAmount);
+      
       const revenue = acc[booking.type]?.revenue || 0;
       const count = acc[booking.type]?.count || 0;
       acc[booking.type] = {
-        revenue: revenue + (booking.total_amount || 0),
+        revenue: revenue + actualRevenue,
         count: count + 1
       };
       return acc;
@@ -143,7 +157,11 @@ const OfflineBookingsReport = () => {
 
     const dailyRevenue = bookingsData.reduce((acc, booking) => {
       const date = format(new Date(booking.created_at), 'yyyy-MM-dd');
-      acc[date] = (acc[date] || 0) + (booking.total_amount || 0);
+      const bookingAmount = booking.total_amount || 0;
+      const installmentAmount = booking.installments?.reduce((instSum, inst) => instSum + (inst.amount || 0), 0) || 0;
+      const actualRevenue = Math.max(bookingAmount, installmentAmount);
+      
+      acc[date] = (acc[date] || 0) + actualRevenue;
       return acc;
     }, {} as Record<string, number>);
 

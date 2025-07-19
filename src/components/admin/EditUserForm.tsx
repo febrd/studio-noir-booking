@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useMutation } from '@tanstack/react-query';
@@ -20,7 +21,8 @@ export const EditUserForm = ({ user, open, onOpenChange, onSuccess }: EditUserFo
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    role: 'pelanggan' as 'owner' | 'admin' | 'keuangan' | 'pelanggan'
+    role: 'pelanggan' as 'owner' | 'admin' | 'keuangan' | 'pelanggan',
+    is_active: true
   });
 
   useEffect(() => {
@@ -28,7 +30,8 @@ export const EditUserForm = ({ user, open, onOpenChange, onSuccess }: EditUserFo
       setFormData({
         name: user.name || '',
         email: user.email || '',
-        role: user.role || 'pelanggan'
+        role: user.role || 'pelanggan',
+        is_active: user.is_active !== undefined ? user.is_active : true
       });
     }
   }, [user]);
@@ -40,7 +43,8 @@ export const EditUserForm = ({ user, open, onOpenChange, onSuccess }: EditUserFo
         .update({
           name: data.name,
           email: data.email,
-          role: data.role
+          role: data.role,
+          is_active: data.is_active
         })
         .eq('id', user.id);
 
@@ -115,6 +119,15 @@ export const EditUserForm = ({ user, open, onOpenChange, onSuccess }: EditUserFo
                 <SelectItem value="owner">Owner</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="is_active"
+              checked={formData.is_active}
+              onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+            />
+            <Label htmlFor="is_active">Status Aktif</Label>
           </div>
 
           <div className="flex justify-end space-x-2">

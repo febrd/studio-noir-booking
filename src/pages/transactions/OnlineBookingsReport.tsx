@@ -8,7 +8,7 @@ import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, ScatterChart, Scatter } from 'recharts';
-import { Download, Eye, TrendingUp, Users, Clock, DollarSign } from 'lucide-react';
+import { Download, TrendingUp, Users, Clock, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 
@@ -37,6 +37,18 @@ const OnlineBookingsReport = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const getStatusColor = (status: string) => {
+    const colors = {
+      'paid': '#22c55e',
+      'installment': '#f59e0b',
+      'pending': '#6b7280',
+      'cancelled': '#ef4444',
+      'confirmed': '#3b82f6',
+      'completed': '#10b981'
+    };
+    return colors[status as keyof typeof colors] || '#6b7280';
+  };
 
   const { data: bookingsData, isLoading } = useQuery({
     queryKey: ['online-bookings', dateRange, typeFilter, statusFilter],
@@ -74,7 +86,17 @@ const OnlineBookingsReport = () => {
   const analytics = useMemo(() => {
     if (!bookingsData) return null;
 
-    const totalRevenue = bookingsData.reduce((sum, booking) => sum + (booking.total_amount || 0), 0);
+    // Calculate revenue including installments
+    const calculateTotalRevenue = (bookings: BookingData[]) => {
+      return bookings.reduce((sum, booking) => {
+        const bookingAmount = booking.total_amount || 0;
+        const installmentAmount = booking.installments?.reduce((instSum, inst) => instSum + (inst.amount || 0), 0) || 0;
+        // Use the higher value between booking amount and total installments
+        return sum + Math.max(bookingAmount, installmentAmount);
+      }, 0);
+    };
+
+    const totalRevenue = calculateTotalRevenue(bookingsData);
     const averageBookingValue = totalRevenue / bookingsData.length || 0;
     
     const statusDistribution = bookingsData.reduce((acc, booking) => {
@@ -83,10 +105,14 @@ const OnlineBookingsReport = () => {
     }, {} as Record<string, number>);
 
     const typeDistribution = bookingsData.reduce((acc, booking) => {
+      const bookingAmount = booking.total_amount || 0;
+      const installmentAmount = booking.installments?.reduce((instSum, inst) => instSum + (inst.amount || 0), 0) || 0;
+      const actualRevenue = Math.max(bookingAmount, installmentAmount);
+      
       const revenue = acc[booking.type]?.revenue || 0;
       const count = acc[booking.type]?.count || 0;
       acc[booking.type] = {
-        revenue: revenue + (booking.total_amount || 0),
+        revenue: revenue + actualRevenue,
         count: count + 1
       };
       return acc;
@@ -120,9 +146,6 @@ const OnlineBookingsReport = () => {
       totalBookings: bookingsData.length,
       statusDistribution,
       typeDistribution,
-      totalDuration,
-      averageDuration,
-      averageExtraTime,
       installmentStats
     };
   }, [bookingsData]);
@@ -132,7 +155,11 @@ const OnlineBookingsReport = () => {
 
     const dailyRevenue = bookingsData.reduce((acc, booking) => {
       const date = format(new Date(booking.created_at), 'yyyy-MM-dd');
-      acc[date] = (acc[date] || 0) + (booking.total_amount || 0);
+      const bookingAmount = booking.total_amount || 0;
+      const installmentAmount = booking.installments?.reduce((instSum, inst) => instSum + (inst.amount || 0), 0) || 0;
+      const actualRevenue = Math.max(bookingAmount, installmentAmount);
+      
+      acc[date] = (acc[date] || 0) + actualRevenue;
       return acc;
     }, {} as Record<string, number>);
 
@@ -166,22 +193,9 @@ const OnlineBookingsReport = () => {
     return {
       dailyRevenueData,
       statusChartData,
-      typeChartData,
-      durationPriceData
+      typeChartData
     };
   }, [bookingsData, analytics]);
-
-  const getStatusColor = (status: string) => {
-    const colors = {
-      'paid': '#22c55e',
-      'installment': '#f59e0b',
-      'pending': '#6b7280',
-      'cancelled': '#ef4444',
-      'confirmed': '#3b82f6',
-      'completed': '#10b981'
-    };
-    return colors[status as keyof typeof colors] || '#6b7280';
-  };
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;

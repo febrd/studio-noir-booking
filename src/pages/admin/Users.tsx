@@ -3,7 +3,9 @@ import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Crown, Shield, CreditCard, User, Edit, Trash2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Crown, Shield, CreditCard, User, Edit, Trash2, Search, Filter } from 'lucide-react';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,15 +18,32 @@ const Users = () => {
   const { userProfile } = useJWTAuth();
   const queryClient = useQueryClient();
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const { data: users, isLoading, refetch } = useQuery({
-    queryKey: ['users'],
+    queryKey: ['users', searchTerm, roleFilter, statusFilter],
     queryFn: async () => {
       console.log('Fetching users...');
-      const { data, error } = await supabase
+      let query = supabase
         .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('*');
+
+      // Apply search filter
+      if (searchTerm) {
+        query = query.or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+      }
+
+      // Apply role filter
+      if (roleFilter !== 'all') {
+        query = query.eq('role', roleFilter);
+      }
+
+      // Apply status filter would go here if we had status column
+      // For now, we assume all users are active
+
+      const { data, error } = await query.order('created_at', { ascending: false });
       
       console.log('Users data:', data);
       console.log('Users error:', error);
@@ -89,8 +108,9 @@ const Users = () => {
     setEditingUser(user);
   };
 
-  // Check if current user can manage users
   const canManageUsers = userProfile?.role === 'owner' || userProfile?.role === 'admin';
+
+  const filteredUsers = users || [];
 
   return (
     <ModernLayout>
@@ -111,6 +131,60 @@ const Users = () => {
           )}
         </div>
 
+        {/* Filter and Search Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Filter & Pencarian
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-2 block">Cari Pengguna</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari berdasarkan nama atau email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="w-48">
+                <label className="text-sm font-medium mb-2 block">Role</label>
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Role</SelectItem>
+                    <SelectItem value="owner">Owner</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="keuangan">Keuangan</SelectItem>
+                    <SelectItem value="pelanggan">Pelanggan</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-48">
+                <label className="text-sm font-medium mb-2 block">Status</label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Status</SelectItem>
+                    <SelectItem value="active">Aktif</SelectItem>
+                    <SelectItem value="inactive">Tidak Aktif</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4">
           {isLoading ? (
             <Card>
@@ -118,8 +192,8 @@ const Users = () => {
                 <p>Memuat pengguna...</p>
               </CardContent>
             </Card>
-          ) : users && users.length > 0 ? (
-            users.map((user) => (
+          ) : filteredUsers && filteredUsers.length > 0 ? (
+            filteredUsers.map((user) => (
               <Card key={user.id} className="glass-elegant">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -130,9 +204,12 @@ const Users = () => {
                           {user.name}
                         </CardTitle>
                         <CardDescription>{user.email}</CardDescription>
-                        <div className="mt-2">
+                        <div className="mt-2 flex gap-2">
                           <Badge className={getRoleColor(user.role)}>
                             {user.role}
+                          </Badge>
+                          <Badge variant="outline" className="text-green-600">
+                            Aktif
                           </Badge>
                         </div>
                       </div>
@@ -187,8 +264,10 @@ const Users = () => {
           ) : (
             <Card>
               <CardContent className="p-6 text-center">
-                <p className="text-muted-foreground mb-4">Belum ada pengguna yang terdaftar</p>
-                {canManageUsers && (
+                <p className="text-muted-foreground mb-4">
+                  {searchTerm || roleFilter !== 'all' ? 'Tidak ada pengguna yang sesuai dengan filter' : 'Belum ada pengguna yang terdaftar'}
+                </p>
+                {canManageUsers && !searchTerm && roleFilter === 'all' && (
                   <AddUserForm onSuccess={() => {
                     refetch();
                     queryClient.invalidateQueries({ queryKey: ['users'] });
