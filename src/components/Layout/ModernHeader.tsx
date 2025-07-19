@@ -15,16 +15,16 @@ import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { useNavigate } from 'react-router-dom';
 
 export function ModernHeader() {
-  const { user, logout } = useJWTAuth();
+  const { userProfile, signOut } = useJWTAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    logout();
-    navigate('/auth');
+    signOut();
+    navigate('/jwt-auth');
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
+    <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
       <SidebarTrigger className="-ml-1" />
       
       <div className="flex flex-1 items-center justify-between">
@@ -42,7 +42,7 @@ export function ModernHeader() {
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback>
-                    {user?.name?.charAt(0).toUpperCase() || 'U'}
+                    {userProfile?.name?.charAt(0).toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -50,9 +50,9 @@ export function ModernHeader() {
             <DropdownMenuContent className="w-56 bg-background border shadow-lg" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user?.name || 'User'}</p>
+                  <p className="text-sm font-medium leading-none">{userProfile?.name || 'User'}</p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    {user?.email || 'user@example.com'}
+                    {userProfile?.email || 'user@example.com'}
                   </p>
                 </div>
               </DropdownMenuLabel>
