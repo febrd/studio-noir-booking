@@ -43,9 +43,12 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // Check for stored JWT session
     const storedUser = localStorage.getItem('jwt_user');
+    console.log('JWT Auth: Checking stored user:', storedUser);
+    
     if (storedUser) {
       try {
         const parsed = JSON.parse(storedUser);
+        console.log('JWT Auth: Parsed user profile:', parsed);
         setUserProfile(parsed);
         setIsAuthenticated(true);
       } catch (error) {
@@ -72,6 +75,7 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Safely cast the data with proper type checking
       const result = data as any;
+      console.log('JWT Auth: Login result:', result);
       
       if (!result || typeof result !== 'object' || !result.success) {
         return { success: false, error: result?.error || 'Login gagal' };
@@ -83,6 +87,7 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
           return { success: false, error: 'Akun Anda telah dinonaktifkan. Silakan hubungi administrator.' };
         }
 
+        console.log('JWT Auth: Setting user profile:', result.user);
         setUserProfile(result.user);
         setIsAuthenticated(true);
         localStorage.setItem('jwt_user', JSON.stringify(result.user));
@@ -138,6 +143,7 @@ export const JWTAuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = () => {
+    console.log('JWT Auth: Signing out');
     setUserProfile(null);
     setIsAuthenticated(false);
     localStorage.removeItem('jwt_user');

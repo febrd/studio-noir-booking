@@ -20,7 +20,7 @@ export function ModernHeader() {
 
   const handleLogout = () => {
     signOut();
-    navigate('/jwt-auth');
+    navigate('/auth');
   };
 
   return (
@@ -53,6 +53,9 @@ export function ModernHeader() {
                   <p className="text-sm font-medium leading-none">{userProfile?.name || 'User'}</p>
                   <p className="text-xs leading-none text-muted-foreground">
                     {userProfile?.email || 'user@example.com'}
+                  </p>
+                  <p className="text-xs leading-none text-muted-foreground capitalize">
+                    Role: {userProfile?.role || 'user'}
                   </p>
                 </div>
               </DropdownMenuLabel>

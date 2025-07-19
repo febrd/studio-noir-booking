@@ -26,7 +26,7 @@ const JWTAuth = () => {
 
   // Redirect if already authenticated
   if (userProfile) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   if (loading) {
@@ -54,7 +54,7 @@ const JWTAuth = () => {
     if (!result.success) {
       setError(result.error || 'Login gagal');
     } else {
-      // Success will redirect via useEffect
+      // Success will redirect via Navigate component above
     }
     
     setIsSubmitting(false);
@@ -93,7 +93,6 @@ const JWTAuth = () => {
         setError('Registrasi berhasil tapi gagal login otomatis. Silakan login manual.');
       }
       setRegisterForm({ name: '', email: '', password: '', confirmPassword: '' });
-
     }
     
     setIsSubmitting(false);
@@ -165,7 +164,6 @@ const JWTAuth = () => {
                   {/* Sample users info */}
                   <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
                     <p className="font-medium mb-1">Gunakan Credentials yang terdaftar</p>
-                   
                   </div>
                   
                   <Button 
