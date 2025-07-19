@@ -32,12 +32,40 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronRight } from 'lucide-react';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 
+// Define types for menu items
+type MenuItemWithUrl = {
+  title: string;
+  url: string;
+  icon: React.ComponentType<any>;
+};
+
+type MenuItemWithItems = {
+  title: string;
+  icon: React.ComponentType<any>;
+  items: {
+    title: string;
+    url: string;
+    icon: React.ComponentType<any>;
+  }[];
+};
+
+type MenuItem = MenuItemWithUrl | MenuItemWithItems;
+
+// Type guard functions
+const hasItems = (item: MenuItem): item is MenuItemWithItems => {
+  return 'items' in item;
+};
+
+const hasUrl = (item: MenuItem): item is MenuItemWithUrl => {
+  return 'url' in item;
+};
+
 export function AppSidebar() {
   const { userProfile } = useJWTAuth();
 
   // Define menu items based on user role
-  const getMenuItems = () => {
-    const commonItems = [
+  const getMenuItems = (): MenuItem[] => {
+    const commonItems: MenuItem[] = [
       {
         title: "Dashboard",
         url: "/dashboard",
@@ -203,7 +231,7 @@ export function AppSidebar() {
   };
 
   // Only show payment gateway for owner
-  const ownerOnlyItems = userProfile?.role === 'owner' ? [
+  const ownerOnlyItems: MenuItem[] = userProfile?.role === 'owner' ? [
     {
       title: "Payment Gateway",
       url: "/payment-gateway",
@@ -227,7 +255,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  {item.items ? (
+                  {hasItems(item) ? (
                     <Collapsible asChild defaultOpen={item.title === "Studio Management"}>
                       <SidebarMenuItem>
                         <CollapsibleTrigger asChild>
@@ -253,14 +281,14 @@ export function AppSidebar() {
                         </CollapsibleContent>
                       </SidebarMenuItem>
                     </Collapsible>
-                  ) : (
+                  ) : hasUrl(item) ? (
                     <SidebarMenuButton asChild tooltip={item.title}>
                       <a href={item.url}>
                         <item.icon />
                         <span>{item.title}</span>
                       </a>
                     </SidebarMenuButton>
-                  )}
+                  ) : null}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
