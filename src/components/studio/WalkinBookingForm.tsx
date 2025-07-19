@@ -239,7 +239,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
           .insert({
             booking_id: booking.id,
             amount: totalAmount,
-            payment_type: data.payment_method,
+            payment_type: 'offline',
             type: 'offline',
             status: 'paid',
             description: `Walk-in session payment - ${data.payment_method}`
@@ -274,7 +274,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
           .insert({
             booking_id: newBooking.id,
             amount: totalAmount,
-            payment_type: data.payment_method,
+            payment_type: 'offline',
             type: 'offline',
             status: 'paid',
             description: `Walk-in session payment - ${data.payment_method}`

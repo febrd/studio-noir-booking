@@ -29,7 +29,12 @@ export function MobileNavigation() {
     }
     
     return acc;
-  }, [] as typeof allNavigation);
+  }, [] as Array<{
+    name: string;
+    href: string;
+    icon: any;
+    children?: Array<{ name: string; href: string; icon: any }>;
+  }>);
 
   // Take first 5 most important items for mobile
   const mobileNavigation = flatNavigation.slice(0, 5);

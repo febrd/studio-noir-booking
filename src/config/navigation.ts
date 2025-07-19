@@ -15,121 +15,126 @@ import {
 
 export const navigationItems = [
   {
-    title: 'Dashboard',
+    name: 'Dashboard',
     icon: LayoutDashboard,
     href: '/dashboard',
     roles: ['admin', 'owner', 'keuangan', 'pelanggan']
   },
   {
-    title: 'Studio Management',
+    name: 'Studio Management',
     icon: Building2,
+    href: '/studio',
     roles: ['admin', 'owner'],
     children: [
       {
-        title: 'Studios',
+        name: 'Studios',
         href: '/studio/studios',
         icon: Building2
       },
       {
-        title: 'Package Categories',
+        name: 'Package Categories',
         href: '/studio/package-categories',
         icon: Package
       },
       {
-        title: 'Packages',
+        name: 'Packages',
         href: '/studio/packages',
         icon: Package
       },
       {
-        title: 'Additional Services',
+        name: 'Additional Services',
         href: '/studio/services',
         icon: Settings
       }
     ]
   },
   {
-    title: 'Bookings & Sessions',
+    name: 'Bookings & Sessions',
     icon: Calendar,
+    href: '/bookings',
     roles: ['admin', 'owner', 'keuangan'],
     children: [
       {
-        title: 'Bookings Transaction',
+        name: 'Bookings Transaction',
         href: '/studio/bookings',
         icon: Calendar
       },
       {
-        title: 'Walk-in Sessions',
+        name: 'Walk-in Sessions',
         href: '/studio/walkin-sessions',
         icon: Clock
       },
       {
-        title: 'Booking Logs',
+        name: 'Booking Logs',
         href: '/studio/booking-logs',
         icon: FileText
       }
     ]
   },
   {
-    title: 'Transactions',
+    name: 'Transactions',
     icon: CreditCard,
+    href: '/transactions',
     roles: ['admin', 'owner', 'keuangan'],
     children: [
       {
-        title: 'Offline Transactions',
+        name: 'Offline Transactions',
         href: '/studio/offline-transactions',
         icon: CreditCard
       },
       {
-        title: 'Transaction History',
+        name: 'Transaction History',
         href: '/transactions',
         icon: CreditCard
       }
     ]
   },
   {
-    title: 'Reports',
+    name: 'Reports',
     icon: BarChart3,
+    href: '/reports',
     roles: ['admin', 'owner', 'keuangan'],
     children: [
       {
-        title: 'Transaction Reports',
+        name: 'Transaction Reports',
         href: '/transactions/reports',
         icon: BarChart3
       },
       {
-        title: 'Online Bookings Report',
+        name: 'Online Bookings Report',
         href: '/transactions/online-bookings',
         icon: FileText
       },
       {
-        title: 'Offline Bookings Report',
+        name: 'Offline Bookings Report',
         href: '/transactions/offline-bookings',
         icon: FileText
       },
       {
-        title: 'Monthly Recaps',
+        name: 'Monthly Recaps',
         href: '/recaps',
         icon: BarChart3
       }
     ]
   },
   {
-    title: 'Administration',
+    name: 'Administration',
     icon: Users,
+    href: '/admin',
     roles: ['admin', 'owner'],
     children: [
       {
-        title: 'Customer Management',
+        name: 'Customer Management',
         href: '/admin/customers',
         icon: Users
       },
       {
-        title: 'User Management',
+        name: 'User Management',
         href: '/admin/users',
         icon: UserPlus
       },
       {
-        title: 'Payment Providers',
+        name: 'Payment Providers',
         href: '/admin/payment-providers',
         icon: CreditCard
       }
@@ -142,7 +147,7 @@ export const getAccessibleNavigation = (userRole: string) => {
   return navigationItems
     .filter(item => item.roles.includes(userRole as any))
     .map(item => ({
-      name: item.title,
+      name: item.name,
       href: item.href,
       icon: item.icon,
       children: item.children || []
