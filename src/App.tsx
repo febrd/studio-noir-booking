@@ -1,12 +1,12 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
+import JWTAuth from "./pages/JWTAuth";
 import JWTDashboard from "./pages/JWTDashboard";
-import { JWTProtectedRoute } from "./components/JWTProtectedRoute";
+import { JWTProtectedRoute } from "./components/auth/JWTProtectedRoute";
 import BookingSelectionPage from "./pages/customer/BookingSelectionPage";
 import SelfPhotoPackagesPage from "./pages/customer/SelfPhotoPackagesPage";
 import RegularPackagesPage from "./pages/customer/RegularPackagesPage";
@@ -22,9 +22,8 @@ function App() {
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<LoginPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/" element={<JWTAuth />} />
+            <Route path="/auth" element={<JWTAuth />} />
             <Route path="/dashboard" element={
               <JWTProtectedRoute allowedRoles={['admin', 'owner', 'keuangan', 'pelanggan']}>
                 <JWTDashboard />
