@@ -218,11 +218,7 @@ export function AppSidebar() {
 
   // Only show payment gateway for owner
   const ownerOnlyItems: MenuItem[] = userProfile?.role === 'owner' ? [
-    {
-      title: "Payment Gateway",
-      url: "/payment-gateway",
-      icon: CreditCard,
-    },
+
     {
       title: "Payment Providers",
       url: "/admin/payment-providers",

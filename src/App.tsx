@@ -145,13 +145,7 @@ function App() {
                 </JWTProtectedRoute>
               } />
               
-              {/* Payment Gateway */}
-              <Route path="/payment-gateway" element={
-                <JWTProtectedRoute allowedRoles={['owner']}>
-                  <PaymentGateway />
-                </JWTProtectedRoute>
-              } />
-              
+             
               {/* 404 Route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
