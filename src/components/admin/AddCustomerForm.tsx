@@ -9,7 +9,9 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface AddCustomerFormProps {
   open: boolean;
@@ -18,6 +20,28 @@ interface AddCustomerFormProps {
 }
 
 export const AddCustomerForm = ({ open, onOpenChange, onSuccess }: AddCustomerFormProps) => {
+ 
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const { data: users } = useQuery({
+    queryKey: ['users-list', customerSearch],
+    queryFn: async () => {
+      let query = supabase
+        .from('users')
+        .select('id, name, email')
+        .eq('role', 'pelanggan')
+        .order('name');
+  
+      if (customerSearch.trim()) {
+        query = query.or(`name.ilike.%${customerSearch}%,email.ilike.%${customerSearch}%`);
+      }
+  
+      const { data, error } = await query.limit(50);
+      if (error) throw error;
+      return data;
+    }
+  });
+  
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -97,16 +121,58 @@ export const AddCustomerForm = ({ open, onOpenChange, onSuccess }: AddCustomerFo
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="email@contoh.com"
-                required
-              />
-            </div>
+  <Label htmlFor="email">Email *</Label>
+  <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+    <PopoverTrigger asChild>
+      <Button
+        variant="outline"
+        role="combobox"
+        aria-expanded={customerSearchOpen}
+        className="w-full justify-between"
+      >
+        {formData.email ? (
+          `${formData.email} ${formData.full_name ? `(${formData.full_name})` : ''}`
+        ) : (
+          "Cari dan pilih email customer..."
+        )}
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent className="w-full p-0">
+      <Command>
+        <CommandInput 
+          placeholder="Cari nama atau email customer..." 
+          value={customerSearch}
+          onValueChange={setCustomerSearch}
+        />
+        <CommandList>
+          <CommandEmpty>Tidak ada customer ditemukan.</CommandEmpty>
+          <CommandGroup>
+            {users?.map((user) => (
+              <CommandItem
+                key={user.id}
+                value={`${user.name} ${user.email}`}
+                onSelect={() => {
+                  setFormData({
+                    ...formData,
+                    email: user.email,
+                    full_name: user.name // opsional: auto isi nama juga
+                  });
+                  setCustomerSearchOpen(false);
+                }}
+              >
+                <div className="flex flex-col">
+                  <span className="font-medium">{user.email}</span>
+                  <span className="text-sm text-gray-500">{user.name}</span>
+                </div>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+    </PopoverContent>
+  </Popover>
+</div>
+
 
             <div className="space-y-2">
               <Label htmlFor="phone">Telepon</Label>
