@@ -16,6 +16,7 @@ import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
 import { toast } from 'sonner';
 import { ExportButtons } from '@/components/ExportButtons';
+import { MonthlyRevenueDetails } from '@/components/MonthlyRevenueDetails';
 
 interface WeeklyRevenue {
   week: string;
@@ -486,7 +487,6 @@ const TransactionReports = () => {
           <h1 className="text-3xl font-bold">Comprehensive Transaction Reports</h1>
           <p className="text-muted-foreground">Laporan transaksi lengkap dan rekapitulasi bulanan</p>
         </div>
-      
       </div>
 
       <Tabs defaultValue="transactions" className="space-y-4">
@@ -969,50 +969,13 @@ const TransactionReports = () => {
           </Card>
 
           {/* Detail Pendapatan Bulanan */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Detail Pendapatan Bulanan</CardTitle>
-              <CardDescription>
-                Rincian pendapatan berdasarkan item dan kategori paket
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-gray-200">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="border border-gray-200 p-3 text-left">Item</th>
-                      <th className="border border-gray-200 p-3 text-left">Kategori Paket</th>
-                      <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Item)</th>
-                      <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Paket)</th>
-                      <th className="border border-gray-200 p-3 text-left">Omset</th>
-                      <th className="border border-gray-200 p-3 text-left">Rata-rata Transaksi (Item)</th>
-                      <th className="border border-gray-200 p-3 text-left">Rata-rata Transaksi (Kategori)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recapsAnalytics?.monthlyDetails.map((detail, index) => (
-                      <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="border border-gray-200 p-3 font-medium">{detail.item}</td>
-                        <td className="border border-gray-200 p-3">{detail.category}</td>
-                        <td className="border border-gray-200 p-3">{detail.sessions_count}</td>
-                        <td className="border border-gray-200 p-3">{detail.sessions_per_package.toFixed(1)} / hari</td>
-                        <td className="border border-gray-200 p-3 font-semibold">
-                          Rp {detail.revenue.toLocaleString('id-ID')}
-                        </td>
-                        <td className="border border-gray-200 p-3">
-                          Rp {detail.avg_transaction_item.toLocaleString('id-ID')}
-                        </td>
-                        <td className="border border-gray-200 p-3">
-                          Rp {detail.avg_transaction_category.toLocaleString('id-ID')}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+          {recapsAnalytics && (
+            <MonthlyRevenueDetails 
+              monthlyDetails={recapsAnalytics.monthlyDetails}
+              startDate={startDate}
+              endDate={endDate}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>

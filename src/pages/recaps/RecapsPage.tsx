@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +13,7 @@ import { format, startOfMonth, endOfMonth, addDays, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { ExportButtons } from '@/components/ExportButtons';
+import { MonthlyRevenueDetails } from '@/components/MonthlyRevenueDetails';
 
 interface WeeklyRevenue {
   week: string;
@@ -274,28 +274,43 @@ const RecapsPage = () => {
     const headers = [
       'Item',
       'Kategori Paket',
-      'Jumlah Sesi (per Item)',
-      'Jumlah Sesi (per Paket)',
-      'Omset',
-      'Rata-rata Transaksi (Item)',
-      'Rata-rata Transaksi (Kategori)'
+      'Jumlah Item Terjual',
+      'Jumlah Paket Terjual',
+      'Pendapatan per Item',
+      'Pendapatan per Paket'
     ];
 
-    const data = analytics.monthlyDetails.map(detail => [
-      detail.item,
-      detail.category,
-      detail.sessions_count.toString(),
-      `${detail.sessions_per_package.toFixed(1)} / hari`,
-      `Rp ${detail.revenue.toLocaleString('id-ID')}`,
-      `Rp ${detail.avg_transaction_item.toLocaleString('id-ID')}`,
-      `Rp ${detail.avg_transaction_category.toLocaleString('id-ID')}`
-    ]);
+    // Create expanded data for export
+    const groupedByItem = analytics.monthlyDetails.reduce((acc, detail) => {
+      if (!acc[detail.item]) {
+        acc[detail.item] = {
+          totalSessions: 0,
+          totalRevenue: 0,
+          packages: []
+        };
+      }
+      acc[detail.item].totalSessions += detail.sessions_count;
+      acc[detail.item].totalRevenue += detail.revenue;
+      acc[detail.item].packages.push(detail);
+      return acc;
+    }, {} as Record<string, { totalSessions: number; totalRevenue: number; packages: any[] }>);
+
+    const data = Object.entries(groupedByItem).flatMap(([item, itemData]) =>
+      itemData.packages.map((packageDetail, index) => [
+        index === 0 ? item : '',
+        packageDetail.category,
+        index === 0 ? itemData.totalSessions.toString() : '',
+        packageDetail.sessions_count.toString(),
+        index === 0 ? `Rp ${itemData.totalRevenue.toLocaleString('id-ID')}` : '',
+        `Rp ${packageDetail.revenue.toLocaleString('id-ID')}`
+      ])
+    );
 
     return {
-      title: `Rekapitulasi Bulanan ${format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: id })}`,
+      title: `Detail Pendapatan Bulanan ${format(new Date(selectedYear, selectedMonth - 1), 'MMMM yyyy', { locale: id })}`,
       headers,
       data,
-      filename: `recaps-${selectedMonth}-${selectedYear}`
+      filename: `detail-pendapatan-${selectedMonth}-${selectedYear}`
     };
   }, [analytics, selectedMonth, selectedYear]);
 
@@ -518,51 +533,14 @@ const RecapsPage = () => {
         </CardContent>
       </Card>
 
-      {/* Detail Pendapatan Bulanan */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Detail Pendapatan Bulanan</CardTitle>
-          <CardDescription>
-            Rincian pendapatan berdasarkan item dan kategori paket
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-200">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="border border-gray-200 p-3 text-left">Item</th>
-                  <th className="border border-gray-200 p-3 text-left">Kategori Paket</th>
-                  <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Item)</th>
-                  <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Paket)</th>
-                  <th className="border border-gray-200 p-3 text-left">Omset</th>
-                  <th className="border border-gray-200 p-3 text-left">Rata-rata Transaksi (Item)</th>
-                  <th className="border border-gray-200 p-3 text-left">Rata-rata Transaksi (Kategori)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analytics?.monthlyDetails.map((detail, index) => (
-                  <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="border border-gray-200 p-3 font-medium">{detail.item}</td>
-                    <td className="border border-gray-200 p-3">{detail.category}</td>
-                    <td className="border border-gray-200 p-3">{detail.sessions_count}</td>
-                    <td className="border border-gray-200 p-3">{detail.sessions_per_package.toFixed(1)} / hari</td>
-                    <td className="border border-gray-200 p-3 font-semibold">
-                      Rp {detail.revenue.toLocaleString('id-ID')}
-                    </td>
-                    <td className="border border-gray-200 p-3">
-                      Rp {detail.avg_transaction_item.toLocaleString('id-ID')}
-                    </td>
-                    <td className="border border-gray-200 p-3">
-                      Rp {detail.avg_transaction_category.toLocaleString('id-ID')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      {/* New Monthly Revenue Details Component */}
+      {analytics && (
+        <MonthlyRevenueDetails 
+          monthlyDetails={analytics.monthlyDetails}
+          startDate={startDate}
+          endDate={endDate}
+        />
+      )}
     </div>
   );
 };
