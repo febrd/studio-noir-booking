@@ -83,17 +83,17 @@ const SelfPhotoPackagesPage = () => {
     });
 
   const handlePackageSelect = (packageId: string) => {
-    toast.success('Paket dipilih! Mengarahkan ke halaman booking...');
-    navigate(`/booking?package=${packageId}`);
+    toast.success('Navigating to checkout...');
+    navigate(`/customer/self-photo-checkout?package=${packageId}`);
   };
 
   if (error) {
     return (
       <div className="min-h-screen bg-white p-4">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center py-12 border-4 border-black bg-red-100">
-            <h2 className="text-3xl font-black text-black mb-4">ERROR LOADING PACKAGES</h2>
-            <p className="text-gray-700 font-medium">Please try again later</p>
+          <div className="text-center py-12">
+            <h2 className="text-3xl font-peace-sans font-black text-black mb-4">Error Loading Packages</h2>
+            <p className="text-gray-700 font-inter">Please try again later</p>
           </div>
         </div>
       </div>
@@ -102,51 +102,51 @@ const SelfPhotoPackagesPage = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Bauhaus Header */}
-      <div className="bg-black text-white border-b-4 border-black sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-6">
+      {/* Clean Header */}
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-8 py-6">
+          <div className="flex items-center justify-between">
             <Button
               variant="outline"
               onClick={() => navigate('/customer/booking-selection')}
-              className="border-2 border-white text-white hover:bg-white hover:text-black font-bold"
+              className="border border-gray-200 text-gray-600 hover:bg-gray-50 font-inter font-medium"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              KEMBALI
+              Kembali
             </Button>
-            <h1 className="text-4xl font-black tracking-wide">SELF PHOTO</h1>
+            <h1 className="text-4xl font-peace-sans font-black text-black">Self Photo</h1>
             <div className="w-20"></div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search and Filter - Bauhaus Style */}
-        <div className="mb-8 space-y-4">
+      <div className="max-w-6xl mx-auto px-8 py-12">
+        {/* Search and Filter */}
+        <div className="mb-16 space-y-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <Input
                 placeholder="Cari paket self photo..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-12 border-2 border-gray-300 focus:border-black text-lg py-3"
+                className="pl-12 border border-gray-200 focus:border-black text-base py-3 font-inter"
               />
             </div>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-48 border-2 border-gray-300 focus:border-black text-lg py-3">
+              <SelectTrigger className="w-full sm:w-48 border border-gray-200 focus:border-black text-base py-3 font-inter">
                 <SelectValue placeholder="Urutkan berdasarkan" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="popular">
-                  <div className="flex items-center gap-2 font-bold">
+                  <div className="flex items-center gap-2 font-inter font-medium">
                     <Star className="h-4 w-4" />
-                    POPULER
+                    Populer
                   </div>
                 </SelectItem>
-                <SelectItem value="price-low">HARGA TERENDAH</SelectItem>
-                <SelectItem value="price-high">HARGA TERTINGGI</SelectItem>
-                <SelectItem value="duration">DURASI</SelectItem>
+                <SelectItem value="price-low">Harga Terendah</SelectItem>
+                <SelectItem value="price-high">Harga Tertinggi</SelectItem>
+                <SelectItem value="duration">Durasi</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -154,63 +154,67 @@ const SelfPhotoPackagesPage = () => {
 
         {/* Loading State */}
         {isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[...Array(6)].map((_, i) => (
-              <Card key={i} className="border-4 border-black">
-                <div className="h-48 bg-gray-200 animate-pulse"></div>
-                <CardContent className="p-4">
-                  <div className="h-6 bg-gray-200 rounded mb-2 animate-pulse"></div>
-                  <div className="h-4 bg-gray-200 rounded mb-4 animate-pulse"></div>
-                  <div className="h-12 bg-gray-200 rounded animate-pulse"></div>
+              <Card key={i} className="border border-gray-100 shadow-none">
+                <div className="h-48 bg-gray-100 animate-pulse"></div>
+                <CardContent className="p-6">
+                  <div className="h-6 bg-gray-100 rounded mb-2 animate-pulse"></div>
+                  <div className="h-4 bg-gray-100 rounded mb-4 animate-pulse"></div>
+                  <div className="h-12 bg-gray-100 rounded animate-pulse"></div>
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
 
-        {/* Packages Grid - Bauhaus Style */}
+        {/* Packages Grid */}
         {!isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredPackages.map((pkg, index) => {
-              const colorClasses = ['bg-red-500', 'bg-blue-600', 'bg-yellow-400'];
-              const colorClass = colorClasses[index % colorClasses.length];
+              const colors = ['bg-red-50', 'bg-blue-50', 'bg-yellow-50'];
+              const textColors = ['text-red-600', 'text-blue-600', 'text-yellow-600'];
+              const colorClass = colors[index % colors.length];
+              const textColorClass = textColors[index % textColors.length];
               
               return (
                 <Card 
                   key={pkg.id} 
-                  className="border-4 border-black shadow-none cursor-pointer hover:shadow-lg transition-shadow bg-white"
+                  className="border border-gray-100 shadow-none cursor-pointer hover:shadow-sm transition-all bg-white group"
                   onClick={() => handlePackageSelect(pkg.id)}
                 >
                   <div className={`h-48 ${colorClass} relative overflow-hidden flex items-center justify-center`}>
-                    <div className="text-white text-center">
-                      <Users className="h-16 w-16 mx-auto mb-2" />
-                      <p className="text-xl font-black tracking-wide">SELF PHOTO</p>
+                    <div className="text-center">
+                      <Users className={`h-16 w-16 mx-auto mb-3 ${textColorClass}`} />
+                      <p className={`text-xl font-peace-sans font-black tracking-wide ${textColorClass}`}>
+                        SELF PHOTO
+                      </p>
                     </div>
-                    <Badge className="absolute top-4 right-4 bg-black text-white border-2 border-white font-bold">
-                      POPULER
+                    <Badge className="absolute top-4 right-4 bg-white text-black border border-gray-200 font-peace-sans font-bold">
+                      Popular
                     </Badge>
                   </div>
                   
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-3 p-6">
                     <div className="flex justify-between items-start">
-                      <CardTitle className="text-xl font-black tracking-wide">
+                      <CardTitle className="text-xl font-peace-sans font-black text-black">
                         {pkg.title}
                       </CardTitle>
                       <div className="text-right">
-                        <div className="text-3xl font-black text-black">
-                          Rp {pkg.price?.toLocaleString('id-ID')}
+                        <div className="text-2xl font-peace-sans font-black text-black">
+                          {pkg.price?.toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 })}
                         </div>
                       </div>
                     </div>
                   </CardHeader>
                   
-                  <CardContent className="pt-0">
+                  <CardContent className="pt-0 p-6">
                     <div className="space-y-4">
-                      <p className="text-sm text-gray-600 font-medium">
+                      <p className="text-sm text-gray-600 font-inter">
                         {pkg.description || 'Paket self photo dengan kualitas profesional'}
                       </p>
                       
-                      <div className="flex items-center gap-4 text-sm font-medium text-gray-700">
+                      <div className="flex items-center gap-4 text-sm font-inter text-gray-600">
                         <div className="flex items-center gap-1">
                           <Clock className="h-4 w-4" />
                           {pkg.base_time_minutes} menit
@@ -221,8 +225,8 @@ const SelfPhotoPackagesPage = () => {
                         </div>
                       </div>
                       
-                      <Button className="w-full bg-black text-white hover:bg-gray-800 font-black py-3 text-lg tracking-wide">
-                        PILIH PAKET
+                      <Button className="w-full bg-black text-white hover:bg-gray-800 font-peace-sans font-bold py-3 text-base group-hover:bg-gray-900 transition-all">
+                        Pilih Paket
                       </Button>
                     </div>
                   </CardContent>
@@ -234,10 +238,10 @@ const SelfPhotoPackagesPage = () => {
 
         {/* No Results */}
         {!isLoading && filteredPackages.length === 0 && (
-          <div className="text-center py-12 border-4 border-black bg-gray-100">
-            <Camera className="h-20 w-20 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-3xl font-black mb-2">TIDAK ADA PAKET DITEMUKAN</h3>
-            <p className="text-gray-600 font-medium">Coba ubah pencarian atau filter</p>
+          <div className="text-center py-16">
+            <Camera className="h-20 w-20 text-gray-300 mx-auto mb-6" />
+            <h3 className="text-3xl font-peace-sans font-black mb-4 text-black">Tidak Ada Paket Ditemukan</h3>
+            <p className="text-gray-600 font-inter">Coba ubah pencarian atau filter</p>
           </div>
         )}
       </div>

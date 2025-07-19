@@ -11,6 +11,8 @@ import BookingSelectionPage from "./pages/customer/BookingSelectionPage";
 import SelfPhotoPackagesPage from "./pages/customer/SelfPhotoPackagesPage";
 import RegularPackagesPage from "./pages/customer/RegularPackagesPage";
 import OrderHistoryPage from "./pages/customer/OrderHistoryPage";
+import SelfPhotoCheckoutPage from "./pages/customer/SelfPhotoCheckoutPage";
+import RegularCheckoutPage from "./pages/customer/RegularCheckoutPage";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +49,16 @@ function App() {
             <Route path="/customer/order-history" element={
               <JWTProtectedRoute allowedRoles={['pelanggan']}>
                 <OrderHistoryPage />
+              </JWTProtectedRoute>
+            } />
+            <Route path="/customer/self-photo-checkout" element={
+              <JWTProtectedRoute allowedRoles={['pelanggan']}>
+                <SelfPhotoCheckoutPage />
+              </JWTProtectedRoute>
+            } />
+            <Route path="/customer/regular-checkout" element={
+              <JWTProtectedRoute allowedRoles={['pelanggan']}>
+                <RegularCheckoutPage />
               </JWTProtectedRoute>
             } />
           </Routes>
