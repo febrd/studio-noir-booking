@@ -86,6 +86,7 @@ export type Database = {
       }
       booking_logs: {
         Row: {
+          action: string | null
           action_type: string
           booking_id: string
           created_at: string | null
@@ -96,6 +97,7 @@ export type Database = {
           performed_by: string
         }
         Insert: {
+          action?: string | null
           action_type: string
           booking_id: string
           created_at?: string | null
@@ -106,6 +108,7 @@ export type Database = {
           performed_by: string
         }
         Update: {
+          action?: string | null
           action_type?: string
           booking_id?: string
           created_at?: string | null
@@ -121,13 +124,6 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "bookings"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "booking_logs_performed_by_fkey"
-            columns: ["performed_by"]
-            isOneToOne: false
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -178,6 +174,7 @@ export type Database = {
           id: string
           package_category_id: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
+          performed_by: string | null
           start_time: string | null
           status: Database["public"]["Enums"]["booking_status"]
           studio_id: string | null
@@ -194,6 +191,7 @@ export type Database = {
           id?: string
           package_category_id?: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
+          performed_by?: string | null
           start_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
           studio_id?: string | null
@@ -210,6 +208,7 @@ export type Database = {
           id?: string
           package_category_id?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
+          performed_by?: string | null
           start_time?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
           studio_id?: string | null
@@ -241,7 +240,56 @@ export type Database = {
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_studio_package"
+            columns: ["studio_package_id"]
+            isOneToOne: false
+            referencedRelation: "studio_packages"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      customer_profiles: {
+        Row: {
+          address: string | null
+          created_at: string
+          date_of_birth: string | null
+          email: string
+          full_name: string
+          gender: string | null
+          id: string
+          is_active: boolean
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email: string
+          full_name: string
+          gender?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email?: string
+          full_name?: string
+          gender?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       installments: {
         Row: {
@@ -656,7 +704,7 @@ export type Database = {
       booking_type: "self_photo" | "regular"
       payment_environment: "sandbox" | "production"
       payment_method: "online" | "offline"
-      payment_type: "online" | "offline"
+      payment_type: "online" | "offline" | "installment"
       provider_status: "active" | "inactive"
       transaction_status:
         | "paid"
@@ -806,7 +854,7 @@ export const Constants = {
       booking_type: ["self_photo", "regular"],
       payment_environment: ["sandbox", "production"],
       payment_method: ["online", "offline"],
-      payment_type: ["online", "offline"],
+      payment_type: ["online", "offline", "installment"],
       provider_status: ["active", "inactive"],
       transaction_status: [
         "paid",

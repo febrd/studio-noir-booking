@@ -14,10 +14,24 @@ import { useState } from 'react';
 import { AddCustomerForm } from '@/components/admin/AddCustomerForm';
 import { EditCustomerForm } from '@/components/admin/EditCustomerForm';
 
+interface CustomerProfile {
+  id: string;
+  full_name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  date_of_birth?: string;
+  gender?: 'male' | 'female';
+  notes?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 const Customers = () => {
   const { userProfile } = useJWTAuth();
   const queryClient = useQueryClient();
-  const [editingCustomer, setEditingCustomer] = useState<any>(null);
+  const [editingCustomer, setEditingCustomer] = useState<CustomerProfile | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -27,7 +41,7 @@ const Customers = () => {
     queryFn: async () => {
       console.log('Fetching customers...');
       let query = supabase
-        .from('customer_profiles')
+        .from('customer_profiles' as any)
         .select('*');
 
       // Apply search filter
@@ -49,14 +63,14 @@ const Customers = () => {
         console.error('Error fetching customers:', error);
         throw error;
       }
-      return data;
+      return data as CustomerProfile[];
     },
   });
 
   const deleteCustomerMutation = useMutation({
     mutationFn: async (customerId: string) => {
       const { error } = await supabase
-        .from('customer_profiles')
+        .from('customer_profiles' as any)
         .delete()
         .eq('id', customerId);
 
@@ -78,7 +92,7 @@ const Customers = () => {
     }
   };
 
-  const handleEditCustomer = (customer: any) => {
+  const handleEditCustomer = (customer: CustomerProfile) => {
     setEditingCustomer(customer);
   };
 

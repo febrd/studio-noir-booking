@@ -48,7 +48,7 @@ export const EditCustomerForm = ({ customer, open, onOpenChange, onSuccess }: Ed
   const updateCustomerMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const { error } = await supabase
-        .from('customer_profiles')
+        .from('customer_profiles' as any)
         .update({
           full_name: data.full_name,
           email: data.email,

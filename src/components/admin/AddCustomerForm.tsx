@@ -32,7 +32,7 @@ export const AddCustomerForm = ({ open, onOpenChange, onSuccess }: AddCustomerFo
   const addCustomerMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const { error } = await supabase
-        .from('customer_profiles')
+        .from('customer_profiles' as any)
         .insert({
           full_name: data.full_name,
           email: data.email,
