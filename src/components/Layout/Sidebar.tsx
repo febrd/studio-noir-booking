@@ -20,7 +20,6 @@ interface SidebarProps {
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Payment Gateway', href: '/payment-gateway', icon: CreditCard },
-  { name: 'Users', href: '/admin/users', icon: Users },
   { name: 'Users', 
     href: '/admin',
      icon: Users, 
