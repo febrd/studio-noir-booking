@@ -1,4 +1,3 @@
-
 import { Suspense } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -29,6 +28,7 @@ import PaymentProviders from './pages/admin/PaymentProviders';
 import PaymentGateway from './pages/PaymentGateway';
 import Unauthorized from './pages/Unauthorized';
 import NotFound from './pages/NotFound';
+import BookingSelectionPage from './pages/customer/BookingSelectionPage';
 
 const queryClient = new QueryClient();
 
@@ -49,6 +49,13 @@ function App() {
               <Route path="/dashboard" element={
                 <JWTProtectedRoute>
                   <JWTDashboard />
+                </JWTProtectedRoute>
+              } />
+
+              {/* Customer Routes */}
+              <Route path="/customer/booking-selection" element={
+                <JWTProtectedRoute allowedRoles={['pelanggan']}>
+                  <BookingSelectionPage />
                 </JWTProtectedRoute>
               } />
               

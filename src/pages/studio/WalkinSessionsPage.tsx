@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format, startOfDay, endOfDay } from 'date-fns';
-import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz';
 import WalkinBookingForm from '@/components/studio/WalkinBookingForm';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
 
@@ -21,12 +21,12 @@ const WalkinSessionsPage = () => {
   const queryClient = useQueryClient();
   
   const today = new Date();
-  const witaToday = toZonedTime(today, WITA_TIMEZONE);
+  const witaToday = utcToZonedTime(today, WITA_TIMEZONE);
 
   console.log('Today UTC:', today);
   console.log('Today WITA:', witaToday);
 
-  // Fetch today's walking sessions with better debugging
+  // Fetch today's walking sessions with corrected query
   const { data: sessions, isLoading, error } = useQuery({
     queryKey: ['walkin-sessions', format(witaToday, 'yyyy-MM-dd')],
     queryFn: async () => {
@@ -35,13 +35,22 @@ const WalkinSessionsPage = () => {
       // Convert WITA times to UTC for database query
       const startOfDayWita = startOfDay(witaToday);
       const endOfDayWita = endOfDay(witaToday);
-      const startOfDayUtc = fromZonedTime(startOfDayWita, WITA_TIMEZONE);
-      const endOfDayUtc = fromZonedTime(endOfDayWita, WITA_TIMEZONE);
+      const startOfDayUtc = zonedTimeToUtc(startOfDayWita, WITA_TIMEZONE);
+      const endOfDayUtc = zonedTimeToUtc(endOfDayWita, WITA_TIMEZONE);
 
       console.log('Query range UTC:', {
         start: startOfDayUtc.toISOString(),
         end: endOfDayUtc.toISOString()
       });
+
+      // First, let's check all walk-in sessions to debug
+      const { data: allWalkInData, error: allError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('is_walking_session', true);
+
+      console.log('All walk-in sessions in database:', allWalkInData);
+      console.log('All walk-in sessions error:', allError);
 
       const { data, error } = await supabase
         .from('bookings')
@@ -61,7 +70,7 @@ const WalkinSessionsPage = () => {
         .lte('start_time', endOfDayUtc.toISOString())
         .order('start_time', { ascending: true });
 
-      console.log('Walk-in sessions query result:', { data, error });
+      console.log('Filtered walk-in sessions query result:', { data, error });
 
       if (error) {
         console.error('Error fetching walk-in sessions:', error);
@@ -71,8 +80,8 @@ const WalkinSessionsPage = () => {
       // Convert UTC times back to WITA for display
       const sessionsWithWitaTime = data?.map(session => ({
         ...session,
-        start_time_wita: toZonedTime(new Date(session.start_time), WITA_TIMEZONE),
-        end_time_wita: toZonedTime(new Date(session.end_time), WITA_TIMEZONE)
+        start_time_wita: utcToZonedTime(new Date(session.start_time), WITA_TIMEZONE),
+        end_time_wita: utcToZonedTime(new Date(session.end_time), WITA_TIMEZONE)
       })) || [];
 
       console.log('Sessions with WITA time:', sessionsWithWitaTime);
@@ -125,15 +134,6 @@ const WalkinSessionsPage = () => {
     } as const;
     
     return <Badge variant={variants[status as keyof typeof variants] || 'secondary'}>{status}</Badge>;
-  };
-
-  const calculateTotalWithServices = (session: any) => {
-    const baseAmount = session.total_amount || 0;
-    const servicesTotal = session.booking_additional_services?.reduce((total: number, service: any) => {
-      return total + (service.additional_services.price * service.quantity);
-    }, 0) || 0;
-    
-    return baseAmount + servicesTotal;
   };
 
   if (error) {
@@ -264,7 +264,7 @@ const WalkinSessionsPage = () => {
               <h3 className="font-semibold mb-2">Debug Info:</h3>
               <p>Sessions found: {sessions?.length || 0}</p>
               <p>Today WITA: {format(witaToday, 'yyyy-MM-dd HH:mm:ss')}</p>
-              <pre className="text-xs mt-2 bg-gray-100 p-2 rounded">
+              <pre className="text-xs mt-2 bg-gray-100 p-2 rounded overflow-auto">
                 {JSON.stringify(sessions?.slice(0, 2), null, 2)}
               </pre>
             </CardContent>
