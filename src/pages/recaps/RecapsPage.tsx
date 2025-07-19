@@ -13,6 +13,7 @@ import { Download, Target, TrendingUp, Calendar, DollarSign } from 'lucide-react
 import { format, startOfMonth, endOfMonth, addDays, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { ExportButtons } from '@/components/ExportButtons';
 
 interface WeeklyRevenue {
   week: string;
@@ -86,7 +87,7 @@ const RecapsPage = () => {
         .select('*')
         .eq('month', selectedMonth)
         .eq('year', selectedYear)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
       return data;
@@ -217,15 +218,7 @@ const RecapsPage = () => {
       currentTarget,
       achievementPercentage
     };
-  }, [bookingsData, weeklyPeriods, monthlyTarget, targetAmount]);
-
-  const handleExportPDF = () => {
-    toast.info('Fitur ekspor PDF sedang dalam pengembangan');
-  };
-
-  const handleExportExcel = () => {
-    toast.info('Fitur ekspor Excel sedang dalam pengembangan');
-  };
+  }, [bookingsData, weeklyPeriods, monthlyTarget, targetAmount, startDate, endDate]);
 
   const handleSaveTarget = () => {
     updateTargetMutation.mutate(targetAmount);
@@ -244,16 +237,7 @@ const RecapsPage = () => {
             Periode: {format(startDate, 'dd MMMM yyyy', { locale: id })} - {format(endDate, 'dd MMMM yyyy', { locale: id })}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleExportPDF}>
-            <Download className="h-4 w-4 mr-2" />
-            Export PDF
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportExcel}>
-            <Download className="h-4 w-4 mr-2" />
-            Export Excel
-          </Button>
-        </div>
+        <ExportButtons />
       </div>
 
       {/* Period Selection */}
@@ -341,7 +325,7 @@ const RecapsPage = () => {
             </div>
             <div className="space-y-2">
               <Label>Persentase Achievement</Label>
-              <div className={`text-2xl font-bold ${analytics?.achievementPercentage >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
+              <div className={`text-2xl font-bold ${analytics && analytics.achievementPercentage >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
                 {analytics?.achievementPercentage.toFixed(1)}%
               </div>
             </div>
@@ -430,7 +414,7 @@ const RecapsPage = () => {
                   <th className="border border-gray-200 p-3 text-left">Item</th>
                   <th className="border border-gray-200 p-3 text-left">Kategori Paket</th>
                   <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Item)</th>
-                  <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Paket)</th>
+                  <th className="border border-gray-200 p-3 text-left">Jumlah Sesi (per Hari)</th>
                   <th className="border border-gray-200 p-3 text-left">Omset</th>
                   <th className="border border-gray-200 p-3 text-left">Rata-rata Transaksi (Item)</th>
                   <th className="border border-gray-200 p-3 text-left">Rata-rata Transaksi (Kategori)</th>
