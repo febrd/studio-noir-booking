@@ -1,3 +1,4 @@
+
 import { Suspense } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -29,6 +30,8 @@ import PaymentGateway from './pages/PaymentGateway';
 import Unauthorized from './pages/Unauthorized';
 import NotFound from './pages/NotFound';
 import BookingSelectionPage from './pages/customer/BookingSelectionPage';
+import SelfPhotoPackagesPage from './pages/customer/SelfPhotoPackagesPage';
+import RegularPackagesPage from './pages/customer/RegularPackagesPage';
 
 const queryClient = new QueryClient();
 
@@ -45,9 +48,9 @@ function App() {
               <Route path="/auth" element={<Auth />} />
               <Route path="/unauthorized" element={<Unauthorized />} />
               
-              {/* Protected routes */}
+              {/* Protected routes - Allow all authenticated users to access dashboard */}
               <Route path="/dashboard" element={
-                <JWTProtectedRoute>
+                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan', 'pelanggan']}>
                   <JWTDashboard />
                 </JWTProtectedRoute>
               } />
@@ -56,6 +59,18 @@ function App() {
               <Route path="/customer/booking-selection" element={
                 <JWTProtectedRoute allowedRoles={['pelanggan']}>
                   <BookingSelectionPage />
+                </JWTProtectedRoute>
+              } />
+              
+              <Route path="/customer/self-photo-packages" element={
+                <JWTProtectedRoute allowedRoles={['pelanggan']}>
+                  <SelfPhotoPackagesPage />
+                </JWTProtectedRoute>
+              } />
+              
+              <Route path="/customer/regular-packages" element={
+                <JWTProtectedRoute allowedRoles={['pelanggan']}>
+                  <RegularPackagesPage />
                 </JWTProtectedRoute>
               } />
               
@@ -152,7 +167,6 @@ function App() {
                 </JWTProtectedRoute>
               } />
               
-             
               {/* 404 Route */}
               <Route path="*" element={<NotFound />} />
             </Routes>

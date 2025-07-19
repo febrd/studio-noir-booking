@@ -65,13 +65,11 @@ const BookingSelectionPage = () => {
   const handleTypeSelect = (typeId: string) => {
     setSelectedType(typeId);
     if (typeId === 'self_photo') {
-      // Navigate to self photo packages
       navigate('/customer/self-photo-packages');
     }
   };
 
   const handleCategorySelect = (categoryId: string) => {
-    // Navigate to regular studio packages with category filter
     navigate(`/customer/regular-packages?category=${categoryId}`);
   };
 
