@@ -14,21 +14,22 @@ import { useAuth } from '@/hooks/useAuth';
 interface Studio {
   id: string;
   name: string;
-  address: string;
-  phone: string;
+  location: string;
+  description: string;
+  type: string;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
 interface StudioPackage {
   id: string;
-  name: string;
+  title: string;
   price: number;
-  duration: number;
+  base_time_minutes: number;
   description: string;
-  max_people: number;
   studio_id: string;
-  package_category_id: string;
+  category_id: string;
   created_at: string;
   updated_at: string;
   studios: Studio;
@@ -95,15 +96,19 @@ const RegularSchedulePage: React.FC = () => {
 
   const fetchUnavailableDates = async () => {
     try {
+      // Since we don't have booking_date column, we'll use start_time to determine booked dates
       const { data, error } = await supabase
         .from('bookings')
-        .select('booking_date')
-        .eq('package_id', packageId)
-        .eq('status', 'confirmed');
+        .select('start_time')
+        .eq('studio_package_id', packageId)
+        .eq('status', 'confirmed')
+        .not('start_time', 'is', null);
 
       if (error) throw error;
 
-      const bookedDates = data.map(booking => parseISO(booking.booking_date));
+      const bookedDates = data
+        .filter(booking => booking.start_time)
+        .map(booking => parseISO(booking.start_time!.split('T')[0]));
       setUnavailableDates(bookedDates);
     } catch (error) {
       console.error('Error fetching unavailable dates:', error);
@@ -116,12 +121,13 @@ const RegularSchedulePage: React.FC = () => {
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
-      // Get existing bookings for this date
+      // Get existing bookings for this date using start_time
       const { data: bookings, error } = await supabase
         .from('bookings')
-        .select('booking_time, id')
-        .eq('package_id', packageId)
-        .eq('booking_date', dateStr)
+        .select('start_time, id')
+        .eq('studio_package_id', packageId)
+        .gte('start_time', `${dateStr}T00:00:00`)
+        .lt('start_time', `${dateStr}T23:59:59`)
         .eq('status', 'confirmed');
 
       if (error) throw error;
@@ -130,13 +136,16 @@ const RegularSchedulePage: React.FC = () => {
       const slots: TimeSlot[] = [];
       for (let hour = 9; hour <= 21; hour++) {
         const time = `${hour.toString().padStart(2, '0')}:00`;
-        const isBooked = bookings.some(booking => booking.booking_time === time);
+        const timeToCheck = `${dateStr}T${time}:00`;
+        const isBooked = bookings.some(booking => 
+          booking.start_time && booking.start_time.includes(time)
+        );
         
         slots.push({
           id: `${dateStr}-${time}`,
           time,
           available: !isBooked,
-          bookingId: isBooked ? bookings.find(b => b.booking_time === time)?.id : undefined
+          bookingId: isBooked ? bookings.find(b => b.start_time?.includes(time))?.id : undefined
         });
       }
 
@@ -175,17 +184,21 @@ const RegularSchedulePage: React.FC = () => {
     setBookingLoading(true);
 
     try {
+      const startTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.time}:00`;
+      const endTime = new Date(new Date(startTime).getTime() + selectedPackage.base_time_minutes * 60000).toISOString();
+
       const { data, error } = await supabase
         .from('bookings')
         .insert({
-          customer_id: user.id,
-          package_id: packageId,
+          user_id: user.id,
+          studio_package_id: packageId,
           studio_id: selectedPackage.studio_id,
-          booking_date: format(selectedDate, 'yyyy-MM-dd'),
-          booking_time: selectedTimeSlot.time,
+          start_time: startTime,
+          end_time: endTime,
           status: 'confirmed',
-          total_price: selectedPackage.price,
-          payment_status: 'pending'
+          total_amount: selectedPackage.price,
+          payment_method: 'online',
+          type: 'regular'
         })
         .select()
         .single();
@@ -265,18 +278,14 @@ const RegularSchedulePage: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <h3 className="font-semibold text-lg">{selectedPackage.name}</h3>
+              <h3 className="font-semibold text-lg">{selectedPackage.title}</h3>
               <p className="text-gray-600">{selectedPackage.description}</p>
             </div>
             
             <div className="flex items-center gap-4 text-sm text-gray-600">
               <div className="flex items-center gap-1">
                 <Clock className="w-4 h-4" />
-                <span>{selectedPackage.duration} minutes</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <User className="w-4 h-4" />
-                <span>Max {selectedPackage.max_people} people</span>
+                <span>{selectedPackage.base_time_minutes} minutes</span>
               </div>
             </div>
 
@@ -355,7 +364,7 @@ const RegularSchedulePage: React.FC = () => {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span>Package:</span>
-                <span className="font-medium">{selectedPackage.name}</span>
+                <span className="font-medium">{selectedPackage.title}</span>
               </div>
               <div className="flex justify-between">
                 <span>Date:</span>
@@ -367,7 +376,7 @@ const RegularSchedulePage: React.FC = () => {
               </div>
               <div className="flex justify-between">
                 <span>Duration:</span>
-                <span className="font-medium">{selectedPackage.duration} minutes</span>
+                <span className="font-medium">{selectedPackage.base_time_minutes} minutes</span>
               </div>
               <div className="flex justify-between">
                 <span>Studio:</span>
