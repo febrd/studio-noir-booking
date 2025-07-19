@@ -486,7 +486,7 @@ const TransactionReports = () => {
           <h1 className="text-3xl font-bold">Comprehensive Transaction Reports</h1>
           <p className="text-muted-foreground">Laporan transaksi lengkap dan rekapitulasi bulanan</p>
         </div>
-        <ExportButtons exportData={exportData} />
+      
       </div>
 
       <Tabs defaultValue="transactions" className="space-y-4">
@@ -499,6 +499,7 @@ const TransactionReports = () => {
           <Card>
             <CardHeader>
               <CardTitle>Filter Laporan</CardTitle>
+              <ExportButtons exportData={exportData} />
             </CardHeader>
             <CardContent>
               <DatePickerWithRange
