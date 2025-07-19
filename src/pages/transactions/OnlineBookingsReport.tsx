@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,7 +26,7 @@ interface BookingData {
   end_time: string;
   additional_time_minutes: number;
   created_at: string;
-  performed_by: string;
+  performed_by: string | null;
   users: { name: string; email: string };
   studios: { name: string; type: string };
   studio_packages: { title: string; price: number };
@@ -60,15 +59,15 @@ const OnlineBookingsReport = () => {
         query = query.lte('created_at', dateRange.to.toISOString());
       }
       if (typeFilter !== 'all') {
-        query = query.eq('type', typeFilter);
+        query = query.eq('type', typeFilter as any);
       }
       if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
+        query = query.eq('status', statusFilter as any);
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
-      return data as BookingData[];
+      return data as unknown as BookingData[];
     }
   });
 

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -97,7 +96,7 @@ const OfflineTransactionsPage = () => {
   const summary = transactions?.reduce((acc, transaction) => {
     acc.totalAmount += Number(transaction.amount);
     acc.totalTransactions += 1;
-    if (transaction.payment_type === 'installment') {
+    if (transaction.status === 'pending' || transaction.status === 'installment') {
       acc.installmentCount += 1;
     }
     return acc;
@@ -163,7 +162,7 @@ const OfflineTransactionsPage = () => {
           <CardContent>
             <div className="text-2xl font-bold">{summary.totalTransactions}</div>
             <p className="text-xs text-muted-foreground">
-              {summary.installmentCount} cicilan
+              {summary.installmentCount} pending/cicilan
             </p>
           </CardContent>
         </Card>
