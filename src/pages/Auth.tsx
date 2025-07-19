@@ -31,8 +31,8 @@ const Auth = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-elegant">Studio Noir</h1>
-          <p className="text-muted-foreground mt-2">Professional Photo Studio Management</p>
+          <h1 className="text-3xl font-bold text-elegant">Masuk Studio</h1>
+          <p className="text-muted-foreground mt-2">Professional Photo Studio</p>
         </div>
 
         <Card className="glass-elegant">
