@@ -1,7 +1,6 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { AddPaymentProviderForm } from '@/components/PaymentGateway/AddPaymentProviderForm';
 import { EditPaymentProviderForm } from '@/components/PaymentGateway/EditPaymentProviderForm';
 import { PaymentProviderCard } from '@/components/PaymentGateway/PaymentProviderCard';
@@ -88,83 +87,77 @@ const PaymentProviders = () => {
 
   if (isLoading) {
     return (
-      <ModernLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-6 w-6 animate-spin" />
-            <span>Memuat payment providers...</span>
-          </div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Memuat payment providers...</span>
         </div>
-      </ModernLayout>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <ModernLayout>
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
-            <p className="text-muted-foreground">
-              Kelola provider pembayaran untuk sistem booking
-            </p>
-          </div>
-          
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Gagal memuat data payment providers: {error instanceof Error ? error.message : 'Unknown error'}
-            </AlertDescription>
-          </Alert>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
+          <p className="text-muted-foreground">
+            Kelola provider pembayaran untuk sistem booking
+          </p>
         </div>
-      </ModernLayout>
+        
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Gagal memuat data payment providers: {error instanceof Error ? error.message : 'Unknown error'}
+          </AlertDescription>
+        </Alert>
+      </div>
     );
   }
 
   return (
-    <ModernLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
-            <p className="text-muted-foreground">
-              Kelola provider pembayaran untuk sistem booking
-            </p>
-          </div>
-          
-          <AddPaymentProviderForm onSuccess={handleAddSuccess} />
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
+          <p className="text-muted-foreground">
+            Kelola provider pembayaran untuk sistem booking
+          </p>
         </div>
-
-        {providers && providers.length === 0 ? (
-          <div className="text-center py-12">
-            <h3 className="text-lg font-semibold mb-2">Belum ada payment provider</h3>
-            <p className="text-muted-foreground mb-4">
-              Tambahkan payment provider pertama Anda untuk mulai menerima pembayaran
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {providers?.map((provider) => (
-              <PaymentProviderCard
-                key={provider.id}
-                provider={provider}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-        )}
-
-        {selectedProvider && (
-          <EditPaymentProviderForm
-            provider={selectedProvider}
-            open={isEditModalOpen}
-            onOpenChange={setIsEditModalOpen}
-            onSuccess={handleEditSuccess}
-          />
-        )}
+        
+        <AddPaymentProviderForm onSuccess={handleAddSuccess} />
       </div>
-    </ModernLayout>
+
+      {providers && providers.length === 0 ? (
+        <div className="text-center py-12">
+          <h3 className="text-lg font-semibold mb-2">Belum ada payment provider</h3>
+          <p className="text-muted-foreground mb-4">
+            Tambahkan payment provider pertama Anda untuk mulai menerima pembayaran
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {providers?.map((provider) => (
+            <PaymentProviderCard
+              key={provider.id}
+              provider={provider}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+      )}
+
+      {selectedProvider && (
+        <EditPaymentProviderForm
+          provider={selectedProvider}
+          open={isEditModalOpen}
+          onOpenChange={setIsEditModalOpen}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+    </div>
   );
 };
 

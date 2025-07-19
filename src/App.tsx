@@ -201,36 +201,36 @@ function App() {
                     </JWTProtectedRoute>
                   } />
 
-                  {/* Admin routes with AdminLayout */}
+                  {/* Admin routes now using ModernLayout instead of AdminLayout */}
                   <Route path="/admin" element={
                     <JWTProtectedRoute allowedRoles={['admin', 'owner']}>
-                      <AdminLayout>
+                      <ModernLayout>
                         <div className="p-6">
                           <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
                           <p>Welcome to the admin panel. Use the navigation to access different sections.</p>
                         </div>
-                      </AdminLayout>
+                      </ModernLayout>
                     </JWTProtectedRoute>
                   } />
                   <Route path="/admin/users" element={
                     <JWTProtectedRoute allowedRoles={['admin', 'owner']}>
-                      <AdminLayout>
+                      <ModernLayout>
                         <Users />
-                      </AdminLayout>
+                      </ModernLayout>
                     </JWTProtectedRoute>
                   } />
                   <Route path="/admin/customers" element={
                     <JWTProtectedRoute allowedRoles={['admin', 'owner']}>
-                      <AdminLayout>
+                      <ModernLayout>
                         <Customers />
-                      </AdminLayout>
+                      </ModernLayout>
                     </JWTProtectedRoute>
                   } />
                   <Route path="/admin/payment-providers" element={
                     <JWTProtectedRoute allowedRoles={['admin', 'owner']}>
-                      <AdminLayout>
+                      <ModernLayout>
                         <PaymentProviders />
-                      </AdminLayout>
+                      </ModernLayout>
                     </JWTProtectedRoute>
                   } />
 
