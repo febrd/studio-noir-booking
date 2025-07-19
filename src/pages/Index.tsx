@@ -6,28 +6,24 @@ import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { Navigate } from 'react-router-dom';
 
 const Index = () => {
-  const { userProfile } = useJWTAuth();
+  const { userProfile, loading } = useJWTAuth();
 
-  // Redirect to main JWT dashboard
-  if (userProfile) {
-    return <Navigate to="/" replace />;
+  // Show loading state while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
+    );
   }
 
-  return (
-    <ModernLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Selamat datang di sistem manajemen booking Studio Noir
-          </p>
-        </div>
-        
-        <StatsCards />
-        <RecentBookings />
-      </div>
-    </ModernLayout>
-  );
+  // Redirect to JWT auth if not logged in
+  if (!userProfile) {
+    return <Navigate to="/jwt-auth" replace />;
+  }
+
+  // Redirect to JWT dashboard if logged in
+  return <Navigate to="/jwt-dashboard" replace />;
 };
 
 export default Index;
