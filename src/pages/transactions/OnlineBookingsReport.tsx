@@ -37,14 +37,15 @@ const OnlineBookingsReport = () => {
     }
   });
 
-  // Filter for online bookings (assuming online bookings have payment_method as digital/online methods)
+  // Filter for online bookings based on payment_method
   const onlineBookings = useMemo(() => {
     if (!bookingsData) return [];
-    return bookingsData.filter(booking => 
-      booking.payment_method === 'transfer_bank' || 
-      booking.payment_method === 'e_wallet' ||
-      booking.payment_method === 'credit_card'
-    );
+    return bookingsData.filter(booking => {
+      const paymentMethod = booking.payment_method;
+      return paymentMethod === 'transfer_bank' || 
+             paymentMethod === 'e_wallet' ||
+             paymentMethod === 'credit_card';
+    });
   }, [bookingsData]);
 
   const filteredData = useMemo(() => {

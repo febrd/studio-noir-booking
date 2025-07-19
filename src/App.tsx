@@ -13,6 +13,9 @@ import NotFound from "./pages/NotFound";
 import TransactionsPage from "./pages/transactions/TransactionsPage";
 import RecapsPage from "./pages/recaps/RecapsPage";
 import PaymentGateway from "./pages/PaymentGateway";
+import StudioManagement from "./pages/studio/StudioManagement";
+import Users from "./pages/admin/Users";
+import Customers from "./pages/admin/Customers";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { JWTProtectedRoute } from "./components/auth/JWTProtectedRoute";
 
@@ -31,6 +34,21 @@ const App = () => (
           <Route path="/jwt-dashboard" element={
             <JWTProtectedRoute>
               <JWTDashboard />
+            </JWTProtectedRoute>
+          } />
+          <Route path="/admin/users" element={
+            <JWTProtectedRoute>
+              <Users />
+            </JWTProtectedRoute>
+          } />
+          <Route path="/admin/customers" element={
+            <JWTProtectedRoute>
+              <Customers />
+            </JWTProtectedRoute>
+          } />
+          <Route path="/studio/*" element={
+            <JWTProtectedRoute>
+              <StudioManagement />
             </JWTProtectedRoute>
           } />
           <Route path="/transactions/*" element={

@@ -37,14 +37,15 @@ const OfflineBookingsReport = () => {
     }
   });
 
-  // Filter for offline bookings (assuming offline bookings use cash payment)
+  // Filter for offline bookings based on payment_method
   const offlineBookings = useMemo(() => {
     if (!bookingsData) return [];
-    return bookingsData.filter(booking => 
-      booking.payment_method === 'cash' || 
-      booking.payment_method === 'debit_card' ||
-      !booking.payment_method // null/undefined payment methods are considered offline
-    );
+    return bookingsData.filter(booking => {
+      const paymentMethod = booking.payment_method;
+      return paymentMethod === 'cash' || 
+             paymentMethod === 'debit_card' ||
+             !paymentMethod; // null/undefined payment methods are considered offline
+    });
   }, [bookingsData]);
 
   const filteredData = useMemo(() => {
