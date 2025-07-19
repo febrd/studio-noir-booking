@@ -1,6 +1,6 @@
 
 import { useJWTAuth } from '@/hooks/useJWTAuth';
-import { Bell, Settings, User, Crown, Shield, CreditCard } from 'lucide-react';
+import { Bell, Settings, User, Crown, Shield, CreditCard, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -10,11 +10,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+} from '@/components/ui/navigation-menu';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { getAccessibleNavigation } from '@/config/navigation';
+import { Link } from 'react-router-dom';
 
 export function ModernHeader() {
   const { userProfile, signOut } = useJWTAuth();
+  const navigation = getAccessibleNavigation(userProfile?.role || 'pelanggan');
 
   const getRoleIcon = (role: string) => {
     switch (role) {
@@ -60,11 +71,50 @@ export function ModernHeader() {
           </div>
         </div>
 
-        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-          <div className="w-full flex-1 md:w-auto md:flex-none">
-            {/* Search or breadcrumb can go here */}
-          </div>
-          
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex flex-1 items-center justify-between space-x-2">
+          <NavigationMenu>
+            <NavigationMenuList>
+              {navigation.map((item) => (
+                <NavigationMenuItem key={item.name}>
+                  {item.children && item.children.length > 0 ? (
+                    <>
+                      <NavigationMenuTrigger className="h-9">
+                        <item.icon className="mr-2 h-4 w-4" />
+                        {item.name}
+                      </NavigationMenuTrigger>
+                      <NavigationMenuContent>
+                        <div className="grid w-[400px] gap-1 p-2">
+                          {item.children.map((child) => (
+                            <NavigationMenuLink key={child.title} asChild>
+                              <Link
+                                to={child.href}
+                                className="flex items-center space-x-2 rounded-md p-3 text-sm leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                              >
+                                <child.icon className="h-4 w-4" />
+                                <span>{child.title}</span>
+                              </Link>
+                            </NavigationMenuLink>
+                          ))}
+                        </div>
+                      </NavigationMenuContent>
+                    </>
+                  ) : (
+                    <NavigationMenuLink asChild>
+                      <Link
+                        to={item.href}
+                        className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        <item.icon className="mr-2 h-4 w-4" />
+                        {item.name}
+                      </Link>
+                    </NavigationMenuLink>
+                  )}
+                </NavigationMenuItem>
+              ))}
+            </NavigationMenuList>
+          </NavigationMenu>
+
           <nav className="flex items-center space-x-1">
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <Bell className="h-4 w-4" />

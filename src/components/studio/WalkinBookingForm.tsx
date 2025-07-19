@@ -12,7 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, startOfDay, endOfDay } from 'date-fns';
+import { format, startOfDay, endOfDay, addMinutes } from 'date-fns';
+import { WalkinTimeExtensionManager } from './WalkinTimeExtensionManager';
 
 const walkinBookingSchema = z.object({
   customer_name: z.string().min(1, 'Nama customer wajib diisi'),
@@ -21,7 +22,6 @@ const walkinBookingSchema = z.object({
   category_id: z.string().optional(),
   package_id: z.string().min(1, 'Package wajib dipilih'),
   start_time: z.string().min(1, 'Waktu mulai wajib diisi'),
-  end_time: z.string().min(1, 'Waktu selesai wajib diisi'),
   payment_method: z.enum(['cash', 'debit', 'credit', 'qris', 'transfer']),
   notes: z.string().optional()
 });
@@ -35,6 +35,7 @@ interface WalkinBookingFormProps {
 
 const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [additionalTime, setAdditionalTime] = useState(0);
   const queryClient = useQueryClient();
   
   const today = new Date();
@@ -49,7 +50,6 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       category_id: booking?.package_category_id || '',
       package_id: booking?.studio_package_id || '',
       start_time: booking?.start_time ? format(new Date(booking.start_time), 'HH:mm') : '',
-      end_time: booking?.end_time ? format(new Date(booking.end_time), 'HH:mm') : '',
       payment_method: booking?.payment_method || 'cash',
       notes: ''
     }
@@ -105,12 +105,9 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
         .select('id, title, price, base_time_minutes')
         .eq('studio_id', selectedStudioId);
       
-      // For regular studios, filter by category if selected
       if (isRegularStudio && selectedCategoryId) {
         query = query.eq('category_id', selectedCategoryId);
-      }
-      // For self-photo studios, get packages without category requirement
-      else if (!isRegularStudio) {
+      } else if (!isRegularStudio) {
         query = query.is('category_id', null);
       }
       
@@ -119,14 +116,42 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!selectedStudioId && (!isRegularStudio || !!selectedCategoryId || !isRegularStudio)
+    enabled: !!selectedStudioId && (!isRegularStudio || !!selectedCategoryId)
   });
+
+  // Get selected package details
+  const selectedPackageId = form.watch('package_id');
+  const selectedPackage = packages?.find(pkg => pkg.id === selectedPackageId);
+
+  // Calculate total amount
+  const calculateTotalAmount = () => {
+    const packagePrice = selectedPackage?.price || 0;
+    const extensionCost = additionalTime > 0 ? 
+      Math.ceil(additionalTime / 5) * (isRegularStudio ? 15000 : 5000) : 0;
+    return packagePrice + extensionCost;
+  };
+
+  // Auto-calculate end time
+  const calculateEndTime = () => {
+    const startTime = form.watch('start_time');
+    if (!startTime || !selectedPackage) return '';
+    
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const startDate = new Date();
+    startDate.setHours(hours, minutes, 0, 0);
+    
+    const totalMinutes = selectedPackage.base_time_minutes + additionalTime;
+    const endDate = addMinutes(startDate, totalMinutes);
+    
+    return format(endDate, 'HH:mm');
+  };
 
   // Reset category and package when studio changes
   useEffect(() => {
     if (selectedStudioId) {
       form.setValue('category_id', '');
       form.setValue('package_id', '');
+      setAdditionalTime(0);
     }
   }, [selectedStudioId, form]);
 
@@ -134,6 +159,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
   useEffect(() => {
     if (isRegularStudio && selectedCategoryId) {
       form.setValue('package_id', '');
+      setAdditionalTime(0);
     }
   }, [selectedCategoryId, isRegularStudio, form]);
 
@@ -141,7 +167,8 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
   const createMutation = useMutation({
     mutationFn: async (data: WalkinBookingFormData) => {
       const startDateTime = new Date(`${todayString}T${data.start_time}:00`);
-      const endDateTime = new Date(`${todayString}T${data.end_time}:00`);
+      const totalMinutes = selectedPackage?.base_time_minutes + additionalTime;
+      const endDateTime = addMinutes(startDateTime, totalMinutes);
 
       // Check for conflicts
       const { data: conflicts } = await supabase
@@ -161,7 +188,6 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       let customerId = booking?.user_id;
       
       if (!customerId) {
-        // Check if customer exists
         const { data: existingUsers } = await supabase
           .from('users')
           .select('id')
@@ -171,7 +197,6 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
         if (existingUsers && existingUsers.length > 0) {
           customerId = existingUsers[0].id;
         } else {
-          // Create new customer
           const { data: newUser, error: userError } = await supabase
             .from('users')
             .insert({
@@ -187,12 +212,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
         }
       }
 
-      // Get package info for total calculation
-      const selectedPackage = packages?.find(p => p.id === data.package_id);
-      const totalAmount = selectedPackage?.price || 0;
-
-      // Map payment method for database - all offline payment methods map to 'offline'
-      const dbPaymentMethod = 'offline';
+      const totalAmount = calculateTotalAmount();
 
       if (booking) {
         // Update existing booking
@@ -204,13 +224,27 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
             package_category_id: isRegularStudio ? data.category_id : null,
             start_time: startDateTime.toISOString(),
             end_time: endDateTime.toISOString(),
-            payment_method: dbPaymentMethod,
+            additional_time_minutes: additionalTime > 0 ? additionalTime : null,
+            payment_method: 'offline',
             total_amount: totalAmount,
             updated_at: new Date().toISOString()
           })
           .eq('id', booking.id);
 
         if (error) throw error;
+
+        // Create transaction record
+        await supabase
+          .from('transactions')
+          .insert({
+            booking_id: booking.id,
+            amount: totalAmount,
+            payment_type: data.payment_method,
+            type: 'offline',
+            status: 'paid',
+            description: `Walk-in session payment - ${data.payment_method}`
+          });
+
         return { id: booking.id };
       } else {
         // Create new booking
@@ -223,7 +257,8 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
             package_category_id: isRegularStudio ? data.category_id : null,
             start_time: startDateTime.toISOString(),
             end_time: endDateTime.toISOString(),
-            payment_method: dbPaymentMethod,
+            additional_time_minutes: additionalTime > 0 ? additionalTime : null,
+            payment_method: 'offline',
             type: 'self_photo',
             status: 'confirmed',
             total_amount: totalAmount
@@ -232,11 +267,25 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
           .single();
 
         if (error) throw error;
+
+        // Create transaction record
+        await supabase
+          .from('transactions')
+          .insert({
+            booking_id: newBooking.id,
+            amount: totalAmount,
+            payment_type: data.payment_method,
+            type: 'offline',
+            status: 'paid',
+            description: `Walk-in session payment - ${data.payment_method}`
+          });
+
         return newBooking;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['walkin-sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
       toast.success(booking ? 'Walk-in session berhasil diupdate' : 'Walk-in session berhasil dibuat');
       onSuccess();
     },
@@ -255,9 +304,12 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
     }
   };
 
+  const endTime = calculateEndTime();
+  const totalAmount = calculateTotalAmount();
+
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Customer Information */}
         <Card>
           <CardHeader>
@@ -335,11 +387,6 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
                     ))}
                   </SelectContent>
                 </Select>
-                {categories?.length === 0 && selectedStudioId && (
-                  <p className="text-sm text-amber-600">
-                    Belum ada kategori untuk studio ini. Silakan buat kategori terlebih dahulu.
-                  </p>
-                )}
               </div>
             )}
 
@@ -356,7 +403,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
                 <SelectContent>
                   {packages?.map((pkg) => (
                     <SelectItem key={pkg.id} value={pkg.id}>
-                      {pkg.title} - {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(pkg.price)}
+                      {pkg.title} - Rp {pkg.price.toLocaleString('id-ID')} ({pkg.base_time_minutes} menit)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -380,15 +427,15 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
               </div>
 
               <div>
-                <Label htmlFor="end_time">Waktu Selesai *</Label>
+                <Label htmlFor="end_time">Waktu Selesai</Label>
                 <Input
                   id="end_time"
                   type="time"
-                  {...form.register('end_time')}
+                  value={endTime}
+                  readOnly
+                  className="bg-muted"
                 />
-                {form.formState.errors.end_time && (
-                  <p className="text-sm text-red-600">{form.formState.errors.end_time.message}</p>
-                )}
+                <p className="text-xs text-muted-foreground mt-1">Otomatis dihitung</p>
               </div>
             </div>
 
@@ -410,8 +457,56 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
                 <p className="text-sm text-red-600">{form.formState.errors.payment_method.message}</p>
               )}
             </div>
+
+            <div>
+              <Label htmlFor="notes">Catatan</Label>
+              <Textarea
+                id="notes"
+                {...form.register('notes')}
+                placeholder="Catatan tambahan (opsional)"
+                rows={3}
+              />
+            </div>
           </CardContent>
         </Card>
+
+        {/* Time Management & Pricing */}
+        <div className="space-y-4">
+          {selectedPackage && (
+            <WalkinTimeExtensionManager
+              baseTimeMinutes={selectedPackage.base_time_minutes}
+              studioType={selectedStudio?.type || 'self_photo'}
+              additionalTime={additionalTime}
+              onAdditionalTimeChange={setAdditionalTime}
+              disabled={isSubmitting}
+            />
+          )}
+
+          {/* Pricing Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Ringkasan Biaya</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Paket:</span>
+                <span>Rp {(selectedPackage?.price || 0).toLocaleString('id-ID')}</span>
+              </div>
+              {additionalTime > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span>Tambahan Waktu:</span>
+                  <span>Rp {(Math.ceil(additionalTime / 5) * (isRegularStudio ? 15000 : 5000)).toLocaleString('id-ID')}</span>
+                </div>
+              )}
+              <div className="border-t pt-2">
+                <div className="flex justify-between font-medium">
+                  <span>Total:</span>
+                  <span>Rp {totalAmount.toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <div className="flex justify-end gap-4">

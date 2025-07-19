@@ -23,98 +23,117 @@ export const navigationItems = [
   {
     title: 'Studio Management',
     icon: Building2,
-    href: '/studio/studios',
-    roles: ['admin', 'owner']
+    roles: ['admin', 'owner'],
+    children: [
+      {
+        title: 'Studios',
+        href: '/studio/studios',
+        icon: Building2
+      },
+      {
+        title: 'Package Categories',
+        href: '/studio/package-categories',
+        icon: Package
+      },
+      {
+        title: 'Packages',
+        href: '/studio/packages',
+        icon: Package
+      },
+      {
+        title: 'Additional Services',
+        href: '/studio/services',
+        icon: Settings
+      }
+    ]
   },
   {
-    title: 'Package Categories',
-    icon: Package,
-    href: '/studio/package-categories',
-    roles: ['admin', 'owner']
-  },
-  {
-    title: 'Packages',
-    icon: Package,
-    href: '/studio/packages',
-    roles: ['admin', 'owner']
-  },
-  {
-    title: 'Additional Services',
-    icon: Settings,
-    href: '/studio/services',
-    roles: ['admin', 'owner']
-  },
-  {
-    title: 'Bookings Transaction',
+    title: 'Bookings & Sessions',
     icon: Calendar,
-    href: '/studio/bookings',
-    roles: ['admin', 'owner', 'keuangan']
+    roles: ['admin', 'owner', 'keuangan'],
+    children: [
+      {
+        title: 'Bookings Transaction',
+        href: '/studio/bookings',
+        icon: Calendar
+      },
+      {
+        title: 'Walk-in Sessions',
+        href: '/studio/walkin-sessions',
+        icon: Clock
+      },
+      {
+        title: 'Booking Logs',
+        href: '/studio/booking-logs',
+        icon: FileText
+      }
+    ]
   },
   {
-    title: 'Walk-in Sessions',
-    icon: Clock,
-    href: '/studio/walkin-sessions',
-    roles: ['admin', 'owner', 'keuangan']
-  },
-  {
-    title: 'Booking Logs',
-    icon: FileText,
-    href: '/studio/booking-logs',
-    roles: ['admin', 'owner']
-  },
-  {
-    title: 'Offline Transactions',
+    title: 'Transactions',
     icon: CreditCard,
-    href: '/studio/offline-transactions',
-    roles: ['admin', 'owner', 'keuangan']
+    roles: ['admin', 'owner', 'keuangan'],
+    children: [
+      {
+        title: 'Offline Transactions',
+        href: '/studio/offline-transactions',
+        icon: CreditCard
+      },
+      {
+        title: 'Transaction History',
+        href: '/transactions',
+        icon: CreditCard
+      }
+    ]
   },
   {
-    title: 'Transaction Reports',
+    title: 'Reports',
     icon: BarChart3,
-    href: '/transactions/reports',
-    roles: ['admin', 'owner', 'keuangan']
+    roles: ['admin', 'owner', 'keuangan'],
+    children: [
+      {
+        title: 'Transaction Reports',
+        href: '/transactions/reports',
+        icon: BarChart3
+      },
+      {
+        title: 'Online Bookings Report',
+        href: '/transactions/online-bookings',
+        icon: FileText
+      },
+      {
+        title: 'Offline Bookings Report',
+        href: '/transactions/offline-bookings',
+        icon: FileText
+      },
+      {
+        title: 'Monthly Recaps',
+        href: '/recaps',
+        icon: BarChart3
+      }
+    ]
   },
   {
-    title: 'Online Bookings Report',
-    icon: FileText,
-    href: '/transactions/online-bookings',
-    roles: ['admin', 'owner', 'keuangan']
-  },
-  {
-    title: 'Offline Bookings Report',
-    icon: FileText,
-    href: '/transactions/offline-bookings',
-    roles: ['admin', 'owner', 'keuangan']
-  },
-  {
-    title: 'Transaction History',
-    icon: CreditCard,
-    href: '/transactions',
-    roles: ['admin', 'owner', 'keuangan']
-  },
-  {
-    title: 'Monthly Recaps',
-    icon: BarChart3,
-    href: '/recaps',
-    roles: ['admin', 'owner', 'keuangan']
-  },
-  {
-    title: 'Customer Management',
+    title: 'Administration',
     icon: Users,
-    href: '/admin/customers',
-    roles: ['admin', 'owner']
-  },
-  {
-    title: 'User Management',
-    icon: UserPlus,
-    href: '/admin/users',
-    roles: ['admin', 'owner']
-  },
-  {
-    title: 'Payment Providers',
-    icon: CreditCard,
-    href: '/admin/payment-providers',
-    roles: ['admin', 'owner']
+    roles: ['admin', 'owner'],
+    children: [
+      {
+        title: 'Customer Management',
+        href: '/admin/customers',
+        icon: Users
+      },
+      {
+        title: 'User Management',
+        href: '/admin/users',
+        icon: UserPlus
+      },
+      {
+        title: 'Payment Providers',
+        href: '/admin/payment-providers',
+        icon: CreditCard
+      }
+    ]
   }
 ];
 
@@ -126,6 +145,6 @@ export const getAccessibleNavigation = (userRole: string) => {
       name: item.title,
       href: item.href,
       icon: item.icon,
-      children: [] // For future use if we add nested navigation
+      children: item.children || []
     }));
 };
