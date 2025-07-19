@@ -1,162 +1,308 @@
 
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { User, Calendar, Camera, Heart, Star, Clock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, Camera, Clock, Star, Plus, Eye } from 'lucide-react';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
+import { Link } from 'react-router-dom';
 
-export function PelangganDashboard() {
+export const PelangganDashboard = () => {
+  const { userProfile } = useJWTAuth();
+
+  const { data: customerData, isLoading } = useQuery({
+    queryKey: ['customer-dashboard', userProfile?.id],
+    queryFn: async () => {
+      if (!userProfile?.id) return null;
+
+      const [bookings, studios, packages] = await Promise.all([
+        supabase
+          .from('bookings')
+          .select(`
+            *,
+            studios (name, type),
+            studio_packages (title, price),
+            installments (amount, paid_at, payment_method)
+          `)
+          .eq('user_id', userProfile.id)
+          .order('created_at', { ascending: false })
+          .limit(10),
+        
+        supabase.from('studios').select('*').eq('is_active', true),
+        supabase.from('studio_packages').select('*, package_categories (name)')
+      ]);
+
+      return {
+        bookings: bookings.data || [],
+        studios: studios.data || [],
+        packages: packages.data || []
+      };
+    },
+    enabled: !!userProfile?.id
+  });
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-64">Loading dashboard...</div>;
+  }
+
+  const { bookings = [], studios = [], packages = [] } = customerData || {};
+
+  // Calculate customer statistics
+  const totalBookings = bookings.length;
+  const completedBookings = bookings.filter(b => b.status === 'completed').length;
+  const upcomingBookings = bookings.filter(b => {
+    const bookingDate = new Date(b.booking_date);
+    return bookingDate > new Date() && b.status === 'confirmed';
+  }).length;
+
+  const totalSpent = bookings.reduce((sum, booking) => {
+    const bookingAmount = booking.total_amount || 0;
+    const installmentAmount = booking.installments?.reduce((instSum: number, inst: any) => instSum + (inst.amount || 0), 0) || 0;
+    return sum + Math.max(bookingAmount, installmentAmount);
+  }, 0);
+
+  // Recent bookings (last 5)
+  const recentBookings = bookings.slice(0, 5);
+
+  // Popular packages
+  const popularPackages = packages.slice(0, 6);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'completed': return 'bg-blue-100 text-blue-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'Dikonfirmasi';
+      case 'pending': return 'Menunggu';
+      case 'completed': return 'Selesai';
+      case 'cancelled': return 'Dibatalkan';
+      default: return status;
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <User className="h-6 w-6 text-purple-600" />
+    <div className="space-y-6 p-6">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome Back!</h1>
+          <h1 className="text-3xl font-bold">Selamat Datang, {userProfile?.name}!</h1>
           <p className="text-muted-foreground">
-            Kelola booking dan riwayat foto studio Anda
+            Kelola booking dan jelajahi paket studio foto kami
           </p>
         </div>
+        <Link to="/studio/bookings">
+          <Button className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Booking Baru
+          </Button>
+        </Link>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Customer Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Booking</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{totalBookings}</div>
             <p className="text-xs text-muted-foreground">
-              Sejak bergabung
+              {completedBookings} selesai
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Photos Taken</CardTitle>
-            <Camera className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Booking Mendatang</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">240+</div>
+            <div className="text-2xl font-bold">{upcomingBookings}</div>
             <p className="text-xs text-muted-foreground">
-              Foto berkualitas tinggi
+              Sudah dikonfirmasi
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Favorite Package</CardTitle>
-            <Heart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm font-bold">Premium Portrait</div>
-            <p className="text-xs text-muted-foreground">
-              Paling sering dipilih
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Member Since</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Pengeluaran</CardTitle>
             <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-sm font-bold">March 2024</div>
+            <div className="text-2xl font-bold">Rp {totalSpent.toLocaleString('id-ID')}</div>
             <p className="text-xs text-muted-foreground">
-              Customer setia
+              Rata-rata: Rp {totalBookings > 0 ? Math.round(totalSpent / totalBookings).toLocaleString('id-ID') : 0}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Studio Tersedia</CardTitle>
+            <Camera className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{studios.length}</div>
+            <p className="text-xs text-muted-foreground">
+              Siap untuk booking
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Booking Actions */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Bookings */}
         <Card>
-          <CardHeader>
-            <CardTitle>Quick Booking</CardTitle>
-            <CardDescription>
-              Buat booking baru dengan mudah
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Booking Terbaru</CardTitle>
+              <CardDescription>Riwayat booking Anda yang terbaru</CardDescription>
+            </div>
+            <Link to="/studio/booking-logs">
+              <Button variant="outline" size="sm">
+                <Eye className="h-4 w-4 mr-2" />
+                Lihat Semua
+              </Button>
+            </Link>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Button className="w-full" size="lg">
-              <Camera className="mr-2 h-4 w-4" />
-              Book Self Photo Session
-            </Button>
-            <Button variant="outline" className="w-full" size="lg">
-              <Calendar className="mr-2 h-4 w-4" />
-              Book Regular Session
-            </Button>
+          <CardContent>
+            <div className="space-y-4">
+              {recentBookings.length > 0 ? (
+                recentBookings.map((booking) => (
+                  <div key={booking.id} className="flex justify-between items-center p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium">{booking.studios?.name}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {booking.studio_packages?.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(booking.booking_date), 'dd MMMM yyyy, HH:mm', { locale: id })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <Badge className={getStatusColor(booking.status)}>
+                        {getStatusText(booking.status)}
+                      </Badge>
+                      <p className="text-sm font-medium mt-1">
+                        Rp {(booking.total_amount || 0).toLocaleString('id-ID')}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <Camera className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">Belum ada booking</p>
+                  <Link to="/studio/bookings">
+                    <Button className="mt-2">Buat Booking Pertama</Button>
+                  </Link>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
+        {/* Popular Packages */}
         <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>
-              Aktivitas booking terbaru Anda
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Paket Populer</CardTitle>
+              <CardDescription>Paket foto yang paling diminati</CardDescription>
+            </div>
+            <Link to="/studio/packages">
+              <Button variant="outline" size="sm">
+                <Eye className="h-4 w-4 mr-2" />
+                Lihat Semua
+              </Button>
+            </Link>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center justify-between p-2 border rounded">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                <span className="text-sm">Premium Portrait</span>
-              </div>
-              <Badge className="bg-green-100 text-green-800">Completed</Badge>
-            </div>
-            <div className="flex items-center justify-between p-2 border rounded">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                <span className="text-sm">Self Photo Basic</span>
-              </div>
-              <Badge className="bg-blue-100 text-blue-800">Confirmed</Badge>
-            </div>
-            <div className="flex items-center justify-between p-2 border rounded">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                <span className="text-sm">Couple Session</span>
-              </div>
-              <Badge className="bg-orange-100 text-orange-800">Pending</Badge>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-3">
+              {popularPackages.length > 0 ? (
+                popularPackages.map((pkg) => (
+                  <div key={pkg.id} className="flex justify-between items-center p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex-1">
+                      <h4 className="font-medium">{pkg.title}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {pkg.package_categories?.name || 'Kategori tidak diketahui'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Durasi: {pkg.duration} menit
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-primary">
+                        Rp {(pkg.price || 0).toLocaleString('id-ID')}
+                      </p>
+                      <Link to="/studio/bookings">
+                        <Button size="sm" variant="outline" className="mt-1">
+                          Booking
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">Tidak ada paket tersedia</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Available Packages */}
+      {/* Quick Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Available Packages</CardTitle>
-          <CardDescription>
-            Pilih paket foto sesuai kebutuhan Anda
-          </CardDescription>
+          <CardTitle>Aksi Cepat</CardTitle>
+          <CardDescription>Fitur yang sering digunakan</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="p-4 border rounded-lg">
-              <h3 className="font-semibold">Basic Self Photo</h3>
-              <p className="text-sm text-muted-foreground mb-2">30 menit sesi foto</p>
-              <p className="font-bold text-lg">Rp 150,000</p>
-              <Button size="sm" className="w-full mt-2">Book Now</Button>
-            </div>
-            <div className="p-4 border rounded-lg">
-              <h3 className="font-semibold">Premium Portrait</h3>
-              <p className="text-sm text-muted-foreground mb-2">60 menit + editing</p>
-              <p className="font-bold text-lg">Rp 300,000</p>
-              <Button size="sm" className="w-full mt-2">Book Now</Button>
-            </div>
-            <div className="p-4 border rounded-lg">
-              <h3 className="font-semibold">Couple Session</h3>
-              <p className="text-sm text-muted-foreground mb-2">90 menit untuk 2 orang</p>
-              <p className="font-bold text-lg">Rp 450,000</p>
-              <Button size="sm" className="w-full mt-2">Book Now</Button>
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Link to="/studio/bookings" className="block">
+              <Button variant="outline" className="w-full h-20 flex flex-col gap-2">
+                <Plus className="h-6 w-6" />
+                <span>Booking Baru</span>
+              </Button>
+            </Link>
+            
+            <Link to="/studio/booking-logs" className="block">
+              <Button variant="outline" className="w-full h-20 flex flex-col gap-2">
+                <Calendar className="h-6 w-6" />
+                <span>Riwayat Booking</span>
+              </Button>
+            </Link>
+            
+            <Link to="/studio/studios" className="block">
+              <Button variant="outline" className="w-full h-20 flex flex-col gap-2">
+                <Camera className="h-6 w-6" />
+                <span>Lihat Studio</span>
+              </Button>
+            </Link>
+            
+            <Link to="/studio/packages" className="block">
+              <Button variant="outline" className="w-full h-20 flex flex-col gap-2">
+                <Star className="h-6 w-6" />
+                <span>Paket Foto</span>
+              </Button>
+            </Link>
           </div>
         </CardContent>
       </Card>
     </div>
   );
-}
+};

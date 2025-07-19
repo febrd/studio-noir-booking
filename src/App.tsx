@@ -5,7 +5,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
-import Auth from "./pages/Auth";
 import JWTAuth from "./pages/JWTAuth";
 import JWTDashboard from "./pages/JWTDashboard";
 import Unauthorized from "./pages/Unauthorized";
@@ -16,7 +15,6 @@ import PaymentGateway from "./pages/PaymentGateway";
 import StudioManagement from "./pages/studio/StudioManagement";
 import Users from "./pages/admin/Users";
 import Customers from "./pages/admin/Customers";
-import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { JWTProtectedRoute } from "./components/auth/JWTProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -29,8 +27,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/jwt-auth" element={<JWTAuth />} />
+          <Route path="/auth" element={<JWTAuth />} />
           <Route path="/jwt-dashboard" element={
             <JWTProtectedRoute>
               <JWTDashboard />

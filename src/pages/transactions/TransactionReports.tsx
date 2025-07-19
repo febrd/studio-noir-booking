@@ -472,6 +472,9 @@ const TransactionReports = () => {
     updateTargetMutation.mutate(targetAmount);
   };
 
+  // Color palette for pie chart
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C', '#8DD1E1', '#D084D0'];
+
   if (isLoading || isRecapsLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
   }
@@ -709,16 +712,31 @@ const TransactionReports = () => {
                     className="h-[400px]"
                   >
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={analytics?.topStudios} layout="horizontal">
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" />
-                        <YAxis dataKey="name" type="category" width={120} />
+                      <PieChart>
+                        <Pie
+                          data={analytics?.topStudios}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, revenue, percent }) => 
+                            `${name}: Rp ${revenue.toLocaleString('id-ID')} (${(percent * 100).toFixed(1)}%)`
+                          }
+                          outerRadius={120}
+                          fill="#8884d8"
+                          dataKey="revenue"
+                        >
+                          {analytics?.topStudios.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
                         <ChartTooltip
-                          content={<ChartTooltipContent />}
-                          formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Revenue']}
+                          formatter={(value, name, props) => [
+                            `Rp ${Number(value).toLocaleString('id-ID')}`,
+                            'Revenue',
+                            `${props.payload.bookings} Bookings`
+                          ]}
                         />
-                        <Bar dataKey="revenue" fill="hsl(var(--foreground))" />
-                      </BarChart>
+                      </PieChart>
                     </ResponsiveContainer>
                   </ChartContainer>
                 </CardContent>
@@ -899,7 +917,7 @@ const TransactionReports = () => {
             </CardContent>
           </Card>
 
-          {/* Top 10 Studios Chart */}
+          {/* Top 10 Studios Pie Chart */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -918,10 +936,23 @@ const TransactionReports = () => {
                 className="h-[400px]"
               >
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={recapsAnalytics?.topStudios || []} layout="horizontal" margin={{ left: 100 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis type="category" dataKey="studio_name" width={100} />
+                  <PieChart>
+                    <Pie
+                      data={recapsAnalytics?.topStudios || []}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ studio_name, revenue, percent }) => 
+                        `${studio_name}: Rp ${revenue.toLocaleString('id-ID')} (${(percent * 100).toFixed(1)}%)`
+                      }
+                      outerRadius={120}
+                      fill="#8884d8"
+                      dataKey="revenue"
+                    >
+                      {recapsAnalytics?.topStudios.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
                     <ChartTooltip
                       content={<ChartTooltipContent />}
                       formatter={(value, name, props) => [
@@ -930,8 +961,7 @@ const TransactionReports = () => {
                         `${props.payload.sessions_count} Sesi`
                       ]}
                     />
-                    <Bar dataKey="revenue" fill="hsl(var(--foreground))" />
-                  </BarChart>
+                  </PieChart>
                 </ResponsiveContainer>
               </ChartContainer>
             </CardContent>

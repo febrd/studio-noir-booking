@@ -15,27 +15,43 @@ export function MobileNavigation() {
     return location.pathname.startsWith(href);
   };
 
-  // Get navigation items based on user role (only show main items on mobile)
-  const navigation = getAccessibleNavigation(userProfile?.role || 'pelanggan')
-    .filter(item => !item.children || item.children.length === 0)
-    .slice(0, 5); // Limit to 5 items for mobile
+  // Get all navigation items based on user role including submenus
+  const allNavigation = getAccessibleNavigation(userProfile?.role || 'pelanggan');
+  
+  // Flatten navigation to include both main items and subitems
+  const flatNavigation = allNavigation.reduce((acc, item) => {
+    // Add main item
+    acc.push(item);
+    
+    // Add children if they exist
+    if (item.children && item.children.length > 0) {
+      acc.push(...item.children);
+    }
+    
+    return acc;
+  }, [] as typeof allNavigation);
+
+  // Take first 5 most important items for mobile
+  const mobileNavigation = flatNavigation.slice(0, 5);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border md:hidden">
       <nav className="flex items-center justify-around py-2">
-        {navigation.map((item) => (
+        {mobileNavigation.map((item, index) => (
           <NavLink
-            key={item.href}
+            key={`${item.href}-${index}`}
             to={item.href}
             className={cn(
-              'flex flex-col items-center gap-1 px-3 py-2 text-xs transition-colors rounded-lg',
+              'flex flex-col items-center gap-1 px-2 py-2 text-xs transition-colors rounded-lg',
               isActive(item.href)
                 ? 'text-primary bg-primary/10'
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            <item.icon className="h-5 w-5" />
-            <span className="text-[10px] font-medium">{item.name}</span>
+            <item.icon className="h-4 w-4" />
+            <span className="text-[10px] font-medium text-center leading-3">
+              {item.name.length > 8 ? item.name.substring(0, 8) + '...' : item.name}
+            </span>
           </NavLink>
         ))}
       </nav>

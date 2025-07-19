@@ -17,9 +17,9 @@ const Index = () => {
     );
   }
 
-  // Redirect to JWT auth if not logged in
+  // Redirect to auth if not logged in
   if (!userProfile) {
-    return <Navigate to="/jwt-auth" replace />;
+    return <Navigate to="/auth" replace />;
   }
 
   // Redirect to JWT dashboard if logged in
