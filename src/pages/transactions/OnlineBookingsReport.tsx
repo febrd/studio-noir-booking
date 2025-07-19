@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,7 +30,6 @@ const OnlineBookingsReport = () => {
         `)
         .gte('created_at', startDate + 'T00:00:00')
         .lte('created_at', endDate + 'T23:59:59')
-        .eq('type', 'online')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -39,10 +37,20 @@ const OnlineBookingsReport = () => {
     }
   });
 
-  const filteredData = useMemo(() => {
+  // Filter for online bookings (assuming online bookings have payment_method as digital/online methods)
+  const onlineBookings = useMemo(() => {
     if (!bookingsData) return [];
+    return bookingsData.filter(booking => 
+      booking.payment_method === 'transfer_bank' || 
+      booking.payment_method === 'e_wallet' ||
+      booking.payment_method === 'credit_card'
+    );
+  }, [bookingsData]);
+
+  const filteredData = useMemo(() => {
+    if (!onlineBookings) return [];
     
-    return bookingsData.filter(booking => {
+    return onlineBookings.filter(booking => {
       const searchLower = searchTerm.toLowerCase();
       return (
         booking.users?.name?.toLowerCase().includes(searchLower) ||
@@ -51,7 +59,7 @@ const OnlineBookingsReport = () => {
         booking.studio_packages?.title?.toLowerCase().includes(searchLower)
       );
     });
-  }, [bookingsData, searchTerm]);
+  }, [onlineBookings, searchTerm]);
 
   const exportData = useMemo(() => {
     if (!filteredData) return undefined;
