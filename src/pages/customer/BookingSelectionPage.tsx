@@ -1,66 +1,61 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Camera, Users, User, Heart, Sparkles, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Camera, Users, User, Heart, ArrowLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+
+interface StudioType {
+  id: string;
+  name: string;
+  type: 'self_photo' | 'regular';
+  description: string;
+  is_active: boolean;
+}
+
+interface Category {
+  id: string;
+  name: string;
+  description: string;
+}
 
 const BookingSelectionPage = () => {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const studioTypes = [
-    {
-      id: 'self_photo',
-      title: 'Self Photo',
-      description: 'Foto sendiri dengan kontrol penuh atas gaya dan pose Anda',
-      icon: User,
-      color: 'from-blue-500 to-purple-600',
-      features: ['Kontrol penuh atas foto', 'Privacy maksimal', 'Waktu fleksibel', 'Harga terjangkau'],
-      image: '/api/placeholder/400/300'
-    },
-    {
-      id: 'regular',
-      title: 'Studio Reguler',
-      description: 'Sesi foto profesional dengan fotografer berpengalaman',
-      icon: Camera,
-      color: 'from-pink-500 to-orange-500',
-      features: ['Fotografer profesional', 'Berbagai kategori', 'Hasil berkualitas tinggi', 'Konsultasi pose'],
-      image: '/api/placeholder/400/300'
-    }
-  ];
+  // Fetch real studio types from database
+  const { data: studioTypes = [], isLoading: studioLoading } = useQuery({
+    queryKey: ['studio-types'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('studios')
+        .select('id, name, type, description, is_active')
+        .eq('is_active', true);
 
-  const categories = [
-    {
-      id: 'personal',
-      title: 'Personal',
-      description: 'Foto individu untuk keperluan pribadi',
-      icon: User,
-      color: 'from-emerald-400 to-cyan-400'
+      if (error) throw error;
+      return data as StudioType[];
     },
-    {
-      id: 'couple',
-      title: 'Couple',
-      description: 'Foto romantis untuk pasangan',
-      icon: Heart,
-      color: 'from-rose-400 to-pink-500'
+  });
+
+  // Fetch real categories from database
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery({
+    queryKey: ['package-categories'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('package_categories')
+        .select('id, name, description');
+
+      if (error) throw error;
+      return data as Category[];
     },
-    {
-      id: 'group',
-      title: 'Group',
-      description: 'Foto bersama teman atau keluarga',
-      icon: Users,
-      color: 'from-violet-400 to-purple-500'
-    },
-    {
-      id: 'family',
-      title: 'Family',
-      description: 'Foto keluarga yang hangat dan berkesan',
-      icon: Users,
-      color: 'from-amber-400 to-orange-500'
-    }
-  ];
+  });
+
+  // Group studios by type
+  const selfPhotoStudios = studioTypes.filter(studio => studio.type === 'self_photo');
+  const regularStudios = studioTypes.filter(studio => studio.type === 'regular');
 
   const handleTypeSelect = (typeId: string) => {
     setSelectedType(typeId);
@@ -73,69 +68,141 @@ const BookingSelectionPage = () => {
     navigate(`/customer/regular-packages?category=${categoryId}`);
   };
 
+  const getCategoryIcon = (categoryName: string) => {
+    const name = categoryName?.toLowerCase() || '';
+    if (name.includes('personal')) return User;
+    if (name.includes('couple')) return Heart;
+    if (name.includes('group') || name.includes('family')) return Users;
+    return Camera;
+  };
+
+  const getCategoryColor = (index: number) => {
+    const colors = ['bg-red-500', 'bg-blue-600', 'bg-yellow-400', 'bg-black'];
+    return colors[index % colors.length];
+  };
+
+  if (studioLoading || categoriesLoading) {
+    return (
+      <ModernLayout>
+        <div className="min-h-screen bg-white flex justify-center items-center">
+          <div className="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </ModernLayout>
+    );
+  }
+
   return (
     <ModernLayout>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="min-h-screen bg-white">
         <div className="max-w-7xl mx-auto px-4 py-8">
-          {/* Header */}
-          <div className="text-center mb-12 animate-fade-in">
+          {/* Bauhaus Header */}
+          <div className="text-center mb-12">
             <div className="flex justify-center items-center gap-4 mb-6">
               <Link to="/dashboard">
-                <Button variant="outline" size="sm" className="hover-scale">
+                <Button variant="outline" size="sm" className="border-2 border-black text-black hover:bg-black hover:text-white font-bold">
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Kembali
+                  KEMBALI
                 </Button>
               </Link>
-              <Sparkles className="h-12 w-12 text-purple-500 animate-pulse" />
             </div>
-            <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Pilih Tipe Studio Anda
+            <h1 className="text-6xl font-black mb-4 tracking-tight">
+              PILIH STUDIO
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Setiap pilihan memiliki keunikan tersendiri. Pilih yang paling sesuai dengan kebutuhan Anda.
+            <p className="text-xl font-light max-w-2xl mx-auto tracking-wide">
+              Setiap pilihan memiliki keunikan tersendiri
             </p>
           </div>
 
           {!selectedType ? (
             /* Studio Type Selection */
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-              {studioTypes.map((type, index) => {
-                const IconComponent = type.icon;
-                return (
-                  <Card 
-                    key={type.id} 
-                    className={`relative overflow-hidden cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 animate-scale-in`}
-                    style={{ animationDelay: `${index * 200}ms` }}
-                    onClick={() => handleTypeSelect(type.id)}
-                  >
-                    <div className={`absolute inset-0 bg-gradient-to-br ${type.color} opacity-5`}></div>
-                    <CardHeader className="relative z-10 text-center pb-4">
-                      <div className={`w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-r ${type.color} flex items-center justify-center`}>
-                        <IconComponent className="h-10 w-10 text-white" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto mb-12">
+              {/* Self Photo Card */}
+              {selfPhotoStudios.length > 0 && (
+                <Card 
+                  className="border-4 border-black shadow-none cursor-pointer hover:shadow-lg transition-shadow bg-white"
+                  onClick={() => handleTypeSelect('self_photo')}
+                >
+                  <CardHeader className="bg-red-500 text-white text-center">
+                    <div className="w-20 h-20 mx-auto mb-4 bg-white rounded-full flex items-center justify-center">
+                      <User className="h-10 w-10 text-red-500" />
+                    </div>
+                    <CardTitle className="text-3xl font-black tracking-wide">SELF PHOTO</CardTitle>
+                    <CardDescription className="text-red-100 font-medium">
+                      Foto sendiri dengan kontrol penuh
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-8">
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center text-sm font-medium">
+                        <div className="w-3 h-3 bg-black mr-3"></div>
+                        Kontrol penuh atas foto
                       </div>
-                      <CardTitle className="text-2xl mb-2">{type.title}</CardTitle>
-                      <CardDescription className="text-base">{type.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="relative z-10">
-                      <div className="space-y-3 mb-6">
-                        {type.features.map((feature, i) => (
-                          <div key={i} className="flex items-center text-sm">
-                            <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${type.color} mr-3`}></div>
-                            {feature}
-                          </div>
-                        ))}
+                      <div className="flex items-center text-sm font-medium">
+                        <div className="w-3 h-3 bg-black mr-3"></div>
+                        Privacy maksimal
                       </div>
-                      <Button 
-                        className={`w-full bg-gradient-to-r ${type.color} hover:opacity-90 transition-all duration-300 text-white font-medium py-3`}
-                        onClick={() => handleTypeSelect(type.id)}
-                      >
-                        Pilih {type.title}
-                        <ChevronRight className="h-5 w-5 ml-2" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      <div className="flex items-center text-sm font-medium">
+                        <div className="w-3 h-3 bg-black mr-3"></div>
+                        Waktu fleksibel
+                      </div>
+                      <div className="flex items-center text-sm font-medium">
+                        <div className="w-3 h-3 bg-black mr-3"></div>
+                        {selfPhotoStudios.length} studio tersedia
+                      </div>
+                    </div>
+                    <Button 
+                      className="w-full bg-black text-white hover:bg-gray-800 font-black py-4 text-lg tracking-wide"
+                      onClick={() => handleTypeSelect('self_photo')}
+                    >
+                      PILIH SELF PHOTO
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Regular Studio Card */}
+              {regularStudios.length > 0 && (
+                <Card 
+                  className="border-4 border-black shadow-none cursor-pointer hover:shadow-lg transition-shadow bg-white"
+                  onClick={() => setSelectedType('regular')}
+                >
+                  <CardHeader className="bg-blue-600 text-white text-center">
+                    <div className="w-20 h-20 mx-auto mb-4 bg-white rounded-full flex items-center justify-center">
+                      <Camera className="h-10 w-10 text-blue-600" />
+                    </div>
+                    <CardTitle className="text-3xl font-black tracking-wide">STUDIO REGULER</CardTitle>
+                    <CardDescription className="text-blue-100 font-medium">
+                      Sesi foto profesional dengan fotografer
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-8">
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center text-sm font-medium">
+                        <div className="w-3 h-3 bg-black mr-3"></div>
+                        Fotografer profesional
+                      </div>
+                      <div className="flex items-center text-sm font-medium">
+                        <div className="w-3 h-3 bg-black mr-3"></div>
+                        Berbagai kategori
+                      </div>
+                      <div className="flex items-center text-sm font-medium">
+                        <div className="w-3 h-3 bg-black mr-3"></div>
+                        Hasil berkualitas tinggi
+                      </div>
+                      <div className="flex items-center text-sm font-medium">
+                        <div className="w-3 h-3 bg-black mr-3"></div>
+                        {regularStudios.length} studio tersedia
+                      </div>
+                    </div>
+                    <Button 
+                      className="w-full bg-black text-white hover:bg-gray-800 font-black py-4 text-lg tracking-wide"
+                      onClick={() => setSelectedType('regular')}
+                    >
+                      PILIH STUDIO REGULER
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           ) : selectedType === 'regular' ? (
             /* Category Selection for Regular Studio */
@@ -144,43 +211,42 @@ const BookingSelectionPage = () => {
                 <Button 
                   variant="outline" 
                   onClick={() => setSelectedType(null)}
-                  className="mb-4 hover-scale"
+                  className="mb-4 border-2 border-black text-black hover:bg-black hover:text-white font-bold"
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Kembali ke Pilihan Studio
+                  KEMBALI KE PILIHAN STUDIO
                 </Button>
-                <h2 className="text-3xl font-bold mb-4">Pilih Kategori Foto</h2>
-                <p className="text-lg text-muted-foreground">
+                <h2 className="text-4xl font-black mb-4 tracking-tight">PILIH KATEGORI FOTO</h2>
+                <p className="text-lg font-light tracking-wide">
                   Setiap kategori dirancang khusus untuk kebutuhan Anda
                 </p>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
                 {categories.map((category, index) => {
-                  const IconComponent = category.icon;
+                  const IconComponent = getCategoryIcon(category.name);
+                  const colorClass = getCategoryColor(index);
                   return (
                     <Card 
                       key={category.id}
-                      className={`relative overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 animate-fade-in`}
-                      style={{ animationDelay: `${index * 100}ms` }}
+                      className="border-4 border-black shadow-none cursor-pointer hover:shadow-lg transition-shadow bg-white"
                       onClick={() => handleCategorySelect(category.id)}
                     >
-                      <div className={`absolute inset-0 bg-gradient-to-br ${category.color} opacity-10`}></div>
-                      <CardHeader className="relative z-10 text-center">
-                        <div className={`w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r ${category.color} flex items-center justify-center`}>
-                          <IconComponent className="h-8 w-8 text-white" />
+                      <CardHeader className={`${colorClass} text-white text-center`}>
+                        <div className="w-16 h-16 mx-auto mb-4 bg-white rounded-full flex items-center justify-center">
+                          <IconComponent className={`h-8 w-8 ${colorClass.replace('bg-', 'text-')}`} />
                         </div>
-                        <CardTitle className="text-xl mb-2">{category.title}</CardTitle>
-                        <CardDescription className="text-sm">{category.description}</CardDescription>
+                        <CardTitle className="text-2xl font-black tracking-wide">{category.name.toUpperCase()}</CardTitle>
+                        <CardDescription className="text-white/80 font-medium">
+                          {category.description || `Foto ${category.name.toLowerCase()}`}
+                        </CardDescription>
                       </CardHeader>
-                      <CardContent className="relative z-10">
+                      <CardContent className="p-6">
                         <Button 
-                          variant="outline" 
-                          className="w-full hover:bg-gradient-to-r hover:bg-opacity-10 transition-all duration-300"
+                          className="w-full bg-black text-white hover:bg-gray-800 font-black py-3 tracking-wide"
                           onClick={() => handleCategorySelect(category.id)}
                         >
-                          Pilih {category.title}
-                          <ChevronRight className="h-4 w-4 ml-2" />
+                          PILIH {category.name.toUpperCase()}
                         </Button>
                       </CardContent>
                     </Card>
@@ -191,14 +257,14 @@ const BookingSelectionPage = () => {
           ) : null}
 
           {/* Call to Action */}
-          <div className="text-center mt-16 animate-fade-in">
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white">
-              <h3 className="text-2xl font-bold mb-4">Butuh Bantuan Memilih?</h3>
-              <p className="text-lg mb-6 opacity-90">
+          <div className="text-center mt-16">
+            <div className="bg-gray-100 border-4 border-black p-8">
+              <h3 className="text-3xl font-black mb-4 tracking-wide">BUTUH BANTUAN MEMILIH?</h3>
+              <p className="text-lg mb-6 font-medium">
                 Tim kami siap membantu Anda menemukan paket foto yang sempurna
               </p>
-              <Button variant="secondary" size="lg" className="hover-scale">
-                Hubungi Kami
+              <Button size="lg" className="bg-black text-white hover:bg-gray-800 font-black py-4 px-8 text-lg tracking-wide">
+                HUBUNGI KAMI
               </Button>
             </div>
           </div>
