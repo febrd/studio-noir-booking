@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,7 @@ interface LoginFormProps {
 }
 
 export const LoginForm = ({ onError }: LoginFormProps) => {
-  const { signIn } = useAuth();
+  const { signIn } = useJWTAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
 
@@ -28,14 +28,14 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
 
     try {
       console.log('Starting login process...');
-      const { error } = await signIn(loginForm.email, loginForm.password);
+      const result = await signIn(loginForm.email, loginForm.password);
       
-      if (error) {
-        console.error('Login failed:', error);
-        onError(error.message || 'Login gagal. Periksa email dan password Anda.');
+      if (!result.success) {
+        console.error('Login failed:', result.error);
+        onError(result.error || 'Login gagal. Periksa email dan password Anda.');
       } else {
         console.log('Login successful');
-        // Success will redirect to main page
+        // Success will redirect to main page automatically
         window.location.href = '/';
       }
     } catch (err) {

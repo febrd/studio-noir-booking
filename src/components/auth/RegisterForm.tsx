@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +12,7 @@ interface RegisterFormProps {
 }
 
 export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
-  const { signUp } = useAuth();
+  const { signUp } = useJWTAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registerForm, setRegisterForm] = useState({ 
     email: '', 
@@ -44,19 +44,22 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
 
     try {
       console.log('Starting registration process...');
-      const { error } = await signUp(registerForm.email, registerForm.password, registerForm.name);
+      const result = await signUp(registerForm.email, registerForm.password, registerForm.name);
       
-      if (error) {
-        console.error('Registration failed:', error);
-        onError(error.message || 'Registrasi gagal. Coba lagi.');
+      if (!result.success) {
+        console.error('Registration failed:', result.error);
+        onError(result.error || 'Registrasi gagal. Coba lagi.');
       } else {
         console.log('Registration successful');
-        onSuccess('Registrasi berhasil! Anda akan diarahkan ke dashboard...');
+        onSuccess('Registrasi berhasil! Silakan login dengan akun baru Anda.');
         setRegisterForm({ email: '', password: '', confirmPassword: '', name: '' });
         
-        // Redirect to main page after successful registration
+        // Switch to login tab after successful registration
         setTimeout(() => {
-          window.location.href = '/';
+          const loginTab = document.querySelector('[value="login"]') as HTMLElement;
+          if (loginTab) {
+            loginTab.click();
+          }
         }, 1500);
       }
     } catch (err) {
