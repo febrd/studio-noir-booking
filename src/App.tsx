@@ -39,15 +39,15 @@ const queryClient = new QueryClient();
 function App() {
 
   useEffect(() => {
-    document.title = 'Masuk Studio'; // Title
+    document.title = 'Masuk Studio | Reservasi Yuk!'; // Title
   
     const favicon = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
     if (favicon) {
-      favicon.href = 'https://masukstudio.com/static/icon.png'; // Ganti URL dengan favicon kamu
+      favicon.href = 'https://iili.io/FwdFJ94.png'; // Ganti URL dengan favicon kamu
     } else {
       const link = document.createElement('link');
       link.rel = 'icon';
-      link.href = 'https://masukstudio.com/static/icon.png';
+      link.href = 'https://iili.io/FwdFJ94.png';
       document.head.appendChild(link);
     }
   }, []);
