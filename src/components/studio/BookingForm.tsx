@@ -13,12 +13,10 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 
-
 interface BookingFormProps {
   booking?: any;
   onSuccess: () => void;
 }
-
 
 interface AdditionalService {
   id: string;
@@ -33,15 +31,30 @@ const isValidUUID = (uuid: string): boolean => {
   return uuidRegex.test(uuid);
 };
 
-const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
+// Timezone utility functions for WITA (GMT+8)
+const toWITAString = (date: Date): string => {
+  // Convert to WITA timezone (GMT+8)
+  const witaOffset = 8 * 60; // 8 hours in minutes
+  const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+  const witaTime = new Date(utc + (witaOffset * 60000));
+  return witaTime.toISOString().slice(0, 16);
+};
 
-  function formatDatetimeLocal(value: string): string {
-    const date = new Date(value);
-    const offset = date.getTimezoneOffset(); // in minutes
-    const localDate = new Date(date.getTime() - offset * 60 * 1000); // shift to local time
-    return localDate.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
-  }
-  
+const fromWITAString = (dateString: string): Date => {
+  // Convert from WITA timezone (GMT+8) to UTC
+  const localDate = new Date(dateString);
+  const witaOffset = 8 * 60; // 8 hours in minutes
+  const utc = localDate.getTime() - (witaOffset * 60000);
+  return new Date(utc);
+};
+
+const formatDatetimeLocalWITA = (value: string): string => {
+  if (!value) return '';
+  const date = new Date(value);
+  return toWITAString(date);
+};
+
+const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const { userProfile } = useJWTAuth();
 
   const [formData, setFormData] = useState({
@@ -174,7 +187,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
 
   const selectedPackage = packages?.find(p => p.id === formData.studio_package_id);
 
-  // Check for booking conflicts
+  // Check for booking conflicts with WITA timezone
   const checkConflictMutation = useMutation({
     mutationFn: async ({ studioId, startTime, endTime }: { studioId: string, startTime: string, endTime: string }) => {
       const { data, error } = await supabase.rpc('check_booking_conflict', {
@@ -192,7 +205,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   });
 
-  // Create guest user mutation - FIXED: Use proper UUID generation
+  // Create guest user mutation
   const createGuestMutation = useMutation({
     mutationFn: async (userData: { name: string; email: string }) => {
       const randomPassword = Math.random().toString(36).slice(-8);
@@ -206,14 +219,14 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           role: 'pelanggan',
           password: randomPassword
         }])
-        .select('id, name') // cukup ambil kolom yang dibutuhkan
+        .select('id, name')
         .single();
   
       if (error) throw error;
       return data;
     },
     onSuccess: (user) => {
-      setFormData(prev => ({ ...prev, user_id: user.id })); // ✅ yang penting ini
+      setFormData(prev => ({ ...prev, user_id: user.id }));
       toast.success(`Guest user created: ${user.name}`);
     },
     onError: (error) => {
@@ -221,12 +234,10 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       toast.error('Gagal membuat user guest');
     }
   });
-  
 
-  // Create/Update booking mutation - FIXED: Better error handling
+  // Create/Update booking mutation with proper end time calculation
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
-    
       const tentativeUserId = data.user_id || '';
       const finalUserId = isValidUUID(tentativeUserId) ? tentativeUserId : null;
       
@@ -235,14 +246,19 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         throw new Error('User ID tidak valid atau kosong');
       }
 
+      // Calculate proper end time in WITA
+      const startTimeUTC = fromWITAString(data.start_time);
+      const totalMinutes = (selectedPackage?.base_time_minutes || 0) + (data.additional_time_minutes || 0);
+      const endTimeUTC = new Date(startTimeUTC.getTime() + (totalMinutes * 60 * 1000));
+
       const bookingData = {
         ...data,
-        user_id: finalUserId, // ✅ gunakan UUID yang sudah tervalidasi
+        user_id: finalUserId,
         studio_id: data.studio_id,
         studio_package_id: data.studio_package_id,
         package_category_id: data.package_category_id || null,
-        start_time: data.start_time,
-        end_time: endTime,
+        start_time: startTimeUTC.toISOString(),
+        end_time: endTimeUTC.toISOString(),
         additional_time_minutes: data.additional_time_minutes || 0,
         payment_method: data.payment_method,
         type: data.type,
@@ -250,18 +266,14 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         total_amount: totalPrice,
         performed_by: userProfile.id,
       };
-     
-      console.log("== Inserted guest user data:", data);
 
       console.log('🔧 BookingData to save:', bookingData);
-      console.log('📦 userProfile:', userProfile);
-      console.log('📝 incoming data parameter:', data);
   
       let result;
       let oldData: any = null;
   
       if (booking?.id) {
-        // Ambil data lama
+        // Get old data for logging
         const { data: existing, error: fetchError } = await supabase
           .from('bookings')
           .select('*')
@@ -272,7 +284,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           console.warn('⚠️ Gagal mengambil data lama:', fetchError);
         } else {
           oldData = existing;
-          console.log('📜 Old booking data:', oldData);
         }
   
         // Update booking
@@ -305,8 +316,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         result = newBooking;
       }
   
-      console.log('✅ Final saved booking result:', result);
-  
       // Logging aktivitas
       if (userProfile?.id && ['admin', 'owner'].includes(userProfile.role)) {
         const isUpdate = Boolean(booking?.id);
@@ -319,8 +328,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           ...(isUpdate && { new_data: result }),
         };
   
-        console.log('🧾 Log payload to insert:', logPayload);
-  
         const { error: logError } = await supabase
           .from('booking_logs')
           .insert([logPayload]);
@@ -329,8 +336,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           console.error('⚠️ Error inserting booking log:', logError);
           toast.warning('Booking disimpan tapi gagal mencatat log.');
         }
-      } else {
-        console.warn('⚠️ Tidak mencatat log: userProfile belum siap atau tidak memiliki izin.');
       }
   
       // Additional services
@@ -348,8 +353,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           quantity: service.quantity,
           total_price: service.price * service.quantity
         }));
-  
-        console.log('🧩 Additional services to insert:', serviceData);
   
         const { error: serviceError } = await supabase
           .from('booking_additional_services')
@@ -384,13 +387,12 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       toast.error(errorMessage);
     }
   });
-  
 
-  // Calculate end time
+  // Calculate end time dynamically based on base time + additional time
   const calculateEndTime = (startTime: string, baseMinutes: number, additionalMinutes: number = 0) => {
     if (!startTime || !baseMinutes) return '';
     
-    const start = new Date(startTime);
+    const start = fromWITAString(startTime);
     const totalMinutes = baseMinutes + additionalMinutes;
     const end = new Date(start.getTime() + (totalMinutes * 60 * 1000));
     
@@ -441,11 +443,12 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       );
       setEndTime(newEndTime);
       
-      // Check for conflicts
+      // Check for conflicts with proper timezone conversion
       if (newEndTime && formData.studio_id) {
+        const startTimeUTC = fromWITAString(formData.start_time);
         checkConflictMutation.mutate({
           studioId: formData.studio_id,
-          startTime: formData.start_time,
+          startTime: startTimeUTC.toISOString(),
           endTime: newEndTime
         });
       }
@@ -520,16 +523,25 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }).format(price);
   };
 
-  const formatDateTime = (dateTimeString: string) => {
+  const formatDateTimeWITA = (dateTimeString: string) => {
     if (!dateTimeString) return '';
-    return new Date(dateTimeString).toLocaleString('id-ID');
+    const date = new Date(dateTimeString);
+    // Format in WITA timezone
+    return new Intl.DateTimeFormat('id-ID', {
+      timeZone: 'Asia/Makassar',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
   };
 
   const selectedUser = users?.find(u => u.id === formData.user_id);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-h-[80vh] overflow-y-auto">
-      {/* Customer Selection - IMPROVED: Searchable dropdown */}
+      {/* Customer Selection */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Customer</h3>
         
@@ -561,7 +573,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
                 type="text"
                 value={guestUser.email}
                 onChange={(e) => setGuestUser(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="Emai/Whatsapp"
+                placeholder="Email/Whatsapp"
                 required
               />
             </div>
@@ -682,18 +694,18 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         </Select>
       </div>
 
-      {/* Date and Time */}
+      {/* Date and Time - WITA timezone */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="start_time">Tanggal & Waktu Mulai *</Label>
+          <Label htmlFor="start_time">Tanggal & Waktu Mulai (WITA) *</Label>
           <Input
             id="start_time"
             type="datetime-local"
-            value={formData.start_time ? formatDatetimeLocal(formData.start_time) : ''}
+            value={formData.start_time ? formatDatetimeLocalWITA(formData.start_time) : ''}
             onChange={(e) => handleInputChange('start_time', e.target.value)}
             required
           />
-
+          <p className="text-xs text-gray-500">Waktu Indonesia Timur (GMT+8)</p>
         </div>
         
         <div className="space-y-2">
@@ -720,17 +732,17 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         </div>
       )}
 
-      {/* Schedule Info */}
+      {/* Schedule Info with WITA timezone */}
       {endTime && (
         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center gap-2 text-blue-800">
             <Clock className="h-4 w-4" />
-            <span className="text-sm font-medium">Jadwal Booking</span>
+            <span className="text-sm font-medium">Jadwal Booking (WITA)</span>
           </div>
           <div className="mt-2 text-sm text-blue-700">
-            <p>Mulai: {formatDateTime(formData.start_time)}</p>
-            <p>Selesai: {formatDateTime(endTime)}</p>
-            <p>Durasi: {selectedPackage?.base_time_minutes + formData.additional_time_minutes} menit</p>
+            <p>Mulai: {formatDateTimeWITA(fromWITAString(formData.start_time).toISOString())}</p>
+            <p>Selesai: {formatDateTimeWITA(endTime)}</p>
+            <p>Durasi: {(selectedPackage?.base_time_minutes || 0) + formData.additional_time_minutes} menit</p>
           </div>
         </div>
       )}

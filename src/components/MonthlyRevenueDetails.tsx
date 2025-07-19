@@ -22,7 +22,41 @@ interface MonthlyRevenueDetailsProps {
 export const MonthlyRevenueDetails = ({ monthlyDetails, startDate, endDate }: MonthlyRevenueDetailsProps) => {
   const daysInPeriod = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-  // Group data by item type
+  // Group data by studio type for the second table
+  const studioTypeMapping: Record<string, string> = {
+    'Self Photo': 'Studio Self Photo',
+    'Regular': 'Studio Reguler', 
+    'Photobooth': 'Studio Photobooth',
+    'Unknown': 'Lain-Lain'
+  };
+
+  // Group by studio type instead of item
+  const groupedByStudioType = monthlyDetails.reduce((acc, detail) => {
+    // Map the item to studio type categories
+    let studioType = 'Lain-Lain'; // default
+    
+    if (detail.item.toLowerCase().includes('self') || detail.item.toLowerCase().includes('selfie')) {
+      studioType = 'Studio Self Photo';
+    } else if (detail.item.toLowerCase().includes('regular') || detail.item.toLowerCase().includes('foto')) {
+      studioType = 'Studio Reguler';
+    } else if (detail.item.toLowerCase().includes('booth')) {
+      studioType = 'Studio Photobooth';
+    }
+    
+    if (!acc[studioType]) {
+      acc[studioType] = {
+        totalSessions: 0,
+        totalRevenue: 0,
+        packages: []
+      };
+    }
+    acc[studioType].totalSessions += detail.sessions_count;
+    acc[studioType].totalRevenue += detail.revenue;
+    acc[studioType].packages.push(detail);
+    return acc;
+  }, {} as Record<string, { totalSessions: number; totalRevenue: number; packages: MonthlyDetail[] }>);
+
+  // Group data by item type for first table
   const groupedByItem = monthlyDetails.reduce((acc, detail) => {
     if (!acc[detail.item]) {
       acc[detail.item] = {
@@ -37,12 +71,20 @@ export const MonthlyRevenueDetails = ({ monthlyDetails, startDate, endDate }: Mo
     return acc;
   }, {} as Record<string, { totalSessions: number; totalRevenue: number; packages: MonthlyDetail[] }>);
 
-  // Calculate daily averages by item
-  const dailyAverages = Object.entries(groupedByItem).map(([item, data]) => ({
-    item,
-    avgTransactionsPerDay: data.totalSessions / daysInPeriod,
+  // Calculate daily averages by studio type for second table
+  const dailyAveragesByStudioType = Object.entries(groupedByStudioType).map(([studioType, data]) => ({
+    studioType,
+    avgSessionsPerDay: data.totalSessions / daysInPeriod,
     avgRevenuePerDay: data.totalRevenue / daysInPeriod
   }));
+
+  // Sort studio types in the desired order
+  const studioTypeOrder = ['Studio Self Photo', 'Studio Reguler', 'Studio Photobooth', 'Lain-Lain'];
+  dailyAveragesByStudioType.sort((a, b) => {
+    const indexA = studioTypeOrder.indexOf(a.studioType);
+    const indexB = studioTypeOrder.indexOf(b.studioType);
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
 
   const totalSessions = Object.values(groupedByItem).reduce((sum, item) => sum + item.totalSessions, 0);
   const totalRevenue = Object.values(groupedByItem).reduce((sum, item) => sum + item.totalRevenue, 0);
@@ -98,7 +140,7 @@ export const MonthlyRevenueDetails = ({ monthlyDetails, startDate, endDate }: Mo
             </div>
           </div>
 
-          {/* Tabel Kedua: Rata-rata Perhari */}
+          {/* Tabel Kedua: Rata-rata Perhari berdasarkan Studio Type */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">📊 Rata-rata Perhari</h3>
             <div className="border rounded-lg overflow-hidden">
@@ -111,10 +153,10 @@ export const MonthlyRevenueDetails = ({ monthlyDetails, startDate, endDate }: Mo
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dailyAverages.map((avg) => (
-                    <TableRow key={avg.item}>
-                      <TableCell className="font-medium">{avg.item}</TableCell>
-                      <TableCell>{avg.avgTransactionsPerDay.toFixed(1)}</TableCell>
+                  {dailyAveragesByStudioType.map((avg) => (
+                    <TableRow key={avg.studioType}>
+                      <TableCell className="font-medium">{avg.studioType}</TableCell>
+                      <TableCell>{avg.avgSessionsPerDay.toFixed(1)}</TableCell>
                       <TableCell>Rp {avg.avgRevenuePerDay.toLocaleString('id-ID')}</TableCell>
                     </TableRow>
                   ))}
