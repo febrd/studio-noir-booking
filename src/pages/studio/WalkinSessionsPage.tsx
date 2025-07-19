@@ -85,7 +85,7 @@ const WalkinSessionsPage = () => {
     const variants = {
       pending: 'secondary',
       confirmed: 'default',
-      completed: 'success',
+      completed: 'outline', // Changed from 'success' to 'outline'
       cancelled: 'destructive'
     } as const;
     
