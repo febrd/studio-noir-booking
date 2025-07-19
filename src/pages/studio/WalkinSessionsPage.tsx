@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format, startOfDay, endOfDay } from 'date-fns';
-import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import WalkinBookingForm from '@/components/studio/WalkinBookingForm';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
 
@@ -21,7 +21,7 @@ const WalkinSessionsPage = () => {
   const queryClient = useQueryClient();
   
   const today = new Date();
-  const witaToday = utcToZonedTime(today, WITA_TIMEZONE);
+  const witaToday = toZonedTime(today, WITA_TIMEZONE);
 
   console.log('Today UTC:', today);
   console.log('Today WITA:', witaToday);
@@ -35,8 +35,8 @@ const WalkinSessionsPage = () => {
       // Convert WITA times to UTC for database query
       const startOfDayWita = startOfDay(witaToday);
       const endOfDayWita = endOfDay(witaToday);
-      const startOfDayUtc = zonedTimeToUtc(startOfDayWita, WITA_TIMEZONE);
-      const endOfDayUtc = zonedTimeToUtc(endOfDayWita, WITA_TIMEZONE);
+      const startOfDayUtc = fromZonedTime(startOfDayWita, WITA_TIMEZONE);
+      const endOfDayUtc = fromZonedTime(endOfDayWita, WITA_TIMEZONE);
 
       console.log('Query range UTC:', {
         start: startOfDayUtc.toISOString(),
@@ -71,8 +71,8 @@ const WalkinSessionsPage = () => {
       // Convert UTC times back to WITA for display
       const sessionsWithWitaTime = data?.map(session => ({
         ...session,
-        start_time_wita: utcToZonedTime(new Date(session.start_time), WITA_TIMEZONE),
-        end_time_wita: utcToZonedTime(new Date(session.end_time), WITA_TIMEZONE)
+        start_time_wita: toZonedTime(new Date(session.start_time), WITA_TIMEZONE),
+        end_time_wita: toZonedTime(new Date(session.end_time), WITA_TIMEZONE)
       })) || [];
 
       console.log('Sessions with WITA time:', sessionsWithWitaTime);
