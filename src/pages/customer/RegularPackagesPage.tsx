@@ -12,18 +12,18 @@ import { toast } from 'sonner';
 
 interface Package {
   id: string;
-  name: string;
+  title: string;
   price: number;
-  duration: number;
+  base_time_minutes: number;
   description: string;
   category: {
     name: string;
     id: string;
-  };
+  } | null;
   studio: {
     name: string;
     id: string;
-  };
+  } | null;
 }
 
 const RegularPackagesPage = () => {
@@ -37,18 +37,17 @@ const RegularPackagesPage = () => {
     queryFn: async () => {
       console.log('Fetching regular packages...');
       const { data, error } = await supabase
-        .from('packages')
+        .from('studio_packages')
         .select(`
           id,
-          name,
+          title,
           price,
-          duration,
+          base_time_minutes,
           description,
           category:package_categories(id, name),
           studio:studios(id, name)
         `)
-        .eq('is_active', true)
-        .order('name');
+        .order('title');
 
       if (error) {
         console.error('Error fetching packages:', error);
@@ -62,7 +61,7 @@ const RegularPackagesPage = () => {
 
   // Filter packages based on search and category
   const filteredPackages = packages.filter(pkg => {
-    const matchesSearch = pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = pkg.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          pkg.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = !selectedCategory || pkg.category?.name === selectedCategory;
     return matchesSearch && matchesCategory;
@@ -217,7 +216,7 @@ const RegularPackagesPage = () => {
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-lg font-semibold text-elegant group-hover:text-primary transition-colors">
-                      {pkg.name}
+                      {pkg.title}
                     </CardTitle>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-primary">
@@ -236,7 +235,7 @@ const RegularPackagesPage = () => {
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Clock className="h-4 w-4" />
-                        {pkg.duration} menit
+                        {pkg.base_time_minutes} menit
                       </div>
                       <div className="flex items-center gap-1">
                         <MapPin className="h-4 w-4" />

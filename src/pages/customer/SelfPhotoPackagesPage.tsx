@@ -13,18 +13,18 @@ import { toast } from 'sonner';
 
 interface Package {
   id: string;
-  name: string;
+  title: string;
   price: number;
-  duration: number;
+  base_time_minutes: number;
   description: string;
   category: {
     name: string;
     id: string;
-  };
+  } | null;
   studio: {
     name: string;
     id: string;
-  };
+  } | null;
 }
 
 const SelfPhotoPackagesPage = () => {
@@ -38,19 +38,18 @@ const SelfPhotoPackagesPage = () => {
     queryFn: async () => {
       console.log('Fetching self photo packages...');
       const { data, error } = await supabase
-        .from('packages')
+        .from('studio_packages')
         .select(`
           id,
-          name,
+          title,
           price,
-          duration,
+          base_time_minutes,
           description,
           category:package_categories(id, name),
           studio:studios(id, name)
         `)
-        .eq('is_active', true)
-        .ilike('name', '%self%')
-        .order('name');
+        .eq('studio.type', 'self_photo')
+        .order('title');
 
       if (error) {
         console.error('Error fetching self photo packages:', error);
@@ -65,7 +64,7 @@ const SelfPhotoPackagesPage = () => {
   // Filter and sort packages
   const filteredPackages = packages
     .filter(pkg => 
-      pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pkg.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       pkg.description?.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
@@ -75,7 +74,7 @@ const SelfPhotoPackagesPage = () => {
         case 'price-high':
           return b.price - a.price;
         case 'duration':
-          return a.duration - b.duration;
+          return a.base_time_minutes - b.base_time_minutes;
         case 'popular':
         default:
           return 0;
@@ -194,7 +193,7 @@ const SelfPhotoPackagesPage = () => {
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-lg font-semibold text-elegant group-hover:text-primary transition-colors">
-                      {pkg.name}
+                      {pkg.title}
                     </CardTitle>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-primary">
@@ -213,7 +212,7 @@ const SelfPhotoPackagesPage = () => {
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Clock className="h-4 w-4" />
-                        {pkg.duration} menit
+                        {pkg.base_time_minutes} menit
                       </div>
                       <div className="flex items-center gap-1">
                         <MapPin className="h-4 w-4" />
