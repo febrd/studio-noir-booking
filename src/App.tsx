@@ -15,6 +15,7 @@ import Users from "./pages/admin/Users";
 import PaymentProviders from "./pages/admin/PaymentProviders";
 import StudioManagement from "./pages/studio/StudioManagement";
 import TransactionsPage from "./pages/transactions/TransactionsPage";
+import Customers from "./pages/admin/Customers";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -99,6 +100,16 @@ const App: React.FC = () => {
                 } 
               />
               
+               {/* Customer Profiles Routes */}
+               <Route 
+                path="/admin/customers" 
+                element={
+                  <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
+                    <Customers />
+                  </JWTProtectedRoute>
+                } 
+              />
+
               {/* Catch-all route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
