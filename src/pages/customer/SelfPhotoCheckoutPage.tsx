@@ -132,10 +132,10 @@ const SelfPhotoCheckoutPage = () => {
 
   // Fetch booked slots when on schedule step
   useEffect(() => {
-    if (currentStep === 'schedule' && packageId) {
+    if (currentStep === 'schedule' && packageData?.studios?.id) {
       fetchBookedSlots();
     }
-  }, [currentStep, packageId]);
+  }, [currentStep, packageData?.studios?.id]);
 
   // Generate time slots when date is selected
   useEffect(() => {
@@ -154,19 +154,31 @@ const SelfPhotoCheckoutPage = () => {
 
   const fetchBookedSlots = async () => {
     try {
+      console.log('Fetching booked slots for self_photo type...');
+      
       const { data, error } = await supabase
         .from('bookings')
         .select('start_time, end_time, id')
-        .eq('studio_package_id', packageId)
-        .in('status', ['pending', 'confirmed']);
+        .eq('type', 'self_photo')
+        .eq('studio_id', packageData?.studios?.id)
+        .in('status', ['pending', 'confirmed', 'paid']);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching booked slots:', error);
+        throw error;
+      }
 
-      // Group bookings by date
+      console.log('Fetched bookings:', data);
+
+      // Group bookings by date (convert UTC to WITA for date comparison)
       const groupedBookings: {[key: string]: BookedSlot[]} = {};
       data.forEach(booking => {
         if (booking.start_time && booking.end_time) {
-          const dateKey = format(parseISO(booking.start_time), 'yyyy-MM-dd');
+          // Convert UTC to WITA to get the correct date
+          const utcDate = new Date(booking.start_time);
+          const witaDate = new Date(utcDate.getTime() + (8 * 60 * 60 * 1000));
+          const dateKey = format(witaDate, 'yyyy-MM-dd');
+          
           if (!groupedBookings[dateKey]) {
             groupedBookings[dateKey] = [];
           }
@@ -178,6 +190,7 @@ const SelfPhotoCheckoutPage = () => {
         }
       });
 
+      console.log('Grouped bookings by date:', groupedBookings);
       setBookedSlots(groupedBookings);
     } catch (error) {
       console.error('Error fetching booked slots:', error);
@@ -191,22 +204,40 @@ const SelfPhotoCheckoutPage = () => {
     const dayBookings = bookedSlots[dateKey] || [];
     const slots: TimeSlot[] = [];
 
+    console.log(`Generating time slots for ${dateKey}:`, dayBookings);
+
     // Generate time slots from 9 AM to 9 PM
     for (let hour = 9; hour <= 21; hour++) {
       const startTime = `${hour.toString().padStart(2, '0')}:00`;
-      const startDateTime = new Date(`${dateKey}T${startTime}:00`);
-      const endDateTime = addMinutes(startDateTime, packageData.base_time_minutes);
-      const endTime = format(endDateTime, 'HH:mm');
+      
+      // Create WITA datetime for this slot
+      const slotStartWITA = new Date(`${dateKey}T${startTime}:00`);
+      const slotEndWITA = addMinutes(slotStartWITA, packageData.base_time_minutes);
+      const endTime = format(slotEndWITA, 'HH:mm');
 
       // Check if this slot conflicts with any existing booking
       const isBooked = dayBookings.some(booking => {
-        const bookingStart = parseISO(booking.start_time);
-        const bookingEnd = parseISO(booking.end_time);
-        const slotStart = startDateTime;
-        const slotEnd = endDateTime;
+        // Convert UTC booking times to WITA for comparison
+        const bookingStartUTC = new Date(booking.start_time);
+        const bookingEndUTC = new Date(booking.end_time);
+        
+        // Convert to WITA
+        const bookingStartWITA = new Date(bookingStartUTC.getTime() + (8 * 60 * 60 * 1000));
+        const bookingEndWITA = new Date(bookingEndUTC.getTime() + (8 * 60 * 60 * 1000));
 
-        // Check for overlap
-        return (slotStart < bookingEnd && slotEnd > bookingStart);
+        // Check for overlap between slot time and booking time (both in WITA)
+        const overlap = (slotStartWITA < bookingEndWITA && slotEndWITA > bookingStartWITA);
+        
+        if (overlap) {
+          console.log(`Slot ${startTime}-${endTime} conflicts with booking:`, {
+            bookingStart: format(bookingStartWITA, 'HH:mm'),
+            bookingEnd: format(bookingEndWITA, 'HH:mm'),
+            slotStart: format(slotStartWITA, 'HH:mm'),
+            slotEnd: format(slotEndWITA, 'HH:mm')
+          });
+        }
+        
+        return overlap;
       });
 
       slots.push({
@@ -215,13 +246,16 @@ const SelfPhotoCheckoutPage = () => {
         endTime,
         available: !isBooked,
         bookingId: isBooked ? dayBookings.find(b => {
-          const bookingStart = parseISO(b.start_time);
-          const bookingEnd = parseISO(b.end_time);
-          return (startDateTime < bookingEnd && endDateTime > bookingStart);
+          const bookingStartUTC = new Date(b.start_time);
+          const bookingEndUTC = new Date(b.end_time);
+          const bookingStartWITA = new Date(bookingStartUTC.getTime() + (8 * 60 * 60 * 1000));
+          const bookingEndWITA = new Date(bookingEndUTC.getTime() + (8 * 60 * 60 * 1000));
+          return (slotStartWITA < bookingEndWITA && slotEndWITA > bookingStartWITA);
         })?.id : undefined
       });
     }
 
+    console.log('Generated time slots:', slots);
     setTimeSlots(slots);
   };
 
@@ -294,11 +328,19 @@ const SelfPhotoCheckoutPage = () => {
     return (
       <div className="text-sm">
         <div className="font-medium mb-1">Booked times:</div>
-        {dayBookings.map((booking, index) => (
-          <div key={index}>
-            {format(parseISO(booking.start_time), 'HH:mm')} - {format(parseISO(booking.end_time), 'HH:mm')}
-          </div>
-        ))}
+        {dayBookings.map((booking, index) => {
+          // Convert UTC to WITA for display
+          const startUTC = new Date(booking.start_time);
+          const endUTC = new Date(booking.end_time);
+          const startWITA = new Date(startUTC.getTime() + (8 * 60 * 60 * 1000));
+          const endWITA = new Date(endUTC.getTime() + (8 * 60 * 60 * 1000));
+          
+          return (
+            <div key={index}>
+              {format(startWITA, 'HH:mm')} - {format(endWITA, 'HH:mm')}
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -351,13 +393,20 @@ const SelfPhotoCheckoutPage = () => {
     setBookingLoading(true);
 
     try {
-      // Convert selected time to UTC for database storage
+      // Convert selected WITA time to UTC for database storage
       const startDateTimeWITA = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.startTime}:00`;
       const endDateTimeWITA = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.endTime}:00`;
       
       const startDateTimeUTC = parseWITAToUTC(startDateTimeWITA);
       const endDateTimeUTC = parseWITAToUTC(endDateTimeWITA);
       const totalAmount = calculateTotal();
+
+      console.log('Creating booking with times:', {
+        startWITA: startDateTimeWITA,
+        endWITA: endDateTimeWITA,
+        startUTC: startDateTimeUTC.toISOString(),
+        endUTC: endDateTimeUTC.toISOString()
+      });
 
       const { data, error } = await supabase
         .from('bookings')
@@ -763,7 +812,7 @@ const SelfPhotoCheckoutPage = () => {
                 <CardHeader className="p-6">
                   <CardTitle className="font-peace-sans font-black">Waktu Tersedia</CardTitle>
                   <p className="text-sm text-gray-600 font-inter">
-                    {format(selectedDate, 'EEEE, dd MMMM yyyy')}
+                    {format(selectedDate, 'EEEE, dd MMMM yyyy')} (WITA)
                   </p>
                 </CardHeader>
                 <CardContent className="p-6 pt-0">
@@ -774,7 +823,7 @@ const SelfPhotoCheckoutPage = () => {
                         variant={selectedTimeSlot?.id === slot.id ? "default" : "outline"}
                         className={`flex flex-col py-3 h-auto font-inter ${
                           !slot.available 
-                            ? 'opacity-50 cursor-not-allowed' 
+                            ? 'opacity-50 cursor-not-allowed bg-gray-200 text-gray-500' 
                             : 'cursor-pointer'
                         }`}
                         disabled={!slot.available}
@@ -782,6 +831,7 @@ const SelfPhotoCheckoutPage = () => {
                       >
                         <div className="font-medium">{slot.startTime} - {slot.endTime}</div>
                         <div className="text-xs opacity-75">{packageData.base_time_minutes} menit</div>
+                        {!slot.available && <div className="text-xs text-red-500">Tidak Tersedia</div>}
                       </Button>
                     ))}
                   </div>
