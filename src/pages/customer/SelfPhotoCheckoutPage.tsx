@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -8,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Clock, MapPin, Package, User, CreditCard, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, MapPin, Package, User, CreditCard, AlertCircle, Minus, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +31,7 @@ const SelfPhotoCheckoutPage = () => {
   const [selectedServices, setSelectedServices] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [conflictingBookings, setConflictingBookings] = useState<any[]>([]);
+  const [packageQuantity, setPackageQuantity] = useState(1);
 
   // Fetch package details
   const { data: packageData, isLoading } = useQuery({
@@ -127,6 +129,19 @@ const SelfPhotoCheckoutPage = () => {
     return slots;
   };
 
+  const handleQuantityChange = (increase: boolean) => {
+    if (increase) {
+      setPackageQuantity(prev => prev + 1);
+    } else if (packageQuantity > 1) {
+      setPackageQuantity(prev => prev - 1);
+    }
+  };
+
+  const handleContinueToServices = () => {
+    // This can be used to scroll to services section or show next step
+    console.log('Continue to additional services');
+  };
+
   const handleServiceToggle = (service: any, checked: boolean) => {
     if (checked) {
       setSelectedServices(prev => [...prev, { ...service, quantity: 1 }]);
@@ -146,7 +161,7 @@ const SelfPhotoCheckoutPage = () => {
   };
 
   const calculateTotal = () => {
-    let total = packageData?.price || 0;
+    let total = (packageData?.price || 0) * packageQuantity;
     selectedServices.forEach(service => {
       total += service.price * service.quantity;
     });
@@ -283,8 +298,6 @@ const SelfPhotoCheckoutPage = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Package Info */}
-       
-
             <Card className="border border-gray-100 shadow-none">
               <CardHeader className="p-8">
                 <div className="flex justify-between items-start">
@@ -357,6 +370,8 @@ const SelfPhotoCheckoutPage = () => {
               >
                 Continue to Additional Services
               </Button>
+            </div>
+
             {/* Date Selection */}
             <div className="space-y-2">
               <Label htmlFor="date">Tanggal (WITA) *</Label>
@@ -516,8 +531,8 @@ const SelfPhotoCheckoutPage = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between">
-                <span>Paket: {packageData.title}</span>
-                <span>{formatPrice(packageData.price)}</span>
+                <span>Paket: {packageData.title} × {packageQuantity}</span>
+                <span>{formatPrice(packageData.price * packageQuantity)}</span>
               </div>
               
               {selectedServices.map((service) => (
