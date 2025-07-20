@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,8 +19,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, Plus, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { TimeExtensionManager } from './TimeExtensionManager';
-import { InstallmentManager } from './InstallmentManager';
+import TimeExtensionManager from './TimeExtensionManager';
+import InstallmentManager from './InstallmentManager';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { formatUTCToDatetimeLocal, parseWITAToUTC } from '@/utils/timezoneUtils';
 
@@ -117,6 +118,9 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const selectedStudio = studios?.find(studio => studio.id === selectedStudioId);
   const isRegularStudio = selectedStudio?.type === 'regular';
   const isSelfPhotoStudio = selectedStudio?.type === 'self_photo';
+
+  // Get selected category ID
+  const selectedCategoryId = form.watch('category_id');
 
   // Fetch categories for regular studios
   const { data: categories } = useQuery({
@@ -385,13 +389,14 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       }
 
       const totalAmount = calculateTotalAmount();
+      const bookingType = selectedStudio?.type === 'self_photo' ? 'self_photo' : 'regular';
 
       const bookingData = {
         user_id: customerId,
         studio_id: data.studio_id,
         studio_package_id: data.package_id,
         package_category_id: isRegularStudio ? data.category_id : null,
-        type: selectedStudio?.type === 'self_photo' ? 'self_photo' : 'regular',
+        type: bookingType as 'self_photo' | 'regular',
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),
         additional_time_minutes: additionalTime > 0 ? additionalTime : null,
