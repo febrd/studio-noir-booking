@@ -1,132 +1,87 @@
-
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Calendar } from '@/components/ui/calendar';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Clock, Users, MapPin, Camera, Calendar as CalendarIcon } from 'lucide-react';
-import { format, parseISO, isSameDay, isBefore, startOfDay, addMinutes } from 'date-fns';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar, Clock, MapPin, Package, User, CreditCard, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useJWTAuth } from '@/hooks/useJWTAuth';
-
-interface Package {
-  id: string;
-  title: string;
-  price: number;
-  base_time_minutes: number;
-  description: string;
-  package_categories: {
-    name: string;
-    id: string;
-  } | null;
-  studios: {
-    name: string;
-    id: string;
-  } | null;
-}
-
-interface AdditionalService {
-  id: string;
-  name: string;
-  price: number;
-  description: string;
-}
-
-interface TimeSlot {
-  id: string;
-  startTime: string;
-  endTime: string;
-  available: boolean;
-  bookingId?: string;
-}
-
-interface BookedSlot {
-  start_time: string;
-  end_time: string;
-  id: string;
-}
+import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { parseWITAToUTC, formatDateTimeWITA } from '@/utils/timezoneUtils';
 
 const RegularCheckoutPage = () => {
+  const { packageId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const packageId = searchParams.get('package');
-  const { userProfile } = useJWTAuth();
   
-  // Package quantity is fixed at 1 for regular packages
-  const packageQuantity = 1;
-  
-  const [currentStep, setCurrentStep] = useState<'package' | 'services' | 'schedule'>('package');
-  const [selectedServices, setSelectedServices] = useState<{[key: string]: number}>({});
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-  const [bookedSlots, setBookedSlots] = useState<{[key: string]: BookedSlot[]}>({});
-  const [bookingLoading, setBookingLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedTime, setSelectedTime] = useState('');
+  const [customerInfo, setCustomerInfo] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    notes: ''
+  });
+  const [selectedServices, setSelectedServices] = useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [conflictingBookings, setConflictingBookings] = useState<any[]>([]);
 
   // Fetch package details
-  const { data: packageData, isLoading: packageLoading } = useQuery({
-    queryKey: ['regular-package', packageId],
+  const { data: packageData, isLoading } = useQuery({
+    queryKey: ['package', packageId],
     queryFn: async () => {
-      if (!packageId) return null;
-      
       const { data, error } = await supabase
         .from('studio_packages')
         .select(`
-          id,
-          title,
-          price,
-          base_time_minutes,
-          description,
-          package_categories(id, name),
-          studios!inner(id, name, type)
+          *,
+          studios (id, name, location, type),
+          package_categories (id, name)
         `)
         .eq('id', packageId)
-        .eq('studios.type', 'regular')
         .single();
-
+      
       if (error) throw error;
-      return data as Package;
-    },
-    enabled: !!packageId
+      return data;
+    }
   });
 
-  // Fetch additional services for the studio
-  const { data: additionalServices = [] } = useQuery({
-    queryKey: ['additional-services', packageData?.studios?.id],
+  // Fetch additional services
+  const { data: additionalServices } = useQuery({
+    queryKey: ['additional-services', packageData?.studio_id],
     queryFn: async () => {
-      if (!packageData?.studios?.id) return [];
+      if (!packageData?.studio_id) return [];
       
       const { data, error } = await supabase
         .from('additional_services')
         .select('*')
-        .eq('studio_id', packageData.studios.id);
-
+        .eq('studio_id', packageData.studio_id);
+      
       if (error) throw error;
-      return data as AdditionalService[];
+      return data;
     },
-    enabled: !!packageData?.studios?.id
+    enabled: !!packageData?.studio_id
   });
 
-  // Fetch booked slots when we reach schedule step
-  useEffect(() => {
-    if (currentStep === 'schedule' && packageId) {
-      fetchBookedSlots();
-    }
-  }, [currentStep, packageId]);
+  // Check for booking conflicts with proper WITA timezone handling
+  const checkConflicts = async (date: string, time: string) => {
+    if (!date || !time || !packageId) return;
 
-  // Generate time slots when date changes
-  useEffect(() => {
-    if (selectedDate && packageData) {
-      generateTimeSlots();
-    }
-  }, [selectedDate, bookedSlots, packageData]);
-
-  const fetchBookedSlots = async () => {
     try {
+      const dateTimeString = `${date}T${time}`;
+      const startDateTime = parseWITAToUTC(dateTimeString).toISOString();
+      const endDateTime = new Date(parseWITAToUTC(dateTimeString).getTime() + (packageData?.base_time_minutes || 60) * 60000).toISOString();
+
+      console.log('Checking conflicts for WITA times:', {
+        input: dateTimeString,
+        startUTC: startDateTime,
+        endUTC: endDateTime
+      });
+
       const { data, error } = await supabase
         .from('bookings')
         .select('start_time, end_time, id')
@@ -135,260 +90,180 @@ const RegularCheckoutPage = () => {
 
       if (error) throw error;
 
-      // Group bookings by date
-      const groupedBookings: {[key: string]: BookedSlot[]} = {};
-      data.forEach(booking => {
-        if (booking.start_time && booking.end_time) {
-          const dateKey = format(parseISO(booking.start_time), 'yyyy-MM-dd');
-          if (!groupedBookings[dateKey]) {
-            groupedBookings[dateKey] = [];
-          }
-          groupedBookings[dateKey].push({
-            start_time: booking.start_time,
-            end_time: booking.end_time,
-            id: booking.id
-          });
-        }
-      });
+      const conflicts = data?.filter(booking => {
+        const bookingStart = new Date(booking.start_time).getTime();
+        const bookingEnd = new Date(booking.end_time).getTime();
+        const newStart = new Date(startDateTime).getTime();
+        const newEnd = new Date(endDateTime).getTime();
 
-      setBookedSlots(groupedBookings);
+        return (
+          (newStart >= bookingStart && newStart < bookingEnd) ||
+          (newEnd > bookingStart && newEnd <= bookingEnd) ||
+          (newStart <= bookingStart && newEnd >= bookingEnd)
+        );
+      }) || [];
+
+      setConflictingBookings(conflicts);
     } catch (error) {
-      console.error('Error fetching booked slots:', error);
+      console.error('Error checking conflicts:', error);
     }
   };
 
+  // Handle date/time changes
+  useEffect(() => {
+    if (selectedDate && selectedTime) {
+      checkConflicts(selectedDate, selectedTime);
+    }
+  }, [selectedDate, selectedTime, packageId]);
+
+  // Generate time slots (WITA)
   const generateTimeSlots = () => {
-    if (!selectedDate || !packageData) return;
-
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const dayBookings = bookedSlots[dateKey] || [];
-    const slots: TimeSlot[] = [];
-
-    // Generate time slots from 9 AM to 9 PM
-    for (let hour = 9; hour <= 21; hour++) {
-      const startTime = `${hour.toString().padStart(2, '0')}:00`;
-      const startDateTime = new Date(`${dateKey}T${startTime}:00`);
-      const endDateTime = addMinutes(startDateTime, packageData.base_time_minutes);
-      const endTime = format(endDateTime, 'HH:mm');
-
-      // Check if this slot conflicts with any existing booking
-      const isBooked = dayBookings.some(booking => {
-        const bookingStart = parseISO(booking.start_time);
-        const bookingEnd = parseISO(booking.end_time);
-        const slotStart = startDateTime;
-        const slotEnd = endDateTime;
-
-        // Check for overlap
-        return (slotStart < bookingEnd && slotEnd > bookingStart);
-      });
-
-      slots.push({
-        id: `${dateKey}-${startTime}`,
-        startTime,
-        endTime,
-        available: !isBooked,
-        bookingId: isBooked ? dayBookings.find(b => {
-          const bookingStart = parseISO(b.start_time);
-          const bookingEnd = parseISO(b.end_time);
-          return (startDateTime < bookingEnd && endDateTime > bookingStart);
-        })?.id : undefined
-      });
-    }
-
-    setTimeSlots(slots);
-  };
-
-  const handleServiceQuantityChange = (serviceId: string, increment: boolean) => {
-    setSelectedServices(prev => {
-      const current = prev[serviceId] || 0;
-      if (increment) {
-        return { ...prev, [serviceId]: current + 1 };
-      } else if (current > 0) {
-        return { ...prev, [serviceId]: current - 1 };
+    const slots = [];
+    for (let hour = 8; hour <= 20; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        slots.push(timeString);
       }
-      return prev;
-    });
+    }
+    return slots;
   };
 
-  const handleDateSelect = (date: Date | undefined) => {
-    setSelectedDate(date);
-    setSelectedTimeSlot(null);
-  };
-
-  const handleTimeSlotSelect = (timeSlot: TimeSlot) => {
-    if (timeSlot.available) {
-      setSelectedTimeSlot(timeSlot);
+  const handleServiceToggle = (service: any, checked: boolean) => {
+    if (checked) {
+      setSelectedServices(prev => [...prev, { ...service, quantity: 1 }]);
+    } else {
+      setSelectedServices(prev => prev.filter(s => s.id !== service.id));
     }
   };
 
-  const isDateUnavailable = (date: Date) => {
-    const today = startOfDay(new Date());
-    if (isBefore(date, today)) return true;
-
-    const dateKey = format(date, 'yyyy-MM-dd');
-    const dayBookings = bookedSlots[dateKey] || [];
+  const updateServiceQuantity = (serviceId: string, quantity: number) => {
+    if (quantity < 1) return;
     
-    // Check if all time slots are booked for this date
-    const totalSlots = 13; // 9 AM to 9 PM = 13 hours
-    return dayBookings.length >= totalSlots;
-  };
-
-  const getDateTooltipContent = (date: Date) => {
-    const dateKey = format(date, 'yyyy-MM-dd');
-    const dayBookings = bookedSlots[dateKey] || [];
-    
-    if (dayBookings.length === 0) return null;
-    
-    return (
-      <div className="text-sm">
-        <div className="font-medium mb-1">Booked times:</div>
-        {dayBookings.map((booking, index) => (
-          <div key={index}>
-            {format(parseISO(booking.start_time), 'HH:mm')} - {format(parseISO(booking.end_time), 'HH:mm')}
-          </div>
-        ))}
-      </div>
+    setSelectedServices(prev =>
+      prev.map(service =>
+        service.id === serviceId ? { ...service, quantity } : service
+      )
     );
-  };
-
-  const CustomDay = ({ date, displayMonth }: { date: Date; displayMonth: Date }) => {
-    const isUnavailable = isDateUnavailable(date);
-    const isSelected = selectedDate && isSameDay(date, selectedDate);
-    const isToday = isSameDay(date, new Date());
-    const tooltipContent = getDateTooltipContent(date);
-
-    const dayComponent = (
-      <button
-        className={`
-          w-9 h-9 text-sm rounded-md transition-colors
-          ${isSelected ? 'bg-primary text-primary-foreground' : ''}
-          ${isUnavailable ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-green-500 hover:bg-green-50 cursor-pointer'}
-          ${isToday && !isSelected ? 'border-2 border-blue-500' : ''}
-        `}
-        onClick={() => !isUnavailable && handleDateSelect(date)}
-        disabled={isUnavailable}
-      >
-        {date.getDate()}
-      </button>
-    );
-
-    if (tooltipContent && isUnavailable) {
-      return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              {dayComponent}
-            </TooltipTrigger>
-            <TooltipContent>
-              {tooltipContent}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    }
-
-    return dayComponent;
   };
 
   const calculateTotal = () => {
-    const packageTotal = (packageData?.price || 0) * packageQuantity;
-    const servicesTotal = additionalServices.reduce((sum, service) => {
-      const serviceQuantity = selectedServices[service.id] || 0;
-      return sum + (service.price * serviceQuantity);
-    }, 0);
-    return packageTotal + servicesTotal;
+    let total = packageData?.price || 0;
+    selectedServices.forEach(service => {
+      total += service.price * service.quantity;
+    });
+    return total;
   };
 
-  const getCategoryIcon = (category: string) => {
-    switch (category?.toLowerCase()) {
-      case 'personal':
-        return <Users className="h-5 w-5" />;
-      case 'couple':
-        return <Users className="h-5 w-5" />;
-      case 'group':
-        return <Users className="h-5 w-5" />;
-      case 'family':
-        return <Users className="h-5 w-5" />;
-      default:
-        return <Camera className="h-5 w-5" />;
-    }
-  };
+  // Create booking mutation with proper WITA timezone handling
+  const createBookingMutation = useMutation({
+    mutationFn: async (bookingData: any) => {
+      const totalAmount = calculateTotal();
+      const dateTimeString = `${selectedDate}T${selectedTime}`;
+      const startDateTime = parseWITAToUTC(dateTimeString).toISOString();
+      const endDateTime = new Date(parseWITAToUTC(dateTimeString).getTime() + (packageData?.base_time_minutes || 60) * 60000).toISOString();
 
-  const handleProceedToServices = () => {
-    setCurrentStep('services');
-  };
+      console.log('Creating regular booking with WITA conversion:', {
+        inputWITA: dateTimeString,
+        startUTC: startDateTime,
+        endUTC: endDateTime
+      });
 
-  const handleProceedToSchedule = () => {
-    setCurrentStep('schedule');
-  };
-
-  const handleFinalBooking = async () => {
-    if (!selectedDate || !selectedTimeSlot || !userProfile || !packageData) {
-      toast.error('Please select a date and time slot');
-      return;
-    }
-
-    setBookingLoading(true);
-
-    try {
-      const startDateTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.startTime}:00`;
-      const endDateTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.endTime}:00`;
-
-      const { data, error } = await supabase
-        .from('bookings')
+      // Create user first
+      const { data: userData, error: userError } = await supabase
+        .from('users')
         .insert({
-          user_id: userProfile.id,
-          studio_package_id: packageId,
-          studio_id: packageData.studios?.id,
-          start_time: startDateTime,
-          end_time: endDateTime,
-          status: 'pending',
-          total_amount: calculateTotal(),
-          payment_method: 'online',
-          type: 'regular',
-          performed_by: userProfile.id // Add this required field
+          name: customerInfo.name,
+          email: customerInfo.email,
+          role: 'pelanggan'
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (userError) throw userError;
 
-      // Insert additional services if any are selected
-      const selectedServiceEntries = Object.entries(selectedServices).filter(([_, quantity]) => quantity > 0);
-      
-      if (selectedServiceEntries.length > 0) {
-        const additionalServiceInserts = selectedServiceEntries.map(([serviceId, quantity]) => ({
-          booking_id: data.id,
-          additional_service_id: serviceId,
-          quantity: quantity
+      // Create booking with proper WITA to UTC conversion
+      const { data: booking, error: bookingError } = await supabase
+        .from('bookings')
+        .insert({
+          user_id: userData.id,
+          studio_package_id: packageId,
+          package_category_id: packageData?.category_id,
+          studio_id: packageData.studios?.id,
+          start_time: startDateTime,
+          end_time: endDateTime,
+          status: 'pending',
+          total_amount: totalAmount,
+          payment_method: 'online',
+          type: 'regular',
+        })
+        .select()
+        .single();
+
+      if (bookingError) throw bookingError;
+
+      // Add additional services if any
+      if (selectedServices.length > 0) {
+        const serviceData = selectedServices.map(service => ({
+          booking_id: booking.id,
+          additional_service_id: service.id,
+          quantity: service.quantity,
+          total_price: service.price * service.quantity
         }));
 
-        const { error: servicesError } = await supabase
+        const { error: serviceError } = await supabase
           .from('booking_additional_services')
-          .insert(additionalServiceInserts);
+          .insert(serviceData);
 
-        if (servicesError) {
-          console.error('Error adding additional services:', servicesError);
-          // Don't throw here, booking was successful
-        }
+        if (serviceError) throw serviceError;
       }
 
-      toast.success('Booking created successfully!');
-      navigate('/customer/order-history');
-    } catch (error) {
-      console.error('Error creating booking:', error);
-      toast.error('Failed to create booking');
+      return booking;
+    },
+    onSuccess: (booking) => {
+      toast.success('Booking regular berhasil dibuat');
+      navigate(`/booking-confirmation/${booking.id}`);
+    },
+    onError: (error: any) => {
+      console.error('Error creating regular booking:', error);
+      toast.error('Gagal membuat booking regular');
+    }
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (conflictingBookings.length > 0) {
+      toast.error('Jadwal yang dipilih bertabrakan dengan booking lain');
+      return;
+    }
+
+    if (!selectedDate || !selectedTime) {
+      toast.error('Pilih tanggal dan waktu');
+      return;
+    }
+
+    if (!customerInfo.name || !customerInfo.email) {
+      toast.error('Lengkapi informasi customer');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createBookingMutation.mutateAsync({});
     } finally {
-      setBookingLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  if (packageLoading) {
-    return (
-      <div className="min-h-screen bg-white flex justify-center items-center">
-        <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin"></div>
-      </div>
-    );
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR'
+    }).format(price);
+  };
+
+  if (isLoading) {
+    return <div className="p-6">Loading...</div>;
   }
 
   if (!packageData) {
@@ -402,402 +277,240 @@ const RegularCheckoutPage = () => {
         </div>
       </div>
     );
+
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Clean Header */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-8 py-6">
-          <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (currentStep === 'schedule') {
-                  setCurrentStep('services');
-                } else if (currentStep === 'services') {
-                  setCurrentStep('package');
-                } else {
-                  navigate('/customer/regular-packages');
-                }
-              }}
-              className="border border-gray-200 text-gray-600 hover:bg-gray-50 font-inter font-medium"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Kembali
-            </Button>
-            <h1 className="text-3xl font-peace-sans font-black text-black">
-              {currentStep === 'package' && 'Package Selection'}
-              {currentStep === 'services' && 'Additional Services'}
-              {currentStep === 'schedule' && 'Schedule Selection'}
-            </h1>
-            <div className="w-20"></div>
-          </div>
-        </div>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center gap-2 mb-6">
+        <Package className="h-6 w-6" />
+        <h1 className="text-2xl font-bold">Checkout - {packageData.title}</h1>
       </div>
 
-      <div className="max-w-4xl mx-auto px-8 py-12">
-        {currentStep === 'package' && (
-          /* Package Selection */
-          <div className="space-y-12">
-            <div className="text-center">
-              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Studio Package</h2>
-              <p className="text-lg font-inter text-gray-500">Choose your package</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Booking Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Detail Booking</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Package Info */}
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="h-4 w-4" />
+                <span className="font-medium">{packageData.studios?.name}</span>
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <Package className="h-4 w-4" />
+                <span>{packageData.title}</span>
+                <Badge variant="outline">{packageData.package_categories?.name}</Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                <span>{packageData.base_time_minutes} menit</span>
+                <span className="ml-auto font-bold text-green-600">
+                  {formatPrice(packageData.price)}
+                </span>
+              </div>
             </div>
 
-            <Card className="border border-gray-100 shadow-none">
-              <CardHeader className="p-8">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-2xl font-peace-sans font-black text-black mb-2">
-                      {packageData.title}
-                    </CardTitle>
-                    <p className="text-gray-500 font-inter mb-4">{packageData.description}</p>
-                    <div className="flex items-center gap-6 text-sm font-inter text-gray-600">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        {packageData.base_time_minutes} menit
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        {packageData.studios?.name}
-                      </div>
-                    </div>
-                  </div>
-                  <Badge className="bg-blue-50 text-blue-600 border-blue-200 font-peace-sans font-bold flex items-center gap-2">
-                    {getCategoryIcon(packageData.package_categories?.name || '')}
-                    {packageData.package_categories?.name || 'Studio'}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="p-8 pt-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <span className="text-2xl font-peace-sans font-black text-gray-400">
-                      Quantity: {packageQuantity} (Fixed)
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-inter text-gray-500 mb-1">Total</p>
-                    <p className="text-3xl font-peace-sans font-black text-black">
-                      {((packageData.price * packageQuantity)).toLocaleString('id-ID', { 
-                        style: 'currency', 
-                        currency: 'IDR', 
-                        minimumFractionDigits: 0 
-                      })}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="text-center">
-              <Button 
-                onClick={handleProceedToServices}
-                className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-12 py-4 text-lg"
-              >
-                Continue to Additional Services
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {currentStep === 'services' && (
-          /* Additional Services */
-          <div className="space-y-12">
-            <div className="text-center">
-              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Additional Services</h2>
-              <p className="text-lg font-inter text-gray-500">Enhance your photo session</p>
+            {/* Date Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="date">Tanggal (WITA) *</Label>
+              <Input
+                id="date"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                min={format(new Date(), 'yyyy-MM-dd')}
+                required
+              />
             </div>
 
-            <div className="space-y-6">
-              {additionalServices.map((service) => (
-                <Card key={service.id} className="border border-gray-100 shadow-none">
-                  <CardContent className="p-8">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-xl font-peace-sans font-black text-black mb-2">
-                          {service.name}
-                        </h3>
-                        <p className="text-gray-500 font-inter mb-2">{service.description}</p>
-                        <p className="text-lg font-peace-sans font-bold text-blue-600">
-                          {service.price.toLocaleString('id-ID', { 
-                            style: 'currency', 
-                            currency: 'IDR', 
-                            minimumFractionDigits: 0 
-                          })}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleServiceQuantityChange(service.id, false)}
-                          disabled={(selectedServices[service.id] || 0) <= 0}
-                          className="border-gray-200 text-gray-600 hover:bg-gray-50"
-                        >
-                          <span className="text-lg">-</span>
-                        </Button>
-                        <span className="text-xl font-peace-sans font-black min-w-[3rem] text-center">
-                          {selectedServices[service.id] || 0}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleServiceQuantityChange(service.id, true)}
-                          className="border-gray-200 text-gray-600 hover:bg-gray-50"
-                        >
-                          <span className="text-lg">+</span>
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+            {/* Time Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="time">Waktu (WITA) *</Label>
+              <Select value={selectedTime} onValueChange={setSelectedTime}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih waktu (WITA)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {generateTimeSlots().map((time) => (
+                    <SelectItem key={time} value={time}>
+                      {time} WITA
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">Waktu Indonesia Tengah (GMT+8)</p>
             </div>
 
-            {/* Order Summary */}
-            <Card className="border border-gray-100 shadow-none bg-gray-50">
-              <CardContent className="p-8">
-                <h3 className="text-2xl font-peace-sans font-black text-black mb-6">Order Summary</h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="font-inter text-gray-600">
-                      {packageData.title} × {packageQuantity}
-                    </span>
-                    <span className="font-peace-sans font-bold">
-                      {(packageData.price * packageQuantity).toLocaleString('id-ID', { 
-                        style: 'currency', 
-                        currency: 'IDR', 
-                        minimumFractionDigits: 0 
-                      })}
-                    </span>
-                  </div>
-                  {additionalServices.map((service) => {
-                    const serviceQuantity = selectedServices[service.id] || 0;
-                    if (serviceQuantity > 0) {
-                      return (
-                        <div key={service.id} className="flex justify-between items-center">
-                          <span className="font-inter text-gray-600">
-                            {service.name} × {serviceQuantity}
-                          </span>
-                          <span className="font-peace-sans font-bold">
-                            {(service.price * serviceQuantity).toLocaleString('id-ID', { 
-                              style: 'currency', 
-                              currency: 'IDR', 
-                              minimumFractionDigits: 0 
-                            })}
-                          </span>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })}
-                  <div className="border-t border-gray-200 pt-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xl font-peace-sans font-black text-black">Total</span>
-                      <span className="text-2xl font-peace-sans font-black text-black">
-                        {calculateTotal().toLocaleString('id-ID', { 
-                          style: 'currency', 
-                          currency: 'IDR', 
-                          minimumFractionDigits: 0 
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Conflict Warning */}
+            {conflictingBookings.length > 0 && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Jadwal yang dipilih bertabrakan dengan booking lain. Silakan pilih waktu yang berbeda.
+                </AlertDescription>
+              </Alert>
+            )}
 
-            <div className="text-center">
-              <Button 
-                onClick={handleProceedToSchedule}
-                className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-12 py-4 text-lg"
-              >
-                Continue to Schedule Selection
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {currentStep === 'schedule' && (
-          /* Schedule Selection */
-          <div className="space-y-12">
-            <div className="text-center">
-              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Schedule Selection</h2>
-              <p className="text-lg font-inter text-gray-500">Choose your preferred date and time</p>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Package Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CalendarIcon className="w-5 h-5" />
-                    Package Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold text-lg">{packageData.title}</h3>
-                    <p className="text-gray-600">{packageData.description}</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      <span>{packageData.base_time_minutes} minutes</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <MapPin className="w-4 h-4" />
-                    <span>{packageData.studios?.name}</span>
-                  </div>
-                  
-                  <div className="pt-2 border-t">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Quantity:</span>
-                      <Badge variant="secondary">{packageQuantity} (Fixed)</Badge>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-sm text-gray-600">Total Price:</span>
-                      <span className="text-lg font-semibold text-primary">
-                        {calculateTotal().toLocaleString('id-ID', { 
-                          style: 'currency', 
-                          currency: 'IDR', 
-                          minimumFractionDigits: 0 
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Date Selection */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    Select Date
-                    <div className="ml-auto flex items-center gap-4 text-xs">
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 bg-white border border-green-500 rounded"></div>
-                        <span>Available</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 bg-gray-200 rounded"></div>
-                        <span>Unavailable</span>
-                      </div>
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateSelect}
-                    disabled={isDateUnavailable}
-                    initialFocus
-                    className="rounded-md border"
-                    components={{
-                      Day: CustomDay
-                    }}
+            {/* Customer Info */}
+            <div className="space-y-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Informasi Customer
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nama *</Label>
+                  <Input
+                    id="name"
+                    value={customerInfo.name}
+                    onChange={(e) => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))}
+                    required
                   />
-                </CardContent>
-              </Card>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={customerInfo.email}
+                    onChange={(e) => setCustomerInfo(prev => ({ ...prev, email: e.target.value }))}
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="phone">No. HP</Label>
+                <Input
+                  id="phone"
+                  value={customerInfo.phone}
+                  onChange={(e) => setCustomerInfo(prev => ({ ...prev, phone: e.target.value }))}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="notes">Catatan</Label>
+                <Textarea
+                  id="notes"
+                  value={customerInfo.notes}
+                  onChange={(e) => setCustomerInfo(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Permintaan khusus atau catatan..."
+                />
+              </div>
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Time Slots */}
-            {selectedDate && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Available Time Slots</CardTitle>
-                  <p className="text-sm text-gray-600">
-                    {format(selectedDate, 'EEEE, MMMM dd, yyyy')}
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {timeSlots.map((slot) => (
-                      <Button
-                        key={slot.id}
-                        variant={selectedTimeSlot?.id === slot.id ? "default" : "outline"}
-                        className={`flex flex-col py-3 h-auto ${
-                          !slot.available 
-                            ? 'opacity-50 cursor-not-allowed' 
-                            : 'cursor-pointer'
-                        }`}
-                        disabled={!slot.available}
-                        onClick={() => handleTimeSlotSelect(slot)}
-                      >
-                        <div className="font-medium">{slot.startTime} - {slot.endTime}</div>
-                        <div className="text-xs opacity-75">{packageData.base_time_minutes} min</div>
-                      </Button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Booking Summary */}
-            {selectedDate && selectedTimeSlot && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Final Booking Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Package:</span>
-                      <span className="font-medium">{packageData.title}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Date:</span>
-                      <span className="font-medium">{format(selectedDate, 'EEEE, MMMM dd, yyyy')}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Time:</span>
-                      <span className="font-medium">{selectedTimeSlot.startTime} - {selectedTimeSlot.endTime}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Duration:</span>
-                      <span className="font-medium">{packageData.base_time_minutes} minutes</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Studio:</span>
-                      <span className="font-medium">{packageData.studios?.name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Quantity:</span>
-                      <span className="font-medium">{packageQuantity}</span>
-                    </div>
-                  </div>
+        {/* Additional Services & Summary */}
+        <div className="space-y-6">
+          {/* Additional Services */}
+          {additionalServices && additionalServices.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Layanan Tambahan</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {additionalServices.map((service) => {
+                  const selectedService = selectedServices.find(s => s.id === service.id);
+                  const isSelected = !!selectedService;
                   
-                  <div className="border-t pt-4">
-                    <div className="flex justify-between items-center text-lg font-semibold">
-                      <span>Total Price:</span>
-                      <span className="text-primary">
-                        {calculateTotal().toLocaleString('id-ID', { 
-                          style: 'currency', 
-                          currency: 'IDR', 
-                          minimumFractionDigits: 0 
-                        })}
-                      </span>
+                  return (
+                    <div key={service.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => handleServiceToggle(service, e.target.checked)}
+                          className="rounded"
+                        />
+                        <div>
+                          <p className="font-medium">{service.name}</p>
+                          <p className="text-sm text-gray-600">{formatPrice(service.price)}</p>
+                        </div>
+                      </div>
+                      
+                      {isSelected && (
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateServiceQuantity(service.id, selectedService.quantity - 1)}
+                          >
+                            -
+                          </Button>
+                          <span className="w-8 text-center">{selectedService.quantity}</span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateServiceQuantity(service.id, selectedService.quantity + 1)}
+                          >
+                            +
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
 
-                  <Button 
-                    onClick={handleFinalBooking} 
-                    disabled={bookingLoading}
-                    className="w-full bg-black text-white hover:bg-gray-800 font-peace-sans font-bold py-4 text-lg"
-                  >
-                    {bookingLoading ? 'Creating Booking...' : 'Confirm Booking'}
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
+          {/* Order Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Ringkasan Pesanan
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between">
+                <span>Paket: {packageData.title}</span>
+                <span>{formatPrice(packageData.price)}</span>
+              </div>
+              
+              {selectedServices.map((service) => (
+                <div key={service.id} className="flex justify-between text-sm">
+                  <span>{service.name} × {service.quantity}</span>
+                  <span>{formatPrice(service.price * service.quantity)}</span>
+                </div>
+              ))}
+              
+              <div className="border-t pt-3 flex justify-between font-bold text-lg">
+                <span>Total</span>
+                <span className="text-green-600">{formatPrice(calculateTotal())}</span>
+              </div>
+
+              {selectedDate && selectedTime && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm">
+                  <p className="font-medium text-blue-800">Jadwal Regular Photo (WITA):</p>
+                  <p className="text-blue-700">
+                    {format(new Date(`${selectedDate}T${selectedTime}`), 'dd MMMM yyyy')} pukul {selectedTime} WITA
+                  </p>
+                  <p className="text-blue-600">
+                    Durasi: {packageData?.base_time_minutes} menit
+                  </p>
+                </div>
+              )}
+              
+              <Button 
+                onClick={handleSubmit} 
+                className="w-full" 
+                disabled={isSubmitting || conflictingBookings.length > 0}
+              >
+                {isSubmitting ? 'Processing...' : 'Buat Booking'}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
