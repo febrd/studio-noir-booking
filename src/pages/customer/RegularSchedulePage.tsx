@@ -175,9 +175,9 @@ const RegularSchedulePage: React.FC = () => {
       };
     });
 
-    // Operating hours: 10:00 - 20:30 WITA (same as self-photo)
+    // Operating hours: 10:00 - 20:30 WITA
     const slotDuration = selectedPackage.base_time_minutes; // Dynamic duration based on package
-    const slotGap = 5; // 5 minutes gap between slots
+    const slotGap = 10; // 10 minutes gap between slots for regular
 
     // Create initial time (10:00 WITA)
     let currentTime = new Date(`${dateKey}T10:00:00`);
@@ -227,7 +227,7 @@ const RegularSchedulePage: React.FC = () => {
         console.log(`Added available regular slot: ${format(currentTime, 'HH:mm')} - ${format(slotEnd, 'HH:mm')}`);
       }
 
-      // Move to next slot time (current slot end + 5 minutes gap)
+      // Move to next slot time (current slot end + 10 minutes gap)
       currentTime = addMinutes(slotEnd, slotGap);
       slotCounter++;
     }
@@ -514,7 +514,7 @@ const RegularSchedulePage: React.FC = () => {
           <CardHeader>
             <CardTitle>Available Time Slots</CardTitle>
             <p className="text-sm text-gray-600">
-              {format(selectedDate, 'EEEE, MMMM dd, yyyy')} (WITA) - Slot {selectedPackage.base_time_minutes} menit dengan jeda 5 menit (10:00-20:30)
+              {format(selectedDate, 'EEEE, MMMM dd, yyyy')} (WITA) - Slot {selectedPackage.base_time_minutes} menit dengan jeda 10 menit (10:00-20:30)
             </p>
           </CardHeader>
           <CardContent>
