@@ -8,18 +8,18 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, ArrowLeft, Search, Filter, Clock, Camera } from 'lucide-react';
-import { format } from 'date-fns';
-import { id } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { useState } from 'react';
+import { formatDateTimeWITA } from '@/utils/timezoneUtils';
+import { toast } from 'sonner';
 
 const OrderHistoryPage = () => {
   const { userProfile } = useJWTAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  const { data: bookings = [], isLoading } = useQuery({
+  const { data: bookings = [], isLoading, refetch } = useQuery({
     queryKey: ['customer-bookings', userProfile?.id],
     queryFn: async () => {
       if (!userProfile?.id) return [];
@@ -52,12 +52,30 @@ const OrderHistoryPage = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const handleCancelBooking = async (bookingId: string) => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'cancelled' })
+        .eq('id', bookingId);
+
+      if (error) throw error;
+
+      toast.success('Pesanan berhasil dibatalkan');
+      refetch();
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      toast.error('Gagal membatalkan pesanan');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-green-50 text-green-600 border-green-200';
       case 'pending': return 'bg-yellow-50 text-yellow-600 border-yellow-200';
       case 'completed': return 'bg-blue-50 text-blue-600 border-blue-200';
       case 'cancelled': return 'bg-red-50 text-red-600 border-red-200';
+      case 'paid': return 'bg-emerald-50 text-emerald-600 border-emerald-200';
       default: return 'bg-gray-50 text-gray-600 border-gray-200';
     }
   };
@@ -68,6 +86,7 @@ const OrderHistoryPage = () => {
       case 'pending': return 'Menunggu';
       case 'completed': return 'Selesai';
       case 'cancelled': return 'Dibatalkan';
+      case 'paid': return 'Dibayar';
       default: return status;
     }
   };
@@ -133,6 +152,7 @@ const OrderHistoryPage = () => {
                   <SelectItem value="confirmed">Dikonfirmasi</SelectItem>
                   <SelectItem value="completed">Selesai</SelectItem>
                   <SelectItem value="cancelled">Dibatalkan</SelectItem>
+                  <SelectItem value="paid">Dibayar</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -157,7 +177,7 @@ const OrderHistoryPage = () => {
                             <div className="flex items-center gap-4 text-sm text-gray-400 font-inter">
                               <span className="flex items-center">
                                 <Calendar className="h-4 w-4 mr-1" />
-                                {format(new Date(booking.start_time || booking.created_at), 'dd MMM yyyy, HH:mm', { locale: id })}
+                                {booking.start_time ? formatDateTimeWITA(booking.start_time) : formatDateTimeWITA(booking.created_at)}
                               </span>
                               <span className="flex items-center">
                                 <Clock className="h-4 w-4 mr-1" />
@@ -199,9 +219,19 @@ const OrderHistoryPage = () => {
 
                       <div className="flex flex-col sm:flex-row gap-3">
                         {booking.status === 'pending' && (
-                          <Button variant="outline" size="sm" className="border-yellow-200 text-yellow-600 hover:bg-yellow-50 font-peace-sans font-bold">
-                            Menunggu Konfirmasi
-                          </Button>
+                          <>
+                            <Button variant="outline" size="sm" className="border-yellow-200 text-yellow-600 hover:bg-yellow-50 font-peace-sans font-bold">
+                              Menunggu Konfirmasi
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => handleCancelBooking(booking.id)}
+                              className="border-red-200 text-red-600 hover:bg-red-50 font-peace-sans font-bold"
+                            >
+                              Batalkan Pesanan
+                            </Button>
+                          </>
                         )}
                         {booking.status === 'confirmed' && (
                           <Button variant="outline" size="sm" className="border-green-200 text-green-600 hover:bg-green-50 font-peace-sans font-bold">
@@ -211,6 +241,16 @@ const OrderHistoryPage = () => {
                         {booking.status === 'completed' && (
                           <Button variant="outline" size="sm" className="border-blue-200 text-blue-600 hover:bg-blue-50 font-peace-sans font-bold">
                             Selesai
+                          </Button>
+                        )}
+                        {booking.status === 'paid' && (
+                          <Button variant="outline" size="sm" className="border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-peace-sans font-bold">
+                            Dibayar
+                          </Button>
+                        )}
+                        {booking.status === 'cancelled' && (
+                          <Button variant="outline" size="sm" className="border-red-200 text-red-600 hover:bg-red-50 font-peace-sans font-bold">
+                            Dibatalkan
                           </Button>
                         )}
                       </div>

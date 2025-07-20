@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
+import { formatDateTimeWITA, parseWITAToUTC } from '@/utils/timezoneUtils';
 
 interface Package {
   id: string;
@@ -51,6 +52,8 @@ const SelfPhotoCheckoutPage = () => {
   const packageId = searchParams.get('package');
   const { userProfile } = useJWTAuth();
   
+  console.log('Self Photo Package ID from URL:', packageId);
+  
   // Package quantity is now dynamic instead of fixed
   const [packageQuantity, setPackageQuantity] = useState(1);
   
@@ -66,10 +69,14 @@ const SelfPhotoCheckoutPage = () => {
   const [bookingLoading, setBookingLoading] = useState(false);
 
   // Fetch package details
-  const { data: packageData, isLoading: packageLoading } = useQuery({
+  const { data: packageData, isLoading: packageLoading, error: packageError } = useQuery({
     queryKey: ['self-photo-package', packageId],
     queryFn: async () => {
-      if (!packageId) return null;
+      if (!packageId) {
+        throw new Error('Package ID is missing');
+      }
+      
+      console.log('Fetching self photo package with ID:', packageId);
       
       const { data, error } = await supabase
         .from('studio_packages')
@@ -85,11 +92,26 @@ const SelfPhotoCheckoutPage = () => {
         .eq('studios.type', 'self_photo')
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching self photo package:', error);
+        throw error;
+      }
+      
+      console.log('Fetched self photo package data:', data);
       return data as Package;
     },
-    enabled: !!packageId
+    enabled: !!packageId,
+    retry: 3,
+    retryDelay: 1000
   });
+
+  // Show error if package loading failed
+  useEffect(() => {
+    if (packageError) {
+      console.error('Self photo package loading error:', packageError);
+      toast.error('Gagal memuat data paket. Silakan coba lagi.');
+    }
+  }, [packageError]);
 
   // Fetch additional services for the studio
   const { data: additionalServices = [] } = useQuery({
@@ -136,7 +158,7 @@ const SelfPhotoCheckoutPage = () => {
         .from('bookings')
         .select('start_time, end_time, id')
         .eq('studio_package_id', packageId)
-        .eq('status', 'pending');
+        .in('status', ['pending', 'confirmed']);
 
       if (error) throw error;
 
@@ -322,15 +344,19 @@ const SelfPhotoCheckoutPage = () => {
 
   const handleFinalBooking = async () => {
     if (!selectedDate || !selectedTimeSlot || !userProfile || !packageData) {
-      toast.error('Please select a date and time slot');
+      toast.error('Silakan pilih tanggal dan waktu');
       return;
     }
 
     setBookingLoading(true);
 
     try {
-      const startDateTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.startTime}:00`;
-      const endDateTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.endTime}:00`;
+      // Convert selected time to UTC for database storage
+      const startDateTimeWITA = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.startTime}:00`;
+      const endDateTimeWITA = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.endTime}:00`;
+      
+      const startDateTimeUTC = parseWITAToUTC(startDateTimeWITA);
+      const endDateTimeUTC = parseWITAToUTC(endDateTimeWITA);
       const totalAmount = calculateTotal();
 
       const { data, error } = await supabase
@@ -339,8 +365,8 @@ const SelfPhotoCheckoutPage = () => {
           user_id: userProfile.id,
           studio_package_id: packageId,
           studio_id: packageData.studios?.id,
-          start_time: startDateTime,
-          end_time: endDateTime,
+          start_time: startDateTimeUTC.toISOString(),
+          end_time: endDateTimeUTC.toISOString(),
           status: 'pending',
           total_amount: totalAmount,
           payment_method: 'online',
@@ -395,9 +421,10 @@ const SelfPhotoCheckoutPage = () => {
     return (
       <div className="min-h-screen bg-white flex justify-center items-center">
         <div className="text-center">
-          <h2 className="text-2xl font-peace-sans font-black mb-4">Package not found</h2>
+          <h2 className="text-2xl font-peace-sans font-black mb-4">Paket tidak ditemukan</h2>
+          <p className="text-gray-500 mb-4">Paket yang Anda cari tidak tersedia atau telah dihapus.</p>
           <Button onClick={() => navigate('/customer/self-photo-packages')} className="bg-black text-white font-peace-sans font-bold">
-            Back to Packages
+            Kembali ke Daftar Paket
           </Button>
         </div>
       </div>
@@ -428,8 +455,8 @@ const SelfPhotoCheckoutPage = () => {
             </Button>
             <h1 className="text-3xl font-peace-sans font-black text-black">
               {currentStep === 'package' && 'Checkout'}
-              {currentStep === 'services' && 'Additional Services'}
-              {currentStep === 'schedule' && 'Select Schedule'}
+              {currentStep === 'services' && 'Layanan Tambahan'}
+              {currentStep === 'schedule' && 'Pilih Jadwal'}
             </h1>
             <div className="w-20"></div>
           </div>
@@ -441,8 +468,8 @@ const SelfPhotoCheckoutPage = () => {
           /* Package Selection */
           <div className="space-y-12">
             <div className="text-center">
-              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Self Photo Package</h2>
-              <p className="text-lg font-inter text-gray-500">Choose your quantity</p>
+              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Paket Self Photo</h2>
+              <p className="text-lg font-inter text-gray-500">Pilih jumlah yang Anda inginkan</p>
             </div>
 
             <Card className="border border-gray-100 shadow-none">
@@ -465,14 +492,14 @@ const SelfPhotoCheckoutPage = () => {
                     </div>
                   </div>
                   <Badge className="bg-red-50 text-red-600 border-red-200 font-peace-sans font-bold">
-                    Self Photo Session 
+                    Sesi Self Photo 
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="p-8 pt-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <span className="text-lg font-inter text-gray-600">Quantity:</span>
+                    <span className="text-lg font-inter text-gray-600">Jumlah:</span>
                     <div className="flex items-center gap-3">
                       <Button
                         variant="outline"
@@ -515,7 +542,7 @@ const SelfPhotoCheckoutPage = () => {
                 onClick={handleContinueToServices}
                 className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-12 py-4 text-lg"
               >
-                Continue to Additional Services
+                Lanjut ke Layanan Tambahan
               </Button>
             </div>
           </div>
@@ -525,8 +552,8 @@ const SelfPhotoCheckoutPage = () => {
           /* Additional Services */
           <div className="space-y-12">
             <div className="text-center">
-              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Additional Services</h2>
-              <p className="text-lg font-inter text-gray-500">Enhance your experience (optional)</p>
+              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Layanan Tambahan</h2>
+              <p className="text-lg font-inter text-gray-500">Tingkatkan pengalaman Anda (opsional)</p>
             </div>
 
             <div className="space-y-6">
@@ -577,7 +604,7 @@ const SelfPhotoCheckoutPage = () => {
               ) : (
                 <Card className="border border-gray-100 shadow-none">
                   <CardContent className="p-8 text-center">
-                    <p className="text-gray-500 font-inter">No additional services available for this package.</p>
+                    <p className="text-gray-500 font-inter">Tidak ada layanan tambahan tersedia untuk paket ini.</p>
                   </CardContent>
                 </Card>
               )}
@@ -586,7 +613,7 @@ const SelfPhotoCheckoutPage = () => {
             {/* Order Summary */}
             <Card className="border border-gray-100 shadow-none bg-gray-50">
               <CardContent className="p-8">
-                <h3 className="text-2xl font-peace-sans font-black text-black mb-6">Order Summary</h3>
+                <h3 className="text-2xl font-peace-sans font-black text-black mb-6">Ringkasan Pesanan</h3>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="font-inter text-gray-600">
@@ -641,7 +668,7 @@ const SelfPhotoCheckoutPage = () => {
                 onClick={handleContinueToSchedule}
                 className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-12 py-4 text-lg"
               >
-                Continue to Schedule Selection
+                Lanjut ke Pilih Jadwal
               </Button>
             </div>
           </div>
@@ -651,8 +678,8 @@ const SelfPhotoCheckoutPage = () => {
           /* Schedule Selection */
           <div className="space-y-12">
             <div className="text-center">
-              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Select Your Schedule</h2>
-              <p className="text-lg font-inter text-gray-500">Choose your preferred date and time</p>
+              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Pilih Jadwal Anda</h2>
+              <p className="text-lg font-inter text-gray-500">Pilih tanggal dan waktu yang Anda inginkan</p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
@@ -661,7 +688,7 @@ const SelfPhotoCheckoutPage = () => {
                 <CardHeader className="p-6">
                   <CardTitle className="flex items-center gap-2 text-xl font-peace-sans font-black">
                     <CalendarIcon className="w-5 h-5" />
-                    Package Summary
+                    Ringkasan Paket
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 pt-0 space-y-4">
@@ -673,7 +700,7 @@ const SelfPhotoCheckoutPage = () => {
                   <div className="flex items-center gap-4 text-sm text-gray-600">
                     <div className="flex items-center gap-1">
                       <Clock className="w-4 h-4" />
-                      <span>{packageData.base_time_minutes} minutes</span>
+                      <span>{packageData.base_time_minutes} menit</span>
                     </div>
                   </div>
 
@@ -684,7 +711,7 @@ const SelfPhotoCheckoutPage = () => {
                   
                   <div className="pt-2 border-t">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Total Amount:</span>
+                      <span className="text-sm text-gray-600">Total Harga:</span>
                       <span className="text-lg font-peace-sans font-bold text-primary">
                         {calculateTotal().toLocaleString('id-ID', { 
                           style: 'currency', 
@@ -701,15 +728,15 @@ const SelfPhotoCheckoutPage = () => {
               <Card className="border border-gray-100 shadow-none">
                 <CardHeader className="p-6">
                   <CardTitle className="flex items-center justify-between">
-                    <span className="font-peace-sans font-black">Select Date</span>
+                    <span className="font-peace-sans font-black">Pilih Tanggal</span>
                     <div className="flex items-center gap-4 text-xs font-inter">
                       <div className="flex items-center gap-1">
                         <div className="w-3 h-3 bg-white border border-green-500 rounded"></div>
-                        <span>Available</span>
+                        <span>Tersedia</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="w-3 h-3 bg-gray-200 rounded"></div>
-                        <span>Unavailable</span>
+                        <span>Tidak Tersedia</span>
                       </div>
                     </div>
                   </CardTitle>
@@ -734,9 +761,9 @@ const SelfPhotoCheckoutPage = () => {
             {selectedDate && (
               <Card className="border border-gray-100 shadow-none">
                 <CardHeader className="p-6">
-                  <CardTitle className="font-peace-sans font-black">Available Time Slots</CardTitle>
+                  <CardTitle className="font-peace-sans font-black">Waktu Tersedia</CardTitle>
                   <p className="text-sm text-gray-600 font-inter">
-                    {format(selectedDate, 'EEEE, MMMM dd, yyyy')}
+                    {format(selectedDate, 'EEEE, dd MMMM yyyy')}
                   </p>
                 </CardHeader>
                 <CardContent className="p-6 pt-0">
@@ -754,7 +781,7 @@ const SelfPhotoCheckoutPage = () => {
                         onClick={() => handleTimeSlotSelect(slot)}
                       >
                         <div className="font-medium">{slot.startTime} - {slot.endTime}</div>
-                        <div className="text-xs opacity-75">{packageData.base_time_minutes} min</div>
+                        <div className="text-xs opacity-75">{packageData.base_time_minutes} menit</div>
                       </Button>
                     ))}
                   </div>
@@ -766,39 +793,39 @@ const SelfPhotoCheckoutPage = () => {
             {selectedDate && selectedTimeSlot && (
               <Card className="border border-gray-100 shadow-none bg-gray-50">
                 <CardHeader className="p-6">
-                  <CardTitle className="font-peace-sans font-black">Final Booking Summary</CardTitle>
+                  <CardTitle className="font-peace-sans font-black">Konfirmasi Pesanan</CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 pt-0 space-y-4">
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="font-inter">Package:</span>
+                      <span className="font-inter">Paket:</span>
                       <span className="font-peace-sans font-bold">{packageData.title}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="font-inter">Date:</span>
-                      <span className="font-peace-sans font-bold">{format(selectedDate, 'EEEE, MMMM dd, yyyy')}</span>
+                      <span className="font-inter">Tanggal:</span>
+                      <span className="font-peace-sans font-bold">{format(selectedDate, 'EEEE, dd MMMM yyyy')}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="font-inter">Time:</span>
-                      <span className="font-peace-sans font-bold">{selectedTimeSlot.startTime} - {selectedTimeSlot.endTime}</span>
+                      <span className="font-inter">Waktu:</span>
+                      <span className="font-peace-sans font-bold">{selectedTimeSlot.startTime} - {selectedTimeSlot.endTime} (WITA)</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="font-inter">Duration:</span>
-                      <span className="font-peace-sans font-bold">{packageData.base_time_minutes} minutes</span>
+                      <span className="font-inter">Durasi:</span>
+                      <span className="font-peace-sans font-bold">{packageData.base_time_minutes} menit</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="font-inter">Studio:</span>
                       <span className="font-peace-sans font-bold">{packageData.studios?.name}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="font-inter">Quantity:</span>
+                      <span className="font-inter">Jumlah:</span>
                       <span className="font-peace-sans font-bold">{packageQuantity}</span>
                     </div>
                   </div>
                   
                   <div className="border-t border-gray-200 pt-4">
                     <div className="flex justify-between items-center text-lg font-peace-sans font-black">
-                      <span>Total Price:</span>
+                      <span>Total Harga:</span>
                       <span className="text-primary">
                         {calculateTotal().toLocaleString('id-ID', { 
                           style: 'currency', 
@@ -814,7 +841,7 @@ const SelfPhotoCheckoutPage = () => {
                     disabled={bookingLoading}
                     className="w-full bg-black text-white hover:bg-gray-800 font-peace-sans font-bold py-3"
                   >
-                    {bookingLoading ? 'Creating Booking...' : 'Confirm Booking'}
+                    {bookingLoading ? 'Membuat Pesanan...' : 'Konfirmasi Pesanan'}
                   </Button>
                 </CardContent>
               </Card>
