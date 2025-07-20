@@ -43,6 +43,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
   const [additionalTime, setAdditionalTime] = useState(0);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [packageQuantity, setPackageQuantity] = useState(1);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const queryClient = useQueryClient();
   
   const today = new Date();
@@ -151,18 +152,15 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
   const selectedPackageId = form.watch('package_id');
   const selectedPackage = packages?.find(pkg => pkg.id === selectedPackageId);
 
-  // Load booking data for editing
+  // Load booking data for editing - Only run once when all data is available
   useEffect(() => {
-    if (booking) {
+    if (booking && studios && !isDataLoaded) {
       console.log('Loading booking data for edit:', booking);
       
       // Set form values
       form.setValue('customer_name', booking.users?.name || '');
       form.setValue('customer_email', booking.users?.email || '');
       form.setValue('studio_id', booking.studio_id || '');
-      form.setValue('category_id', booking.package_category_id || '');
-      form.setValue('package_id', booking.studio_package_id || '');
-      form.setValue('notes', booking.notes || '');
       
       // Set payment method - map offline to cash for walkin
       const paymentMethod = booking.payment_method === 'offline' ? 'cash' : booking.payment_method;
@@ -185,13 +183,40 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
         setPackageQuantity(booking.package_quantity);
       }
       
-      // Set selected additional services
-      if (booking.booking_additional_services) {
+      // Set notes
+      form.setValue('notes', booking.notes || '');
+      
+      setIsDataLoaded(true);
+    }
+  }, [booking, studios, form, isDataLoaded]);
+
+  // Load category and package after studio is set
+  useEffect(() => {
+    if (booking && isDataLoaded && selectedStudioId && categories && !form.getValues('category_id')) {
+      if (booking.package_category_id) {
+        form.setValue('category_id', booking.package_category_id);
+      }
+    }
+  }, [booking, isDataLoaded, selectedStudioId, categories, form]);
+
+  // Load package after category is set
+  useEffect(() => {
+    if (booking && isDataLoaded && packages && !form.getValues('package_id')) {
+      if (booking.studio_package_id) {
+        form.setValue('package_id', booking.studio_package_id);
+      }
+    }
+  }, [booking, isDataLoaded, packages, form]);
+
+  // Load additional services after they're fetched
+  useEffect(() => {
+    if (booking && isDataLoaded && additionalServices && selectedServices.length === 0) {
+      if (booking.booking_additional_services && booking.booking_additional_services.length > 0) {
         const serviceIds = booking.booking_additional_services.map((service: any) => service.additional_service_id);
         setSelectedServices(serviceIds);
       }
     }
-  }, [booking, form]);
+  }, [booking, isDataLoaded, additionalServices, selectedServices.length]);
 
   // Calculate total amount
   const calculateTotalAmount = () => {
@@ -242,23 +267,23 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
 
   // Reset category and package when studio changes (but not during initial load)
   useEffect(() => {
-    if (selectedStudioId && !booking) {
+    if (selectedStudioId && !booking && isDataLoaded) {
       form.setValue('category_id', '');
       form.setValue('package_id', '');
       setAdditionalTime(0);
       setSelectedServices([]);
       setPackageQuantity(1);
     }
-  }, [selectedStudioId, form, booking]);
+  }, [selectedStudioId, form, booking, isDataLoaded]);
 
   // Reset package when category changes for regular studios (but not during initial load)
   useEffect(() => {
-    if (isRegularStudio && selectedCategoryId && !booking) {
+    if (isRegularStudio && selectedCategoryId && !booking && isDataLoaded) {
       form.setValue('package_id', '');
       setAdditionalTime(0);
       setPackageQuantity(1);
     }
-  }, [selectedCategoryId, isRegularStudio, form, booking]);
+  }, [selectedCategoryId, isRegularStudio, form, booking, isDataLoaded]);
 
   // Create/Update mutation with WITA timezone preservation
   const createMutation = useMutation({

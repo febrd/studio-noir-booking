@@ -1,124 +1,96 @@
-
 import { useState, useEffect } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Clock, Plus, Minus, AlertTriangle, Search } from 'lucide-react';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { format, parseISO, addMinutes } from 'date-fns';
+import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon, Plus, Minus } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { TimeExtensionManager } from './TimeExtensionManager';
+import { InstallmentManager } from './InstallmentManager';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
-import { 
-  formatDatetimeLocalWITA, 
-  parseWITAToUTC, 
-  formatDateTimeWITA, 
-  formatUTCToDatetimeLocal 
-} from '@/utils/timezoneUtils';
+import { formatUTCToDatetimeLocal, parseWITAToUTC } from '@/utils/timezoneUtils';
+
+const bookingSchema = z.object({
+  customer_type: z.enum(['existing', 'guest']),
+  user_id: z.string().optional(),
+  guest_name: z.string().optional(),
+  guest_email: z.string().optional(),
+  studio_id: z.string().min(1, 'Studio wajib dipilih'),
+  category_id: z.string().optional(),
+  package_id: z.string().min(1, 'Package wajib dipilih'),
+  booking_date: z.date(),
+  start_time: z.string().min(1, 'Waktu mulai wajib diisi'),
+  payment_method: z.enum(['online', 'offline']),
+  status: z.enum(['pending', 'confirmed', 'completed', 'cancelled']),
+  notes: z.string().optional(),
+  additional_services: z.array(z.string()).optional()
+}).refine((data) => {
+  if (data.customer_type === 'existing') {
+    return !!data.user_id;
+  }
+  return !!(data.guest_name && data.guest_email);
+}, {
+  message: "Customer information is required",
+  path: ["customer_type"]
+});
+
+type BookingFormData = z.infer<typeof bookingSchema>;
 
 interface BookingFormProps {
   booking?: any;
-  onSuccess: () => void;
+  onSuccess: (bookingData?: any) => void;
 }
-
-interface AdditionalService {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-}
-
-// UUID validation helper
-const isValidUUID = (uuid: string): boolean => {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(uuid);
-};
 
 const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [additionalTime, setAdditionalTime] = useState(0);
+  const [selectedServices, setSelectedServices] = useState<{ [key: string]: number }>({});
+  const [packageQuantity, setPackageQuantity] = useState(1);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const queryClient = useQueryClient();
   const { userProfile } = useJWTAuth();
 
-  const [formData, setFormData] = useState({
-    user_id: '',
-    studio_id: '',
-    studio_package_id: '',
-    package_category_id: '',
-    type: '',
-    start_time: '',
-    additional_time_minutes: 0,
-    payment_method: 'offline',
-    status: 'pending'
-  });
-
-  const [guestUser, setGuestUser] = useState({
-    name: '',
-    email: ''
-  });
-
-  const [selectedServices, setSelectedServices] = useState<AdditionalService[]>([]);
-  const [packageQuantity, setPackageQuantity] = useState(1);
-  const [totalPrice, setTotalPrice] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [createGuestUser, setCreateGuestUser] = useState(false);
-  const [bookingConflict, setBookingConflict] = useState(false);
-  const [endTime, setEndTime] = useState('');
-  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
-  const [customerSearch, setCustomerSearch] = useState('');
-
-  // Load booking data for editing
-  useEffect(() => {
-    if (booking) {
-      console.log('Loading booking data for edit:', booking);
-      
-      // Set form data
-      setFormData({
-        user_id: booking.user_id || '',
-        studio_id: booking.studio_id || '',
-        studio_package_id: booking.studio_package_id || '',
-        package_category_id: booking.package_category_id || '',
-        type: booking.type || '',
-        start_time: booking.start_time ? formatUTCToDatetimeLocal(booking.start_time) : '',
-        additional_time_minutes: booking.additional_time_minutes || 0,
-        payment_method: booking.payment_method || 'offline',
-        status: booking.status || 'pending'
-      });
-      
-      // Set package quantity if exists
-      if (booking.package_quantity) {
-        setPackageQuantity(booking.package_quantity);
-      }
-      
-      // Set selected additional services
-      if (booking.booking_additional_services) {
-        const serviceData = booking.booking_additional_services.map((service: any) => ({
-          id: service.additional_service_id,
-          name: service.additional_services?.name || '',
-          price: service.additional_services?.price || 0,
-          quantity: service.quantity || 1
-        }));
-        setSelectedServices(serviceData);
-      }
+  const form = useForm<BookingFormData>({
+    resolver: zodResolver(bookingSchema),
+    defaultValues: {
+      customer_type: 'guest',
+      user_id: '',
+      guest_name: '',
+      guest_email: '',
+      studio_id: '',
+      category_id: '',
+      package_id: '',
+      booking_date: new Date(),
+      start_time: '',
+      payment_method: 'offline',
+      status: 'pending',
+      notes: '',
+      additional_services: []
     }
-  }, [booking]);
+  });
 
-  // Fetch users with search functionality
-  const { data: users } = useQuery({
-    queryKey: ['users-customers', customerSearch],
+  // Fetch customers
+  const { data: customers } = useQuery({
+    queryKey: ['customers-list'],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('users')
         .select('id, name, email')
         .eq('role', 'pelanggan')
         .order('name');
-      
-      if (customerSearch.trim()) {
-        query = query.or(`name.ilike.%${customerSearch}%,email.ilike.%${customerSearch}%`);
-      }
-      
-      const { data, error } = await query.limit(50);
       
       if (error) throw error;
       return data;
@@ -127,7 +99,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
 
   // Fetch studios
   const { data: studios } = useQuery({
-    queryKey: ['studios-for-booking'],
+    queryKey: ['studios-active'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('studios')
@@ -140,76 +112,203 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   });
 
-  const selectedStudio = studios?.find(s => s.id === formData.studio_id);
+  // Get selected studio details
+  const selectedStudioId = form.watch('studio_id');
+  const selectedStudio = studios?.find(studio => studio.id === selectedStudioId);
+  const isRegularStudio = selectedStudio?.type === 'regular';
   const isSelfPhotoStudio = selectedStudio?.type === 'self_photo';
 
-  // Fetch package categories based on studio
+  // Fetch categories for regular studios
   const { data: categories } = useQuery({
-    queryKey: ['package-categories', formData.studio_id],
+    queryKey: ['package-categories-by-studio', selectedStudioId],
     queryFn: async () => {
-      if (!formData.studio_id) return [];
+      if (!selectedStudioId || !isRegularStudio) return [];
       
       const { data, error } = await supabase
         .from('package_categories')
         .select('id, name, description')
-        .eq('studio_id', formData.studio_id)
+        .eq('studio_id', selectedStudioId)
         .order('name');
       
       if (error) throw error;
       return data;
     },
-    enabled: !!formData.studio_id
+    enabled: !!selectedStudioId && isRegularStudio
   });
 
-  // Fetch packages based on studio and category
+  // Fetch packages based on selected studio and category
   const { data: packages } = useQuery({
-    queryKey: ['packages-for-booking', formData.studio_id, formData.package_category_id],
+    queryKey: ['packages-by-studio-category', selectedStudioId, selectedCategoryId, isRegularStudio],
     queryFn: async () => {
-      if (!formData.studio_id) return [];
+      if (!selectedStudioId) return [];
       
       let query = supabase
         .from('studio_packages')
-        .select('id, title, price, base_time_minutes, category_id')
-        .eq('studio_id', formData.studio_id)
-        .order('title');
-
-      if (selectedStudio?.type === 'regular' && formData.package_category_id) {
-        query = query.eq('category_id', formData.package_category_id);
-      }
-
-      if (selectedStudio?.type === 'self_photo') {
+        .select('id, title, price, base_time_minutes')
+        .eq('studio_id', selectedStudioId);
+      
+      if (isRegularStudio && selectedCategoryId) {
+        query = query.eq('category_id', selectedCategoryId);
+      } else if (!isRegularStudio) {
         query = query.is('category_id', null);
       }
       
-      const { data, error } = await query;
+      const { data, error } = await query.order('title');
       
       if (error) throw error;
       return data;
     },
-    enabled: !!formData.studio_id && (selectedStudio?.type === 'self_photo' || !!formData.package_category_id)
+    enabled: !!selectedStudioId && (!isRegularStudio || !!selectedCategoryId)
   });
 
-  // Fetch additional services based on studio
+  // Fetch additional services for selected studio
   const { data: additionalServices } = useQuery({
-    queryKey: ['additional-services', formData.studio_id],
+    queryKey: ['additional-services-by-studio', selectedStudioId],
     queryFn: async () => {
-      if (!formData.studio_id) return [];
+      if (!selectedStudioId) return [];
       
       const { data, error } = await supabase
         .from('additional_services')
         .select('id, name, price, description')
-        .eq('studio_id', formData.studio_id)
+        .eq('studio_id', selectedStudioId)
         .order('name');
       
       if (error) throw error;
       return data;
     },
-    enabled: !!formData.studio_id
+    enabled: !!selectedStudioId
   });
 
-  const selectedPackage = packages?.find(p => p.id === formData.studio_package_id);
+  // Get selected package details
+  const selectedPackageId = form.watch('package_id');
+  const selectedPackage = packages?.find(pkg => pkg.id === selectedPackageId);
 
-  // Handle quantity change
+  // Load booking data for editing - Only run once when all data is available
+  useEffect(() => {
+    if (booking && customers && studios && !isDataLoaded) {
+      console.log('Loading booking data for edit:', booking);
+      
+      // Set customer type and info
+      if (booking.user_id) {
+        form.setValue('customer_type', 'existing');
+        form.setValue('user_id', booking.user_id);
+      } else {
+        form.setValue('customer_type', 'guest');
+        form.setValue('guest_name', booking.users?.name || '');
+        form.setValue('guest_email', booking.users?.email || '');
+      }
+      
+      // Set studio
+      form.setValue('studio_id', booking.studio_id || '');
+      
+      // Set booking date and time using WITA format
+      if (booking.start_time) {
+        const bookingDate = parseISO(booking.start_time);
+        form.setValue('booking_date', bookingDate);
+        
+        const witaTime = formatUTCToDatetimeLocal(booking.start_time);
+        form.setValue('start_time', witaTime);
+      }
+      
+      // Set payment method and status
+      form.setValue('payment_method', booking.payment_method || 'offline');
+      form.setValue('status', booking.status || 'pending');
+      
+      // Set additional time
+      if (booking.additional_time_minutes) {
+        setAdditionalTime(booking.additional_time_minutes);
+      }
+      
+      // Set package quantity if exists
+      if (booking.package_quantity) {
+        setPackageQuantity(booking.package_quantity);
+      }
+      
+      // Set notes
+      form.setValue('notes', booking.notes || '');
+      
+      setIsDataLoaded(true);
+    }
+  }, [booking, customers, studios, form, isDataLoaded]);
+
+  // Load category and package after studio is set
+  useEffect(() => {
+    if (booking && isDataLoaded && selectedStudioId && categories && !form.getValues('category_id')) {
+      if (booking.package_category_id) {
+        form.setValue('category_id', booking.package_category_id);
+      }
+    }
+  }, [booking, isDataLoaded, selectedStudioId, categories, form]);
+
+  // Load package after category is set
+  useEffect(() => {
+    if (booking && isDataLoaded && packages && !form.getValues('package_id')) {
+      if (booking.studio_package_id) {
+        form.setValue('package_id', booking.studio_package_id);
+      }
+    }
+  }, [booking, isDataLoaded, packages, form]);
+
+  // Load additional services after they're fetched
+  useEffect(() => {
+    if (booking && isDataLoaded && additionalServices && Object.keys(selectedServices).length === 0) {
+      if (booking.booking_additional_services && booking.booking_additional_services.length > 0) {
+        const services: { [key: string]: number } = {};
+        booking.booking_additional_services.forEach((service: any) => {
+          services[service.additional_service_id] = service.quantity || 1;
+        });
+        setSelectedServices(services);
+      }
+    }
+  }, [booking, isDataLoaded, additionalServices, selectedServices]);
+
+  // Calculate total amount
+  const calculateTotalAmount = () => {
+    const packagePrice = (selectedPackage?.price || 0) * packageQuantity;
+    const extensionCost = additionalTime > 0 ? 
+      Math.ceil(additionalTime / 5) * (isRegularStudio ? 15000 : 5000) : 0;
+    
+    const servicesTotal = Object.entries(selectedServices).reduce((total, [serviceId, quantity]) => {
+      const service = additionalServices?.find(s => s.id === serviceId);
+      return total + ((service?.price || 0) * quantity);
+    }, 0);
+    
+    return packagePrice + extensionCost + servicesTotal;
+  };
+
+  // Calculate end time
+  const calculateEndTime = () => {
+    const startTime = form.watch('start_time');
+    const bookingDate = form.watch('booking_date');
+    
+    if (!startTime || !bookingDate || !selectedPackage) return null;
+    
+    try {
+      const startDateTime = new Date(`${format(bookingDate, 'yyyy-MM-dd')}T${startTime}`);
+      const totalMinutes = (selectedPackage.base_time_minutes * packageQuantity) + additionalTime;
+      const endDateTime = addMinutes(startDateTime, totalMinutes);
+      
+      return endDateTime;
+    } catch (error) {
+      return null;
+    }
+  };
+
+  // Handle service quantity change
+  const handleServiceQuantityChange = (serviceId: string, quantity: number) => {
+    if (quantity <= 0) {
+      const newServices = { ...selectedServices };
+      delete newServices[serviceId];
+      setSelectedServices(newServices);
+    } else {
+      setSelectedServices(prev => ({
+        ...prev,
+        [serviceId]: quantity
+      }));
+    }
+  };
+
+  // Handle package quantity change
   const handleQuantityChange = (increment: boolean) => {
     if (increment) {
       setPackageQuantity(prev => prev + 1);
@@ -218,751 +317,558 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   };
 
-  // Check for booking conflicts
-  const checkConflictMutation = useMutation({
-    mutationKey: ['check-conflict'],
-    mutationFn: async ({ studioId, startTime, endTime }: { studioId: string, startTime: string, endTime: string }) => {
-      const { data, error } = await supabase.rpc('check_booking_conflict', {
-        studio_id_param: studioId,
-        start_time_param: startTime,
-        end_time_param: endTime,
-        exclude_booking_id: booking?.id || null
-      });
-      
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (hasConflict) => {
-      setBookingConflict(hasConflict);
+  // Reset dependent fields when studio changes (but not during initial load)
+  useEffect(() => {
+    if (selectedStudioId && !booking && isDataLoaded) {
+      form.setValue('category_id', '');
+      form.setValue('package_id', '');
+      setAdditionalTime(0);
+      setSelectedServices({});
+      setPackageQuantity(1);
     }
-  });
+  }, [selectedStudioId, form, booking, isDataLoaded]);
 
-  // Create guest user mutation
-  const createGuestMutation = useMutation({
-    mutationKey: ['create-guest'],
-    mutationFn: async (userData: { name: string; email: string }) => {
-      const randomPassword = Math.random().toString(36).slice(-8);
-      const guestName = `guest_${userData.name}`;
-  
-      const { data, error } = await supabase
-        .from('users')
-        .insert([{
-          name: guestName,
-          email: userData.email,
-          role: 'pelanggan',
-          password: randomPassword
-        }])
-        .select('id, name')
-        .single();
-  
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (user) => {
-      setFormData(prev => ({ ...prev, user_id: user.id }));
-      toast.success(`Guest user created: ${user.name}`);
-    },
-    onError: (error) => {
-      console.error('Error creating guest user:', error);
-      toast.error('Gagal membuat user guest');
+  // Reset package when category changes for regular studios (but not during initial load)
+  useEffect(() => {
+    if (isRegularStudio && selectedCategoryId && !booking && isDataLoaded) {
+      form.setValue('package_id', '');
+      setAdditionalTime(0);
+      setPackageQuantity(1);
     }
-  });
+  }, [selectedCategoryId, isRegularStudio, form, booking, isDataLoaded]);
 
-  // Create/Update booking mutation with proper WITA timezone handling
-  const saveMutation = useMutation({
+  // Create/Update mutation
+  const createMutation = useMutation({
     mutationKey: ['save-booking'],
-    mutationFn: async (data: any) => {
-      const tentativeUserId = data.user_id || '';
-      const finalUserId = isValidUUID(tentativeUserId) ? tentativeUserId : null;
-      
-      if (!finalUserId) {
-        console.error('❌ User ID tidak valid atau kosong:', tentativeUserId);
-        throw new Error('User ID tidak valid atau kosong');
-      }
+    mutationFn: async (data: BookingFormData) => {
+      // Convert datetime to UTC
+      const startDateTime = parseWITAToUTC(data.start_time);
+      const totalMinutes = ((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime;
+      const endDateTime = new Date(startDateTime.getTime() + (totalMinutes * 60 * 1000));
 
-      // Convert WITA time to UTC for database storage using centralized utility
-      const startTimeUTC = parseWITAToUTC(data.start_time);
-      const totalMinutes = ((selectedPackage?.base_time_minutes || 0) * packageQuantity) + (data.additional_time_minutes || 0);
-      const endTimeUTC = new Date(startTimeUTC.getTime() + (totalMinutes * 60 * 1000));
-
-      console.log('🔧 Timezone conversion:', {
-        inputWITA: data.start_time,
-        startTimeUTC: startTimeUTC.toISOString(),
-        endTimeUTC: endTimeUTC.toISOString(),
+      console.log('🔧 Booking WITA Times:', {
+        startInput: data.start_time,
+        startDateTimeUTC: startDateTime.toISOString(),
+        endDateTimeUTC: endDateTime.toISOString(),
         totalMinutes,
         packageQuantity
       });
 
+      // Handle customer creation/selection
+      let customerId = data.user_id;
+      
+      if (data.customer_type === 'guest') {
+        // Check if customer already exists
+        const { data: existingUsers } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', data.guest_email!)
+          .limit(1);
+
+        if (existingUsers && existingUsers.length > 0) {
+          customerId = existingUsers[0].id;
+        } else {
+          // Create new customer
+          const { data: newUser, error: userError } = await supabase
+            .from('users')
+            .insert({
+              name: data.guest_name!,
+              email: data.guest_email!,
+              role: 'pelanggan'
+            })
+            .select('id')
+            .single();
+
+          if (userError) throw userError;
+          customerId = newUser.id;
+        }
+      }
+
+      const totalAmount = calculateTotalAmount();
+
       const bookingData = {
-        ...data,
-        user_id: finalUserId,
+        user_id: customerId,
         studio_id: data.studio_id,
-        studio_package_id: data.studio_package_id,
-        package_category_id: data.package_category_id || null,
-        start_time: startTimeUTC.toISOString(),
-        end_time: endTimeUTC.toISOString(),
-        additional_time_minutes: data.additional_time_minutes || 0,
+        studio_package_id: data.package_id,
+        package_category_id: isRegularStudio ? data.category_id : null,
+        type: selectedStudio?.type === 'self_photo' ? 'self_photo' : 'regular',
+        start_time: startDateTime.toISOString(),
+        end_time: endDateTime.toISOString(),
+        additional_time_minutes: additionalTime > 0 ? additionalTime : null,
         payment_method: data.payment_method,
-        type: data.type,
         status: data.status,
-        total_amount: totalPrice,
-        performed_by: userProfile.id,
+        total_amount: totalAmount,
         package_quantity: isSelfPhotoStudio ? packageQuantity : null,
+        notes: data.notes || null,
+        performed_by: userProfile?.id
       };
 
-      console.log('🔧 BookingData to save:', bookingData);
-  
-      let result;
-      let oldData: any = null;
-  
-      if (booking?.id) {
-        // Get old data for logging
-        const { data: existing, error: fetchError } = await supabase
+      if (booking) {
+        // Update existing booking
+        const { error } = await supabase
           .from('bookings')
-          .select('*')
-          .eq('id', booking.id)
-          .single();
-  
-        if (fetchError) {
-          console.warn('⚠️ Gagal mengambil data lama:', fetchError);
-        } else {
-          oldData = existing;
-        }
-  
-        // Update booking
-        const { data: updatedBooking, error } = await supabase
-          .from('bookings')
-          .update(bookingData)
-          .eq('id', booking.id)
-          .select()
-          .single();
-  
-        if (error) {
-          console.error('❌ Error updating booking:', error);
-          throw error;
-        }
-  
-        result = updatedBooking;
-      } else {
-        // Create booking
-        const { data: newBooking, error } = await supabase
-          .from('bookings')
-          .insert([bookingData])
-          .select()
-          .single();
-  
-        if (error) {
-          console.error('❌ Error creating booking:', error);
-          throw error;
-        }
-  
-        result = newBooking;
-      }
-  
-      // Logging aktivitas
-      if (userProfile?.id && ['admin', 'owner'].includes(userProfile.role)) {
-        const isUpdate = Boolean(booking?.id);
-        const logPayload = {
-          booking_id: result.id,
-          action_type: isUpdate ? 'update' : 'create',
-          note: isUpdate ? 'Booking diperbarui oleh admin/owner' : 'Booking dibuat oleh admin/owner',
-          performed_by: userProfile.id,
-          ...(isUpdate && { old_data: oldData }),
-          ...(isUpdate && { new_data: result }),
-        };
-  
-        const { error: logError } = await supabase
-          .from('booking_logs')
-          .insert([logPayload]);
-  
-        if (logError) {
-          console.error('⚠️ Error inserting booking log:', logError);
-          toast.warning('Booking disimpan tapi gagal mencatat log.');
-        }
-      }
-  
-      // Additional services
-      if (selectedServices.length > 0) {
-        if (booking?.id) {
+          .update({
+            ...bookingData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', booking.id);
+
+        if (error) throw error;
+
+        // Delete existing additional services
+        await supabase
+          .from('booking_additional_services')
+          .delete()
+          .eq('booking_id', booking.id);
+
+        // Add selected additional services
+        if (Object.keys(selectedServices).length > 0) {
+          const servicesToAdd = Object.entries(selectedServices).map(([serviceId, quantity]) => ({
+            booking_id: booking.id,
+            additional_service_id: serviceId,
+            quantity
+          }));
+
           await supabase
             .from('booking_additional_services')
-            .delete()
-            .eq('booking_id', booking.id);
+            .insert(servicesToAdd);
         }
-  
-        const serviceData = selectedServices.map(service => ({
-          booking_id: result.id,
-          additional_service_id: service.id,
-          quantity: service.quantity,
-          total_price: service.price * service.quantity
-        }));
-  
-        const { error: serviceError } = await supabase
-          .from('booking_additional_services')
-          .insert(serviceData);
-  
-        if (serviceError) {
-          console.error('❌ Error creating additional services:', serviceError);
-          throw serviceError;
+
+        return { id: booking.id, ...bookingData };
+      } else {
+        // Create new booking
+        const { data: newBooking, error } = await supabase
+          .from('bookings')
+          .insert(bookingData)
+          .select('id')
+          .single();
+
+        if (error) throw error;
+
+        // Add selected additional services
+        if (Object.keys(selectedServices).length > 0) {
+          const servicesToAdd = Object.entries(selectedServices).map(([serviceId, quantity]) => ({
+            booking_id: newBooking.id,
+            additional_service_id: serviceId,
+            quantity
+          }));
+
+          await supabase
+            .from('booking_additional_services')
+            .insert(servicesToAdd);
         }
+
+        return { ...newBooking, ...bookingData };
       }
-  
-      return result;
     },
-  
-    onSuccess: () => {
-      toast.success(booking?.id ? 'Booking berhasil diupdate' : 'Booking berhasil ditambahkan');
-      onSuccess();
+    onSuccess: (bookingData) => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      toast.success(booking ? 'Booking berhasil diupdate' : 'Booking berhasil dibuat');
+      onSuccess(bookingData);
     },
-  
     onError: (error: any) => {
-      console.error('❌ Error saving booking:', error);
-      let errorMessage = 'Gagal menyimpan booking';
-  
-      if (error.code === '23503') {
-        errorMessage = 'Error: Data yang dipilih tidak valid atau sudah dihapus';
-      } else if (error.code === '23502') {
-        errorMessage = 'Error: Ada kolom penting yang belum diisi (mungkin performed_by?)';
-      } else if (error.message) {
-        errorMessage = `Error booking: ${error.message}`;
-      }
-  
-      toast.error(errorMessage);
+      console.error('Error saving booking:', error);
+      toast.error(error.message || 'Gagal menyimpan booking');
     }
   });
 
-  // Calculate end time dynamically based on base time + additional time
-  const calculateEndTime = (startTime: string, baseMinutes: number, additionalMinutes: number = 0) => {
-    if (!startTime || !baseMinutes) return '';
-    
-    const startUTC = parseWITAToUTC(startTime);
-    const totalMinutes = (baseMinutes * packageQuantity) + additionalMinutes;
-    const endUTC = new Date(startUTC.getTime() + (totalMinutes * 60 * 1000));
-    
-    return endUTC.toISOString();
-  };
-
-  // Calculate additional time cost
-  const calculateAdditionalTimeCost = (minutes: number, studioType: string) => {
-    if (minutes <= 0) return 0;
-    
-    const slots = Math.ceil(minutes / 5);
-    if (studioType === 'self_photo') {
-      return slots * 5000;
-    } else {
-      return slots * 15000;
-    }
-  };
-
-  // Calculate total price
-  useEffect(() => {
-    let total = 0;
-    
-    // Package price with quantity
-    if (selectedPackage) {
-      total += selectedPackage.price * packageQuantity;
-    }
-    
-    // Additional services
-    selectedServices.forEach(service => {
-      total += service.price * service.quantity;
-    });
-    
-    // Additional time
-    if (formData.additional_time_minutes > 0 && selectedStudio) {
-      total += calculateAdditionalTimeCost(formData.additional_time_minutes, selectedStudio.type);
-    }
-    
-    setTotalPrice(total);
-  }, [selectedPackage, selectedServices, formData.additional_time_minutes, selectedStudio, packageQuantity]);
-
-  // Update end time when start time, package, or additional time changes
-  useEffect(() => {
-    if (formData.start_time && selectedPackage) {
-      const newEndTime = calculateEndTime(
-        formData.start_time, 
-        selectedPackage.base_time_minutes, 
-        formData.additional_time_minutes
-      );
-      setEndTime(newEndTime);
-      
-      // Check for conflicts
-      if (newEndTime && formData.studio_id) {
-        const startTimeUTC = parseWITAToUTC(formData.start_time);
-        checkConflictMutation.mutate({
-          studioId: formData.studio_id,
-          startTime: startTimeUTC.toISOString(),
-          endTime: newEndTime
-        });
-      }
-    }
-  }, [formData.start_time, selectedPackage, formData.additional_time_minutes, formData.studio_id, packageQuantity]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (bookingConflict) {
-      toast.error('Jadwal bertabrakan dengan booking lain. Silakan pilih waktu yang berbeda.');
-      return;
-    }
-    
+  const onSubmit = async (data: BookingFormData) => {
     setIsSubmitting(true);
-
     try {
-      // Create guest user if needed
-      if (createGuestUser && guestUser.name && guestUser.email) {
-        await createGuestMutation.mutateAsync(guestUser);
-      }
-      
-      await saveMutation.mutateAsync(formData);
+      await createMutation.mutateAsync(data);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => {
-      const newData = { ...prev, [field]: value };
-      
-      // Reset dependent fields when studio changes (but not during initial load)
-      if (field === 'studio_id' && !booking) {
-        newData.package_category_id = '';
-        newData.studio_package_id = '';
-        newData.type = studios?.find(s => s.id === value)?.type || '';
-        setSelectedServices([]);
-        setPackageQuantity(1);
-      }
-      
-      // Reset package when category changes (but not during initial load)
-      if (field === 'package_category_id' && !booking) {
-        newData.studio_package_id = '';
-        setPackageQuantity(1);
-      }
-      
-      return newData;
-    });
-  };
-
-  const handleServiceToggle = (service: any, checked: boolean) => {
-    if (checked) {
-      setSelectedServices(prev => [...prev, { ...service, quantity: 1 }]);
-    } else {
-      setSelectedServices(prev => prev.filter(s => s.id !== service.id));
-    }
-  };
-
-  const updateServiceQuantity = (serviceId: string, quantity: number) => {
-    if (quantity < 1) return;
-    
-    setSelectedServices(prev =>
-      prev.map(service =>
-        service.id === serviceId ? { ...service, quantity } : service
-      )
-    );
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR'
-    }).format(price);
-  };
-
-  const selectedUser = users?.find(u => u.id === formData.user_id);
+  const endTime = calculateEndTime();
+  const totalAmount = calculateTotalAmount();
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-h-[80vh] overflow-y-auto">
-      {/* Customer Selection */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Customer</h3>
-        
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="create-guest"
-            checked={createGuestUser}
-            onCheckedChange={(checked) => setCreateGuestUser(checked === true)}
-          />
-          <Label htmlFor="create-guest">Buat akun guest baru</Label>
-        </div>
-
-        {createGuestUser ? (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="guest-name">Nama *</Label>
-              <Input
-                id="guest-name"
-                value={guestUser.name}
-                onChange={(e) => setGuestUser(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Nama customer"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="guest-email">Email/Whatsapp *</Label>
-              <Input
-                id="guest-email"
-                type="text"
-                value={guestUser.email}
-                onChange={(e) => setGuestUser(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="Email/Whatsapp"
-                required
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <Label htmlFor="user_id">Pilih Customer *</Label>
-            <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={customerSearchOpen}
-                  className="w-full justify-between"
-                >
-                  {selectedUser ? (
-                    `${selectedUser.name} (${selectedUser.email})`
-                  ) : (
-                    "Cari dan pilih customer..."
-                  )}
-                  <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput 
-                    placeholder="Cari nama atau email customer..." 
-                    value={customerSearch}
-                    onValueChange={setCustomerSearch}
-                  />
-                  <CommandList>
-                    <CommandEmpty>Tidak ada customer ditemukan.</CommandEmpty>
-                    <CommandGroup>
-                      {users?.map((user) => (
-                        <CommandItem
-                          key={user.id}
-                          value={`${user.name} ${user.email}`}
-                          onSelect={() => {
-                            handleInputChange('user_id', user.id);
-                            setCustomerSearchOpen(false);
-                          }}
-                        >
-                          <div className="flex flex-col">
-                            <span className="font-medium">{user.name}</span>
-                            <span className="text-sm text-gray-500">{user.email}</span>
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-        )}
-      </div>
-
-      {/* Studio Selection */}
-      <div className="space-y-2">
-        <Label htmlFor="studio_id">Studio *</Label>
-        <Select value={formData.studio_id} onValueChange={(value) => handleInputChange('studio_id', value)}>
-          <SelectTrigger>
-            <SelectValue placeholder="Pilih studio" />
-          </SelectTrigger>
-          <SelectContent>
-            {studios?.map((studio) => (
-              <SelectItem key={studio.id} value={studio.id}>
-                {studio.name} ({studio.type === 'self_photo' ? 'Self Photo' : 'Regular'})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Package Category (for regular studios only) */}
-      {selectedStudio?.type === 'regular' && (
-        <div className="space-y-2">
-          <Label htmlFor="package_category_id">Kategori Paket *</Label>
-          <Select value={formData.package_category_id} onValueChange={(value) => handleInputChange('package_category_id', value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Pilih kategori paket" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories?.map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {/* Package Selection */}
-      <div className="space-y-2">
-        <Label htmlFor="studio_package_id">Paket Studio *</Label>
-        <Select 
-          value={formData.studio_package_id} 
-          onValueChange={(value) => handleInputChange('studio_package_id', value)}
-          disabled={!formData.studio_id || (selectedStudio?.type === 'regular' && !formData.package_category_id)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder={
-              !formData.studio_id 
-                ? "Pilih studio terlebih dahulu"
-                : selectedStudio?.type === 'regular' && !formData.package_category_id
-                ? "Pilih kategori terlebih dahulu"
-                : "Pilih paket"
-            } />
-          </SelectTrigger>
-          <SelectContent>
-            {packages?.map((pkg) => (
-              <SelectItem key={pkg.id} value={pkg.id}>
-                {pkg.title} - {formatPrice(pkg.price)} ({pkg.base_time_minutes} menit)
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Package Quantity - only for self photo studios */}
-      {isSelfPhotoStudio && selectedPackage && (
-        <div className="space-y-2">
-          <Label htmlFor="package_quantity">Jumlah Package</Label>
-          <div className="flex items-center space-x-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => handleQuantityChange(false)}
-              disabled={packageQuantity <= 1}
-            >
-              <Minus className="h-4 w-4" />
-            </Button>
-            <Input
-              id="package_quantity"
-              type="number"
-              value={packageQuantity}
-              onChange={(e) => setPackageQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-20 text-center"
-              min="1"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => handleQuantityChange(true)}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Total waktu: {(selectedPackage.base_time_minutes * packageQuantity)} menit
-          </p>
-        </div>
-      )}
-
-      {/* Date and Time - WITA timezone (Waktu Indonesia Tengah - GMT+8) */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="start_time">Tanggal & Waktu Mulai (WITA) *</Label>
-          <Input
-            id="start_time"
-            type="datetime-local"
-            value={formData.start_time}
-            onChange={(e) => handleInputChange('start_time', e.target.value)}
-            required
-          />
-          <p className="text-xs text-gray-500">Waktu Indonesia Tengah (GMT+8) - Central Indonesia Time</p>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="additional_time">Tambahan Waktu (menit)</Label>
-          <Input
-            id="additional_time"
-            type="number"
-            min="0"
-            step="5"
-            value={formData.additional_time_minutes}
-            onChange={(e) => handleInputChange('additional_time_minutes', parseInt(e.target.value) || 0)}
-            placeholder="0"
-          />
-        </div>
-      </div>
-
-      {/* Booking Conflict Warning */}
-      {bookingConflict && (
-        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800">
-          <AlertTriangle className="h-4 w-4" />
-          <span className="text-sm">
-            Jadwal bertabrakan dengan booking lain. Silakan pilih waktu yang berbeda.
-          </span>
-        </div>
-      )}
-
-      {/* Schedule Info with WITA timezone */}
-      {endTime && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center gap-2 text-blue-800">
-            <Clock className="h-4 w-4" />
-            <span className="text-sm font-medium">Jadwal Booking (WITA)</span>
-          </div>
-          <div className="mt-2 text-sm text-blue-700">
-            <p>Mulai: {formatDateTimeWITA(parseWITAToUTC(formData.start_time).toISOString())}</p>
-            <p>Selesai: {formatDateTimeWITA(endTime)}</p>
-            <p>Durasi: {((selectedPackage?.base_time_minutes || 0) * packageQuantity) + formData.additional_time_minutes} menit</p>
-            {isSelfPhotoStudio && packageQuantity > 1 && (
-              <p>Package: {packageQuantity}x ({selectedPackage?.base_time_minutes} menit each)</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Additional Services */}
-      {additionalServices && additionalServices.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Layanan Tambahan</h3>
-          <div className="space-y-3">
-            {additionalServices.map((service) => {
-              const selectedService = selectedServices.find(s => s.id === service.id);
-              const isSelected = !!selectedService;
-              
-              return (
-                <div key={service.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={(checked) => handleServiceToggle(service, checked === true)}
-                    />
-                    <div>
-                      <p className="font-medium">{service.name}</p>
-                      <p className="text-sm text-gray-600">{formatPrice(service.price)}</p>
-                    </div>
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Customer Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Customer</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Controller
+              name="customer_type"
+              control={form.control}
+              render={({ field }) => (
+                <RadioGroup value={field.value} onValueChange={field.onChange}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="guest" id="guest" />
+                    <Label htmlFor="guest">Buat akun guest baru</Label>
                   </div>
-                  
-                  {isSelected && (
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateServiceQuantity(service.id, selectedService.quantity - 1)}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-8 text-center">{selectedService.quantity}</span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateServiceQuantity(service.id, selectedService.quantity + 1)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                      <span className="ml-2 font-medium">
-                        {formatPrice(service.price * selectedService.quantity)}
-                      </span>
-                    </div>
-                  )}
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="existing" id="existing" />
+                    <Label htmlFor="existing">Pilih Customer</Label>
+                  </div>
+                </RadioGroup>
+              )}
+            />
+
+            {form.watch('customer_type') === 'existing' && (
+              <div>
+                <Label htmlFor="user_id">Pilih Customer *</Label>
+                <Select value={form.watch('user_id')} onValueChange={(value) => form.setValue('user_id', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers?.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.name} ({customer.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {form.watch('customer_type') === 'guest' && (
+              <>
+                <div>
+                  <Label htmlFor="guest_name">Nama Customer *</Label>
+                  <Input
+                    id="guest_name"
+                    {...form.register('guest_name')}
+                    placeholder="Masukkan nama customer"
+                  />
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                <div>
+                  <Label htmlFor="guest_email">Email Customer *</Label>
+                  <Input
+                    id="guest_email"
+                    type="email"
+                    {...form.register('guest_email')}
+                    placeholder="Masukkan email customer"
+                  />
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Payment Method and Status */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="payment_method">Metode Pembayaran *</Label>
-          <Select value={formData.payment_method} onValueChange={(value) => handleInputChange('payment_method', value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Pilih metode" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="online">Online</SelectItem>
-              <SelectItem value="offline">Offline</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Booking Details Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Detail Booking</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="studio_id">Studio *</Label>
+              <Select value={form.watch('studio_id')} onValueChange={(value) => form.setValue('studio_id', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih studio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {studios?.map((studio) => (
+                    <SelectItem key={studio.id} value={studio.id}>
+                      {studio.name} ({studio.type === 'self_photo' ? 'Self Photo' : 'Regular'})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="status">Status *</Label>
-          <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Pilih status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="confirmed">Confirmed</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="installment">Installment</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
+            {/* Category selection - only for regular studios */}
+            {isRegularStudio && (
+              <div>
+                <Label htmlFor="category_id">Kategori Package</Label>
+                <Select 
+                  value={form.watch('category_id')} 
+                  onValueChange={(value) => form.setValue('category_id', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih kategori" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories?.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="package_id">Paket Studio *</Label>
+              <Select 
+                value={form.watch('package_id')} 
+                onValueChange={(value) => form.setValue('package_id', value)}
+                disabled={!selectedStudioId || (isRegularStudio && !selectedCategoryId)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih paket" />
+                </SelectTrigger>
+                <SelectContent>
+                  {packages?.map((pkg) => (
+                    <SelectItem key={pkg.id} value={pkg.id}>
+                      {pkg.title} - Rp {pkg.price.toLocaleString('id-ID')} ({pkg.base_time_minutes} menit)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Package Quantity - only for self photo studios */}
+            {isSelfPhotoStudio && selectedPackage && (
+              <div>
+                <Label htmlFor="package_quantity">Jumlah Package</Label>
+                <div className="flex items-center space-x-2 mt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleQuantityChange(false)}
+                    disabled={packageQuantity <= 1}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <Input
+                    id="package_quantity"
+                    type="number"
+                    value={packageQuantity}
+                    onChange={(e) => setPackageQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-20 text-center"
+                    min="1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleQuantityChange(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Total waktu: {(selectedPackage.base_time_minutes * packageQuantity)} menit
+                </p>
+              </div>
+            )}
+
+            <div>
+              <Label>Tanggal & Waktu Mulai (WITA) *</Label>
+              <div className="flex space-x-2">
+                <Controller
+                  name="booking_date"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "flex-1 justify-start text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {field.value ? format(field.value, "dd/MM/yyyy") : "Pilih tanggal"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                />
+                <Input
+                  type="datetime-local"
+                  {...form.register('start_time')}
+                  className="flex-1"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Waktu Indonesia Tengah (GMT+8) - Central Indonesia Time</p>
+            </div>
+
+            <div>
+              <Label htmlFor="payment_method">Metode Pembayaran *</Label>
+              <Select value={form.watch('payment_method')} onValueChange={(value) => form.setValue('payment_method', value as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih metode pembayaran" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="offline">Offline</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="status">Status *</Label>
+              <Select value={form.watch('status')} onValueChange={(value) => form.setValue('status', value as any)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Time & Services Section */}
+        <div className="space-y-4">
+          {/* Time Extension Manager */}
+          {selectedPackage && (
+            <TimeExtensionManager
+              baseTimeMinutes={selectedPackage.base_time_minutes * packageQuantity}
+              studioType={selectedStudio?.type || 'self_photo'}
+              additionalTime={additionalTime}
+              onAdditionalTimeChange={setAdditionalTime}
+              disabled={isSubmitting}
+            />
+          )}
+
+          {/* Booking Schedule */}
+          {endTime && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Jadwal Booking (WITA)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p>Mulai: {format(endTime, 'dd/MM/yyyy, HH.mm')}</p>
+                <p>Selesai: {format(addMinutes(endTime, ((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime), 'dd/MM/yyyy, HH.mm')}</p>
+                <p>Durasi: {((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime} menit</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Additional Services */}
+          {additionalServices && additionalServices.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Layanan Tambahan</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {additionalServices.map((service) => (
+                  <div key={service.id} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id={service.id}
+                        checked={!!selectedServices[service.id]}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            handleServiceQuantityChange(service.id, 1);
+                          } else {
+                            handleServiceQuantityChange(service.id, 0);
+                          }
+                        }}
+                      />
+                      <div>
+                        <Label htmlFor={service.id} className="text-sm font-medium">
+                          {service.name}
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Rp {service.price.toLocaleString('id-ID')}
+                        </p>
+                      </div>
+                    </div>
+                    {selectedServices[service.id] && (
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleServiceQuantityChange(service.id, selectedServices[service.id] - 1)}
+                          disabled={selectedServices[service.id] <= 1}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-8 text-center text-sm">{selectedServices[service.id]}</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleServiceQuantityChange(service.id, selectedServices[service.id] + 1)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Pricing Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Ringkasan Biaya</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Paket{isSelfPhotoStudio && packageQuantity > 1 ? ` (x${packageQuantity})` : ''}:</span>
+                <span>Rp {((selectedPackage?.price || 0) * packageQuantity).toLocaleString('id-ID')}</span>
+              </div>
+              {additionalTime > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span>Tambahan Waktu:</span>
+                  <span>Rp {(Math.ceil(additionalTime / 5) * (isRegularStudio ? 15000 : 5000)).toLocaleString('id-ID')}</span>
+                </div>
+              )}
+              {Object.keys(selectedServices).length > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span>Layanan Tambahan:</span>
+                  <span>Rp {Object.entries(selectedServices).reduce((total, [serviceId, quantity]) => {
+                    const service = additionalServices?.find(s => s.id === serviceId);
+                    return total + ((service?.price || 0) * quantity);
+                  }, 0).toLocaleString('id-ID')}</span>
+                </div>
+              )}
+              <div className="border-t pt-2">
+                <div className="flex justify-between font-medium">
+                  <span>Total:</span>
+                  <span>Rp {totalAmount.toLocaleString('id-ID')}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      {/* Price Preview */}
+      {/* Notes */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Preview Harga
-          </CardTitle>
+          <CardTitle>Catatan</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {selectedPackage && (
-            <div className="flex justify-between">
-              <span>
-                Paket: {selectedPackage.title}
-                {isSelfPhotoStudio && packageQuantity > 1 && ` × ${packageQuantity}`}
-              </span>
-              <span>{formatPrice(selectedPackage.price * packageQuantity)}</span>
-            </div>
-          )}
-          
-          {selectedServices.map((service) => (
-            <div key={service.id} className="flex justify-between text-sm">
-              <span>{service.name} × {service.quantity}</span>
-              <span>{formatPrice(service.price * service.quantity)}</span>
-            </div>
-          ))}
-          
-          {formData.additional_time_minutes > 0 && selectedStudio && (
-            <div className="flex justify-between text-sm">
-              <span>
-                Tambahan waktu ({formData.additional_time_minutes} menit)
-              </span>
-              <span>
-                {formatPrice(calculateAdditionalTimeCost(formData.additional_time_minutes, selectedStudio.type))}
-              </span>
-            </div>
-          )}
-          
-          <div className="border-t pt-2 flex justify-between font-bold text-lg">
-            <span>Total</span>
-            <span className="text-green-600">{formatPrice(totalPrice)}</span>
-          </div>
+        <CardContent>
+          <Textarea
+            {...form.register('notes')}
+            placeholder="Catatan tambahan (opsional)"
+            rows={3}
+          />
         </CardContent>
       </Card>
 
-      <div className="flex gap-2 pt-4">
-        <Button 
-          type="submit" 
-          disabled={
-            isSubmitting || 
-            bookingConflict ||
-            (!formData.user_id && (!createGuestUser || !guestUser.name || !guestUser.email)) ||
-            !formData.studio_id || 
-            !formData.studio_package_id ||
-            !formData.start_time ||
-            (selectedStudio?.type === 'regular' && !formData.package_category_id)
-          } 
-          className="flex-1"
-        >
-          {isSubmitting ? 'Menyimpan...' : booking?.id ? 'Update Booking' : 'Tambah Booking'}
+      {/* Installment Manager for offline bookings */}
+      {booking && form.watch('payment_method') === 'offline' && (
+        <InstallmentManager bookingId={booking.id} totalAmount={totalAmount} />
+      )}
+
+      <div className="flex justify-end gap-4">
+        <Button type="button" variant="outline" onClick={() => onSuccess()}>
+          Batal
+        </Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Menyimpan...' : booking ? 'Update Booking' : 'Buat Booking'}
         </Button>
       </div>
     </form>
