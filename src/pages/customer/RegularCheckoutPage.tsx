@@ -345,12 +345,33 @@ const RegularCheckoutPage = () => {
           status: 'confirmed',
           total_amount: calculateTotal(),
           payment_method: 'online',
-          type: 'regular'
+          type: 'regular',
+          performed_by: userProfile.id // Add this required field
         })
         .select()
         .single();
 
       if (error) throw error;
+
+      // Insert additional services if any are selected
+      const selectedServiceEntries = Object.entries(selectedServices).filter(([_, quantity]) => quantity > 0);
+      
+      if (selectedServiceEntries.length > 0) {
+        const additionalServiceInserts = selectedServiceEntries.map(([serviceId, quantity]) => ({
+          booking_id: data.id,
+          additional_service_id: serviceId,
+          quantity: quantity
+        }));
+
+        const { error: servicesError } = await supabase
+          .from('booking_additional_services')
+          .insert(additionalServiceInserts);
+
+        if (servicesError) {
+          console.error('Error adding additional services:', servicesError);
+          // Don't throw here, booking was successful
+        }
+      }
 
       toast.success('Booking created successfully!');
       navigate('/customer/order-history');
