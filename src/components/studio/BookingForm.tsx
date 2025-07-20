@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,6 +59,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   });
 
   const [selectedServices, setSelectedServices] = useState<AdditionalService[]>([]);
+  const [packageQuantity, setPackageQuantity] = useState(1);
   const [totalPrice, setTotalPrice] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createGuestUser, setCreateGuestUser] = useState(false);
@@ -65,6 +67,29 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const [endTime, setEndTime] = useState('');
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState('');
+
+  // Load booking data for editing
+  useEffect(() => {
+    if (booking) {
+      console.log('Loading booking data for edit:', booking);
+      
+      // Set package quantity if exists
+      if (booking.package_quantity) {
+        setPackageQuantity(booking.package_quantity);
+      }
+      
+      // Set selected additional services
+      if (booking.booking_additional_services) {
+        const serviceData = booking.booking_additional_services.map((service: any) => ({
+          id: service.additional_service_id,
+          name: service.additional_services?.name || '',
+          price: service.additional_services?.price || 0,
+          quantity: service.quantity || 1
+        }));
+        setSelectedServices(serviceData);
+      }
+    }
+  }, [booking]);
 
   // Fetch users with search functionality
   const { data: users } = useQuery({
@@ -103,6 +128,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   });
 
   const selectedStudio = studios?.find(s => s.id === formData.studio_id);
+  const isSelfPhotoStudio = selectedStudio?.type === 'self_photo';
 
   // Fetch package categories based on studio
   const { data: categories } = useQuery({
@@ -170,6 +196,15 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
 
   const selectedPackage = packages?.find(p => p.id === formData.studio_package_id);
 
+  // Handle quantity change
+  const handleQuantityChange = (increment: boolean) => {
+    if (increment) {
+      setPackageQuantity(prev => prev + 1);
+    } else if (packageQuantity > 1) {
+      setPackageQuantity(prev => prev - 1);
+    }
+  };
+
   // Check for booking conflicts
   const checkConflictMutation = useMutation({
     mutationKey: ['check-conflict'],
@@ -234,14 +269,15 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
 
       // Convert WITA time to UTC for database storage using centralized utility
       const startTimeUTC = parseWITAToUTC(data.start_time);
-      const totalMinutes = (selectedPackage?.base_time_minutes || 0) + (data.additional_time_minutes || 0);
+      const totalMinutes = ((selectedPackage?.base_time_minutes || 0) * packageQuantity) + (data.additional_time_minutes || 0);
       const endTimeUTC = new Date(startTimeUTC.getTime() + (totalMinutes * 60 * 1000));
 
       console.log('🔧 Timezone conversion:', {
         inputWITA: data.start_time,
         startTimeUTC: startTimeUTC.toISOString(),
         endTimeUTC: endTimeUTC.toISOString(),
-        totalMinutes
+        totalMinutes,
+        packageQuantity
       });
 
       const bookingData = {
@@ -258,6 +294,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         status: data.status,
         total_amount: totalPrice,
         performed_by: userProfile.id,
+        package_quantity: isSelfPhotoStudio ? packageQuantity : null,
       };
 
       console.log('🔧 BookingData to save:', bookingData);
@@ -386,7 +423,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     if (!startTime || !baseMinutes) return '';
     
     const startUTC = parseWITAToUTC(startTime);
-    const totalMinutes = baseMinutes + additionalMinutes;
+    const totalMinutes = (baseMinutes * packageQuantity) + additionalMinutes;
     const endUTC = new Date(startUTC.getTime() + (totalMinutes * 60 * 1000));
     
     return endUTC.toISOString();
@@ -408,9 +445,9 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   useEffect(() => {
     let total = 0;
     
-    // Package price
+    // Package price with quantity
     if (selectedPackage) {
-      total += selectedPackage.price;
+      total += selectedPackage.price * packageQuantity;
     }
     
     // Additional services
@@ -424,7 +461,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
     
     setTotalPrice(total);
-  }, [selectedPackage, selectedServices, formData.additional_time_minutes, selectedStudio]);
+  }, [selectedPackage, selectedServices, formData.additional_time_minutes, selectedStudio, packageQuantity]);
 
   // Update end time when start time, package, or additional time changes
   useEffect(() => {
@@ -446,7 +483,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         });
       }
     }
-  }, [formData.start_time, selectedPackage, formData.additional_time_minutes, formData.studio_id]);
+  }, [formData.start_time, selectedPackage, formData.additional_time_minutes, formData.studio_id, packageQuantity]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -480,11 +517,13 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         newData.studio_package_id = '';
         newData.type = studios?.find(s => s.id === value)?.type || '';
         setSelectedServices([]);
+        setPackageQuantity(1);
       }
       
       // Reset package when category changes
       if (field === 'package_category_id') {
         newData.studio_package_id = '';
+        setPackageQuantity(1);
       }
       
       return newData;
@@ -673,6 +712,43 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         </Select>
       </div>
 
+      {/* Package Quantity - only for self photo studios */}
+      {isSelfPhotoStudio && selectedPackage && (
+        <div className="space-y-2">
+          <Label htmlFor="package_quantity">Jumlah Package</Label>
+          <div className="flex items-center space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleQuantityChange(false)}
+              disabled={packageQuantity <= 1}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <Input
+              id="package_quantity"
+              type="number"
+              value={packageQuantity}
+              onChange={(e) => setPackageQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-20 text-center"
+              min="1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleQuantityChange(true)}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Total waktu: {(selectedPackage.base_time_minutes * packageQuantity)} menit
+          </p>
+        </div>
+      )}
+
       {/* Date and Time - WITA timezone (Waktu Indonesia Tengah - GMT+8) */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -721,7 +797,10 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           <div className="mt-2 text-sm text-blue-700">
             <p>Mulai: {formatDateTimeWITA(parseWITAToUTC(formData.start_time).toISOString())}</p>
             <p>Selesai: {formatDateTimeWITA(endTime)}</p>
-            <p>Durasi: {(selectedPackage?.base_time_minutes || 0) + formData.additional_time_minutes} menit</p>
+            <p>Durasi: {((selectedPackage?.base_time_minutes || 0) * packageQuantity) + formData.additional_time_minutes} menit</p>
+            {isSelfPhotoStudio && packageQuantity > 1 && (
+              <p>Package: {packageQuantity}x ({selectedPackage?.base_time_minutes} menit each)</p>
+            )}
           </div>
         </div>
       )}
@@ -823,8 +902,11 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         <CardContent className="space-y-2">
           {selectedPackage && (
             <div className="flex justify-between">
-              <span>Paket: {selectedPackage.title}</span>
-              <span>{formatPrice(selectedPackage.price)}</span>
+              <span>
+                Paket: {selectedPackage.title}
+                {isSelfPhotoStudio && packageQuantity > 1 && ` × ${packageQuantity}`}
+              </span>
+              <span>{formatPrice(selectedPackage.price * packageQuantity)}</span>
             </div>
           )}
           
