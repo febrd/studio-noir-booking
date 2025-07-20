@@ -1,5 +1,5 @@
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,20 +7,17 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, ArrowLeft, Search, Filter, Clock, Camera, X } from 'lucide-react';
+import { Calendar, ArrowLeft, Search, Filter, Clock, Camera } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
 
 const OrderHistoryPage = () => {
   const { userProfile } = useJWTAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
 
   const { data: bookings = [], isLoading } = useQuery({
     queryKey: ['customer-bookings', userProfile?.id],
@@ -44,35 +41,6 @@ const OrderHistoryPage = () => {
     enabled: !!userProfile?.id
   });
 
-  const cancelBookingMutation = useMutation({
-    mutationFn: async (bookingId: string) => {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ 
-          status: 'cancelled',
-          performed_by: userProfile?.id
-        })
-        .eq('id', bookingId)
-        .eq('user_id', userProfile?.id); // Ensure user can only cancel their own bookings
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customer-bookings'] });
-      toast({
-        title: "Berhasil",
-        description: "Pesanan berhasil dibatalkan",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Gagal membatalkan pesanan. Silakan coba lagi.",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Filter bookings based on search and status
   const filteredBookings = bookings.filter(booking => {
     const matchesSearch = searchTerm === '' || 
@@ -90,7 +58,6 @@ const OrderHistoryPage = () => {
       case 'pending': return 'bg-yellow-50 text-yellow-600 border-yellow-200';
       case 'completed': return 'bg-blue-50 text-blue-600 border-blue-200';
       case 'cancelled': return 'bg-red-50 text-red-600 border-red-200';
-      case 'paid': return 'bg-emerald-50 text-emerald-600 border-emerald-200';
       default: return 'bg-gray-50 text-gray-600 border-gray-200';
     }
   };
@@ -101,19 +68,12 @@ const OrderHistoryPage = () => {
       case 'pending': return 'Menunggu';
       case 'completed': return 'Selesai';
       case 'cancelled': return 'Dibatalkan';
-      case 'paid': return 'Sudah Dibayar';
       default: return status;
     }
   };
 
   const getTypeText = (type: string) => {
     return type === 'self_photo' ? 'Self Photo' : 'Studio Reguler';
-  };
-
-  const handleCancelBooking = (bookingId: string) => {
-    if (window.confirm('Apakah Anda yakin ingin membatalkan pesanan ini?')) {
-      cancelBookingMutation.mutate(bookingId);
-    }
   };
 
   if (isLoading) {
@@ -171,7 +131,6 @@ const OrderHistoryPage = () => {
                   <SelectItem value="all">Semua Status</SelectItem>
                   <SelectItem value="pending">Menunggu</SelectItem>
                   <SelectItem value="confirmed">Dikonfirmasi</SelectItem>
-                  <SelectItem value="paid">Sudah Dibayar</SelectItem>
                   <SelectItem value="completed">Selesai</SelectItem>
                   <SelectItem value="cancelled">Dibatalkan</SelectItem>
                 </SelectContent>
@@ -240,40 +199,18 @@ const OrderHistoryPage = () => {
 
                       <div className="flex flex-col sm:flex-row gap-3">
                         {booking.status === 'pending' && (
-                          <>
-                            <Button variant="outline" size="sm" className="border-yellow-200 text-yellow-600 hover:bg-yellow-50 font-peace-sans font-bold">
-                              Menunggu Konfirmasi
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => handleCancelBooking(booking.id)}
-                              disabled={cancelBookingMutation.isPending}
-                              className="border-red-200 text-red-600 hover:bg-red-50 font-peace-sans font-bold"
-                            >
-                              <X className="h-4 w-4 mr-1" />
-                              {cancelBookingMutation.isPending ? 'Membatalkan...' : 'Batalkan Pesanan'}
-                            </Button>
-                          </>
+                          <Button variant="outline" size="sm" className="border-yellow-200 text-yellow-600 hover:bg-yellow-50 font-peace-sans font-bold">
+                            Menunggu Konfirmasi
+                          </Button>
                         )}
                         {booking.status === 'confirmed' && (
                           <Button variant="outline" size="sm" className="border-green-200 text-green-600 hover:bg-green-50 font-peace-sans font-bold">
                             Siap Difoto
                           </Button>
                         )}
-                        {booking.status === 'paid' && (
-                          <Button variant="outline" size="sm" className="border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-peace-sans font-bold">
-                            Pembayaran Lunas
-                          </Button>
-                        )}
                         {booking.status === 'completed' && (
                           <Button variant="outline" size="sm" className="border-blue-200 text-blue-600 hover:bg-blue-50 font-peace-sans font-bold">
                             Selesai
-                          </Button>
-                        )}
-                        {booking.status === 'cancelled' && (
-                          <Button variant="outline" size="sm" className="border-red-200 text-red-600 hover:bg-red-50 font-peace-sans font-bold">
-                            Dibatalkan
                           </Button>
                         )}
                       </div>
