@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -53,7 +54,7 @@ const RegularCheckoutPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const packageId = searchParams.get('package');
-  const { user } = useJWTAuth();
+  const { userProfile } = useJWTAuth();
   
   // Package quantity is fixed at 1 for regular packages
   const packageQuantity = 1;
@@ -322,7 +323,7 @@ const RegularCheckoutPage = () => {
   };
 
   const handleFinalBooking = async () => {
-    if (!selectedDate || !selectedTimeSlot || !user || !packageData) {
+    if (!selectedDate || !selectedTimeSlot || !userProfile || !packageData) {
       toast.error('Please select a date and time slot');
       return;
     }
@@ -336,7 +337,7 @@ const RegularCheckoutPage = () => {
       const { data, error } = await supabase
         .from('bookings')
         .insert({
-          user_id: user.id,
+          user_id: userProfile.id,
           studio_package_id: packageId,
           studio_id: packageData.studios?.id,
           start_time: startDateTime,
