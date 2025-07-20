@@ -204,58 +204,81 @@ const SelfPhotoCheckoutPage = () => {
     const dayBookings = bookedSlots[dateKey] || [];
     const slots: TimeSlot[] = [];
 
-    console.log(`Generating time slots for ${dateKey}:`, dayBookings);
+    console.log(`Generating dynamic time slots for ${dateKey}:`, dayBookings);
 
-    // Generate time slots from 9 AM to 9 PM
-    for (let hour = 9; hour <= 21; hour++) {
-      const startTime = `${hour.toString().padStart(2, '0')}:00`;
+    // Convert all booking times to WITA for easier comparison
+    const witaBookings = dayBookings.map(booking => {
+      const startUTC = new Date(booking.start_time);
+      const endUTC = new Date(booking.end_time);
+      const startWITA = new Date(startUTC.getTime() + (8 * 60 * 60 * 1000));
+      const endWITA = new Date(endUTC.getTime() + (8 * 60 * 60 * 1000));
       
-      // Create WITA datetime for this slot
-      const slotStartWITA = new Date(`${dateKey}T${startTime}:00`);
-      const slotEndWITA = addMinutes(slotStartWITA, packageData.base_time_minutes);
-      const endTime = format(slotEndWITA, 'HH:mm');
+      return {
+        ...booking,
+        startWITA,
+        endWITA
+      };
+    });
 
-      // Check if this slot conflicts with any existing booking
-      const isBooked = dayBookings.some(booking => {
-        // Convert UTC booking times to WITA for comparison
-        const bookingStartUTC = new Date(booking.start_time);
-        const bookingEndUTC = new Date(booking.end_time);
-        
-        // Convert to WITA
-        const bookingStartWITA = new Date(bookingStartUTC.getTime() + (8 * 60 * 60 * 1000));
-        const bookingEndWITA = new Date(bookingEndUTC.getTime() + (8 * 60 * 60 * 1000));
+    // Initialize slot generation
+    const startHour = 9; // 09:00 WITA
+    const endHour = 21; // 21:00 WITA
+    const slotDuration = packageData.base_time_minutes; // Dynamic duration based on package
+    const slotGap = 5; // 5 minutes gap between slots
 
-        // Check for overlap between slot time and booking time (both in WITA)
-        const overlap = (slotStartWITA < bookingEndWITA && slotEndWITA > bookingStartWITA);
+    // Create initial time (09:00 WITA)
+    let currentTime = new Date(`${dateKey}T09:00:00`);
+    const endBoundary = new Date(`${dateKey}T21:00:00`);
+
+    let slotCounter = 1;
+
+    while (currentTime < endBoundary) {
+      // Calculate slot end time
+      const slotEnd = addMinutes(currentTime, slotDuration);
+      
+      // Stop if slot would start at or after 21:00
+      if (currentTime >= endBoundary) {
+        break;
+      }
+
+      // Check for conflicts with existing bookings
+      const hasConflict = witaBookings.some(booking => {
+        // Check if slot overlaps with any booking
+        // Slot conflicts if: booking.start < slotEnd AND booking.end > slotStart
+        const conflict = booking.startWITA < slotEnd && booking.endWITA > currentTime;
         
-        if (overlap) {
-          console.log(`Slot ${startTime}-${endTime} conflicts with booking:`, {
-            bookingStart: format(bookingStartWITA, 'HH:mm'),
-            bookingEnd: format(bookingEndWITA, 'HH:mm'),
-            slotStart: format(slotStartWITA, 'HH:mm'),
-            slotEnd: format(slotEndWITA, 'HH:mm')
+        if (conflict) {
+          console.log(`Slot ${format(currentTime, 'HH:mm')}-${format(slotEnd, 'HH:mm')} conflicts with booking:`, {
+            bookingStart: format(booking.startWITA, 'HH:mm'),
+            bookingEnd: format(booking.endWITA, 'HH:mm')
           });
         }
         
-        return overlap;
+        return conflict;
       });
 
-      slots.push({
-        id: `${dateKey}-${startTime}`,
-        startTime,
-        endTime,
-        available: !isBooked,
-        bookingId: isBooked ? dayBookings.find(b => {
-          const bookingStartUTC = new Date(b.start_time);
-          const bookingEndUTC = new Date(b.end_time);
-          const bookingStartWITA = new Date(bookingStartUTC.getTime() + (8 * 60 * 60 * 1000));
-          const bookingEndWITA = new Date(bookingEndUTC.getTime() + (8 * 60 * 60 * 1000));
-          return (slotStartWITA < bookingEndWITA && slotEndWITA > bookingStartWITA);
-        })?.id : undefined
-      });
+      // Only add slot if there's no conflict
+      if (!hasConflict) {
+        slots.push({
+          id: `${dateKey}-${format(currentTime, 'HH:mm')}`,
+          startTime: format(currentTime, 'HH:mm'),
+          endTime: format(slotEnd, 'HH:mm'),
+          available: true
+        });
+
+        console.log(`Added available slot: ${format(currentTime, 'HH:mm')} - ${format(slotEnd, 'HH:mm')}`);
+      }
+
+      // Move to next slot time (current slot end + 5 minutes gap)
+      currentTime = addMinutes(slotEnd, slotGap);
+      slotCounter++;
     }
 
-    console.log('Generated time slots:', slots);
+    console.log(`Generated ${slots.length} available dynamic slots with ${slotDuration}-minute duration and ${slotGap}-minute gap:`);
+    slots.forEach(slot => {
+      console.log(`- ${slot.startTime} to ${slot.endTime}`);
+    });
+
     setTimeSlots(slots);
   };
 
@@ -812,7 +835,7 @@ const SelfPhotoCheckoutPage = () => {
                 <CardHeader className="p-6">
                   <CardTitle className="font-peace-sans font-black">Waktu Tersedia</CardTitle>
                   <p className="text-sm text-gray-600 font-inter">
-                    {format(selectedDate, 'EEEE, dd MMMM yyyy')} (WITA)
+                    {format(selectedDate, 'EEEE, dd MMMM yyyy')} (WITA) - Slot {packageData.base_time_minutes} menit dengan jeda 5 menit
                   </p>
                 </CardHeader>
                 <CardContent className="p-6 pt-0">
@@ -835,6 +858,11 @@ const SelfPhotoCheckoutPage = () => {
                       </Button>
                     ))}
                   </div>
+                  {timeSlots.length === 0 && (
+                    <p className="text-center text-gray-500 py-8">
+                      Tidak ada slot waktu yang tersedia untuk tanggal ini
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             )}
