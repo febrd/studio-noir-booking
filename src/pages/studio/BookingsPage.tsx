@@ -418,7 +418,7 @@ const BookingsPage = () => {
                 Tambah Booking
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl">
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
               <DialogHeader>
                 <DialogTitle>Tambah Booking Baru</DialogTitle>
               </DialogHeader>
@@ -676,7 +676,7 @@ const BookingsPage = () => {
 
         {/* Edit Dialog */}
         <Dialog open={!!editingBooking} onOpenChange={() => setEditingBooking(null)}>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Edit Booking</DialogTitle>
             </DialogHeader>

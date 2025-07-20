@@ -18,9 +18,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, Plus, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import TimeExtensionManager from './TimeExtensionManager';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { formatUTCToDatetimeLocal, parseWITAToUTC } from '@/utils/timezoneUtils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const bookingSchema = z.object({
   customer_type: z.enum(['existing', 'guest']),
@@ -196,8 +196,8 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         form.setValue('user_id', booking.user_id);
       } else {
         form.setValue('customer_type', 'guest');
-        form.setValue('guest_name', booking.users?.name || '');
-        form.setValue('guest_email', booking.users?.email || '');
+        form.setValue('guest_name', booking.customer_name || '');
+        form.setValue('guest_email', booking.customer_email || '');
       }
       
       // Set studio
@@ -226,14 +226,16 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         setPackageQuantity(booking.package_quantity);
       }
       
-      // Set notes
-      form.setValue('notes', booking.notes || '');
+      // Set notes - FIXED: Load notes properly
+      if (booking.notes) {
+        form.setValue('notes', booking.notes);
+      }
       
       setIsDataLoaded(true);
     }
   }, [booking, customers, studios, form, isDataLoaded]);
 
-  // Load category and package after studio is set
+  // Load category after studio is set - only for editing
   useEffect(() => {
     if (booking && isDataLoaded && selectedStudioId && categories && !form.getValues('category_id')) {
       if (booking.package_category_id) {
@@ -242,7 +244,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   }, [booking, isDataLoaded, selectedStudioId, categories, form]);
 
-  // Load package after category is set
+  // Load package after category is set - only for editing
   useEffect(() => {
     if (booking && isDataLoaded && packages && !form.getValues('package_id')) {
       if (booking.studio_package_id) {
@@ -251,19 +253,41 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   }, [booking, isDataLoaded, packages, form]);
 
-  // Load additional services after they're fetched - FIXED: Load selected services from booking
+  // Load additional services - FIXED: Properly load selected services from booking
   useEffect(() => {
-    if (booking && isDataLoaded && additionalServices && Object.keys(selectedServices).length === 0) {
-      console.log('Loading additional services for booking:', booking.booking_additional_services);
-      if (booking.booking_additional_services && booking.booking_additional_services.length > 0) {
-        const services: { [key: string]: number } = {};
-        booking.booking_additional_services.forEach((service: any) => {
-          services[service.additional_service_id] = service.quantity || 1;
-        });
-        console.log('Setting selected services:', services);
-        setSelectedServices(services);
+    const loadAdditionalServices = async () => {
+      if (booking && isDataLoaded && additionalServices && Object.keys(selectedServices).length === 0) {
+        console.log('Loading additional services for booking ID:', booking.id);
+        
+        try {
+          // Fetch booking additional services from database
+          const { data: bookingServices, error } = await supabase
+            .from('booking_additional_services')
+            .select('additional_service_id, quantity')
+            .eq('booking_id', booking.id);
+          
+          if (error) {
+            console.error('Error fetching booking additional services:', error);
+            return;
+          }
+          
+          console.log('Fetched booking services:', bookingServices);
+          
+          if (bookingServices && bookingServices.length > 0) {
+            const services: { [key: string]: number } = {};
+            bookingServices.forEach((service: any) => {
+              services[service.additional_service_id] = service.quantity || 1;
+            });
+            console.log('Setting selected services:', services);
+            setSelectedServices(services);
+          }
+        } catch (error) {
+          console.error('Error loading additional services:', error);
+        }
       }
-    }
+    };
+    
+    loadAdditionalServices();
   }, [booking, isDataLoaded, additionalServices, selectedServices]);
 
   // Calculate total amount
@@ -290,7 +314,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     try {
       const startDateTime = new Date(`${format(bookingDate, 'yyyy-MM-dd')}T${startTime}`);
       
-      // Check if the created date is valid
       if (isNaN(startDateTime.getTime())) {
         console.log('Invalid start date time:', startDateTime);
         return null;
@@ -299,7 +322,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       const totalMinutes = (selectedPackage.base_time_minutes * packageQuantity) + additionalTime;
       const endDateTime = addMinutes(startDateTime, totalMinutes);
       
-      // Check if the end date is valid
       if (isNaN(endDateTime.getTime())) {
         console.log('Invalid end date time:', endDateTime);
         return null;
@@ -504,390 +526,378 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const totalAmount = calculateTotalAmount();
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Customer Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Customer</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Controller
-              name="customer_type"
-              control={form.control}
-              render={({ field }) => (
-                <RadioGroup value={field.value} onValueChange={field.onChange}>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="guest" id="guest" />
-                    <Label htmlFor="guest">Buat akun guest baru</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="existing" id="existing" />
-                    <Label htmlFor="existing">Pilih Customer</Label>
-                  </div>
-                </RadioGroup>
-              )}
-            />
-
-            {form.watch('customer_type') === 'existing' && (
-              <div>
-                <Label htmlFor="user_id">Pilih Customer *</Label>
-                <Select value={form.watch('user_id')} onValueChange={(value) => form.setValue('user_id', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers?.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name} ({customer.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {form.watch('customer_type') === 'guest' && (
-              <>
-                <div>
-                  <Label htmlFor="guest_name">Nama Customer *</Label>
-                  <Input
-                    id="guest_name"
-                    {...form.register('guest_name')}
-                    placeholder="Masukkan nama customer"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="guest_email">Email Customer *</Label>
-                  <Input
-                    id="guest_email"
-                    type="email"
-                    {...form.register('guest_email')}
-                    placeholder="Masukkan email customer"
-                  />
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Booking Details Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Detail Booking</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="studio_id">Studio *</Label>
-              <Select value={form.watch('studio_id')} onValueChange={(value) => form.setValue('studio_id', value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih studio" />
-                </SelectTrigger>
-                <SelectContent>
-                  {studios?.map((studio) => (
-                    <SelectItem key={studio.id} value={studio.id}>
-                      {studio.name} ({studio.type === 'self_photo' ? 'Self Photo' : 'Regular'})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Category selection - only for regular studios */}
-            {isRegularStudio && (
-              <div>
-                <Label htmlFor="category_id">Kategori Package</Label>
-                <Select 
-                  value={form.watch('category_id')} 
-                  onValueChange={(value) => form.setValue('category_id', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih kategori" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories?.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div>
-              <Label htmlFor="package_id">Paket Studio *</Label>
-              <Select 
-                value={form.watch('package_id')} 
-                onValueChange={(value) => form.setValue('package_id', value)}
-                disabled={!selectedStudioId || (isRegularStudio && !selectedCategoryId)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih paket" />
-                </SelectTrigger>
-                <SelectContent>
-                  {packages?.map((pkg) => (
-                    <SelectItem key={pkg.id} value={pkg.id}>
-                      {pkg.title} - Rp {pkg.price.toLocaleString('id-ID')} ({pkg.base_time_minutes} menit)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Package Quantity - only for self photo studios */}
-            {isSelfPhotoStudio && selectedPackage && (
-              <div>
-                <Label htmlFor="package_quantity">Jumlah Package</Label>
-                <div className="flex items-center space-x-2 mt-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleQuantityChange(false)}
-                    disabled={packageQuantity <= 1}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    id="package_quantity"
-                    type="number"
-                    value={packageQuantity}
-                    onChange={(e) => setPackageQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-20 text-center"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleQuantityChange(true)}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Total waktu: {(selectedPackage.base_time_minutes * packageQuantity)} menit
-                </p>
-              </div>
-            )}
-
-            <div>
-              <Label>Tanggal & Waktu Mulai (WITA) *</Label>
-              <div className="flex space-x-2">
-                <Controller
-                  name="booking_date"
-                  control={form.control}
-                  render={({ field }) => (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "flex-1 justify-start text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {field.value ? format(field.value, "dd/MM/yyyy") : "Pilih tanggal"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                />
-                <Input
-                  type="time"
-                  {...form.register('start_time')}
-                  className="flex-1"
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Waktu Indonesia Tengah (GMT+8) - Central Indonesia Time</p>
-            </div>
-
-            <div>
-              <Label htmlFor="payment_method">Metode Pembayaran *</Label>
-              <Select value={form.watch('payment_method')} onValueChange={(value) => form.setValue('payment_method', value as any)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih metode pembayaran" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="online">Online</SelectItem>
-                  <SelectItem value="offline">Offline</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="status">Status *</Label>
-              <Select value={form.watch('status')} onValueChange={(value) => form.setValue('status', value as any)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Time & Services Section */}
-        <div className="space-y-4">
-          {/* Time Extension Manager - only show for existing bookings with valid end time */}
-          {booking && selectedPackage && endTime && (
-            <TimeExtensionManager
-              bookingId={booking.id}
-              currentEndTime={endTime.toISOString()}
-              studioType={selectedStudio?.type || 'self_photo'}
-              currentAdditionalTime={additionalTime}
-              onSuccess={() => {
-                // Refresh booking data after time extension
-                queryClient.invalidateQueries({ queryKey: ['bookings'] });
-              }}
-            />
-          )}
-
-          {/* Booking Schedule */}
-          {endTime && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Jadwal Booking (WITA)</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <p>Mulai: {format(endTime, 'dd/MM/yyyy, HH.mm')}</p>
-                <p>Selesai: {format(addMinutes(endTime, ((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime), 'dd/MM/yyyy, HH.mm')}</p>
-                <p>Durasi: {((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime} menit</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Additional Services */}
-          {additionalServices && additionalServices.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Layanan Tambahan</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {additionalServices.map((service) => (
-                  <div key={service.id} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id={service.id}
-                        checked={!!selectedServices[service.id]}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            handleServiceQuantityChange(service.id, 1);
-                          } else {
-                            handleServiceQuantityChange(service.id, 0);
-                          }
-                        }}
-                      />
-                      <div>
-                        <Label htmlFor={service.id} className="text-sm font-medium">
-                          {service.name}
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Rp {service.price.toLocaleString('id-ID')}
-                        </p>
-                      </div>
-                    </div>
-                    {selectedServices[service.id] && (
-                      <div className="flex items-center space-x-1">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleServiceQuantityChange(service.id, selectedServices[service.id] - 1)}
-                          disabled={selectedServices[service.id] <= 1}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-8 text-center text-sm">{selectedServices[service.id]}</span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleServiceQuantityChange(service.id, selectedServices[service.id] + 1)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Pricing Summary */}
+    <ScrollArea className="h-[80vh] pr-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Customer Section */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Ringkasan Biaya</CardTitle>
+              <CardTitle>Customer</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Paket{isSelfPhotoStudio && packageQuantity > 1 ? ` (x${packageQuantity})` : ''}:</span>
-                <span>Rp {((selectedPackage?.price || 0) * packageQuantity).toLocaleString('id-ID')}</span>
+            <CardContent className="space-y-4">
+              <Controller
+                name="customer_type"
+                control={form.control}
+                render={({ field }) => (
+                  <RadioGroup value={field.value} onValueChange={field.onChange}>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="guest" id="guest" />
+                      <Label htmlFor="guest">Buat akun guest baru</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="existing" id="existing" />
+                      <Label htmlFor="existing">Pilih Customer</Label>
+                    </div>
+                  </RadioGroup>
+                )}
+              />
+
+              {form.watch('customer_type') === 'existing' && (
+                <div>
+                  <Label htmlFor="user_id">Pilih Customer *</Label>
+                  <Select value={form.watch('user_id')} onValueChange={(value) => form.setValue('user_id', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers?.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name} ({customer.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {form.watch('customer_type') === 'guest' && (
+                <>
+                  <div>
+                    <Label htmlFor="guest_name">Nama Customer *</Label>
+                    <Input
+                      id="guest_name"
+                      {...form.register('guest_name')}
+                      placeholder="Masukkan nama customer"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="guest_email">Email Customer *</Label>
+                    <Input
+                      id="guest_email"
+                      type="email"
+                      {...form.register('guest_email')}
+                      placeholder="Masukkan email customer"
+                    />
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Detail Booking Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Detail Booking</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="studio_id">Studio *</Label>
+                <Select value={form.watch('studio_id')} onValueChange={(value) => form.setValue('studio_id', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih studio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {studios?.map((studio) => (
+                      <SelectItem key={studio.id} value={studio.id}>
+                        {studio.name} ({studio.type === 'self_photo' ? 'Self Photo' : 'Regular'})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              {additionalTime > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span>Tambahan Waktu:</span>
-                  <span>Rp {(Math.ceil(additionalTime / 5) * (isRegularStudio ? 15000 : 5000)).toLocaleString('id-ID')}</span>
+
+              {/* Category selection - only for regular studios */}
+              {isRegularStudio && (
+                <div>
+                  <Label htmlFor="category_id">Kategori Package</Label>
+                  <Select 
+                    value={form.watch('category_id')} 
+                    onValueChange={(value) => form.setValue('category_id', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih kategori" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories?.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
-              {Object.keys(selectedServices).length > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span>Layanan Tambahan:</span>
-                  <span>Rp {Object.entries(selectedServices).reduce((total, [serviceId, quantity]) => {
-                    const service = additionalServices?.find(s => s.id === serviceId);
-                    return total + ((service?.price || 0) * quantity);
-                  }, 0).toLocaleString('id-ID')}</span>
+
+              <div>
+                <Label htmlFor="package_id">Paket Studio *</Label>
+                <Select 
+                  value={form.watch('package_id')} 
+                  onValueChange={(value) => form.setValue('package_id', value)}
+                  disabled={!selectedStudioId || (isRegularStudio && !selectedCategoryId)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih paket" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {packages?.map((pkg) => (
+                      <SelectItem key={pkg.id} value={pkg.id}>
+                        {pkg.title} - Rp {pkg.price.toLocaleString('id-ID')} ({pkg.base_time_minutes} menit)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Package Quantity - only for self photo studios */}
+              {isSelfPhotoStudio && selectedPackage && (
+                <div>
+                  <Label htmlFor="package_quantity">Jumlah Package</Label>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleQuantityChange(false)}
+                      disabled={packageQuantity <= 1}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      id="package_quantity"
+                      type="number"
+                      value={packageQuantity}
+                      onChange={(e) => setPackageQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-20 text-center"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleQuantityChange(true)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Total waktu: {(selectedPackage.base_time_minutes * packageQuantity)} menit
+                  </p>
                 </div>
               )}
-              <div className="border-t pt-2">
-                <div className="flex justify-between font-medium">
-                  <span>Total:</span>
-                  <span>Rp {totalAmount.toLocaleString('id-ID')}</span>
+
+              <div>
+                <Label>Tanggal & Waktu Mulai (WITA) *</Label>
+                <div className="flex space-x-2">
+                  <Controller
+                    name="booking_date"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "flex-1 justify-start text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(field.value, "dd/MM/yyyy") : "Pilih tanggal"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  />
+                  <Input
+                    type="time"
+                    {...form.register('start_time')}
+                    className="flex-1"
+                  />
                 </div>
+                <p className="text-xs text-gray-500 mt-1">Waktu Indonesia Tengah (GMT+8) - Central Indonesia Time</p>
+              </div>
+
+              <div>
+                <Label htmlFor="payment_method">Metode Pembayaran *</Label>
+                <Select value={form.watch('payment_method')} onValueChange={(value) => form.setValue('payment_method', value as any)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih metode pembayaran" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="online">Online</SelectItem>
+                    <SelectItem value="offline">Offline</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="status">Status *</Label>
+                <Select value={form.watch('status')} onValueChange={(value) => form.setValue('status', value as any)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="confirmed">Confirmed</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
+
+          {/* Time & Services Section */}
+          <div className="space-y-4">
+            {/* Booking Schedule */}
+            {endTime && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Jadwal Booking (WITA)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <p>Mulai: {format(endTime, 'dd/MM/yyyy, HH.mm')}</p>
+                  <p>Selesai: {format(addMinutes(endTime, ((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime), 'dd/MM/yyyy, HH.mm')}</p>
+                  <p>Durasi: {((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime} menit</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Additional Services */}
+            {additionalServices && additionalServices.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Layanan Tambahan</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {additionalServices.map((service) => (
+                    <div key={service.id} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={service.id}
+                          checked={!!selectedServices[service.id]}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              handleServiceQuantityChange(service.id, 1);
+                            } else {
+                              handleServiceQuantityChange(service.id, 0);
+                            }
+                          }}
+                        />
+                        <div>
+                          <Label htmlFor={service.id} className="text-sm font-medium">
+                            {service.name}
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Rp {service.price.toLocaleString('id-ID')}
+                          </p>
+                        </div>
+                      </div>
+                      {selectedServices[service.id] && (
+                        <div className="flex items-center space-x-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleServiceQuantityChange(service.id, selectedServices[service.id] - 1)}
+                            disabled={selectedServices[service.id] <= 1}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-8 text-center text-sm">{selectedServices[service.id]}</span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleServiceQuantityChange(service.id, selectedServices[service.id] + 1)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Pricing Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Ringkasan Biaya</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Paket{isSelfPhotoStudio && packageQuantity > 1 ? ` (x${packageQuantity})` : ''}:</span>
+                  <span>Rp {((selectedPackage?.price || 0) * packageQuantity).toLocaleString('id-ID')}</span>
+                </div>
+                {additionalTime > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span>Tambahan Waktu:</span>
+                    <span>Rp {(Math.ceil(additionalTime / 5) * (isRegularStudio ? 15000 : 5000)).toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+                {Object.keys(selectedServices).length > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span>Layanan Tambahan:</span>
+                    <span>Rp {Object.entries(selectedServices).reduce((total, [serviceId, quantity]) => {
+                      const service = additionalServices?.find(s => s.id === serviceId);
+                      return total + ((service?.price || 0) * quantity);
+                    }, 0).toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+                <div className="border-t pt-2">
+                  <div className="flex justify-between font-medium">
+                    <span>Total:</span>
+                    <span>Rp {totalAmount.toLocaleString('id-ID')}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
 
-      {/* Notes */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Catatan</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            {...form.register('notes')}
-            placeholder="Catatan tambahan (opsional)"
-            rows={3}
-          />
-        </CardContent>
-      </Card>
+        {/* Notes */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Catatan</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              {...form.register('notes')}
+              placeholder="Catatan tambahan (opsional)"
+              rows={3}
+            />
+          </CardContent>
+        </Card>
 
-      <div className="flex justify-end gap-4">
-        <Button type="button" variant="outline" onClick={() => onSuccess()}>
-          Batal
-        </Button>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Menyimpan...' : booking ? 'Update Booking' : 'Buat Booking'}
-        </Button>
-      </div>
-    </form>
+        <div className="flex justify-end gap-4 sticky bottom-0 bg-white pt-4 border-t">
+          <Button type="button" variant="outline" onClick={() => onSuccess()}>
+            Batal
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Menyimpan...' : booking ? 'Update Booking' : 'Buat Booking'}
+          </Button>
+        </div>
+      </form>
+    </ScrollArea>
   );
 };
 
