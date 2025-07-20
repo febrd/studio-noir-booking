@@ -24,7 +24,30 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('offline');
   const [note, setNote] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+
+  // Get current user
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+      } else {
+        // Fallback: try to get from users table (for non-auth users)
+        const { data: users } = await supabase
+          .from('users')
+          .select('id')
+          .limit(1);
+        
+        if (users && users.length > 0) {
+          setCurrentUserId(users[0].id);
+        }
+      }
+    };
+    
+    getCurrentUser();
+  }, []);
 
   const { data: installments, isLoading, error } = useQuery({
     queryKey: ['installments', bookingId],
@@ -80,6 +103,8 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
 
   const addInstallmentMutation = useMutation({
     mutationFn: async (installmentData: any) => {
+      console.log('Adding installment with data:', installmentData);
+      
       const { data, error } = await supabase
         .from('installments')
         .insert({
@@ -87,15 +112,19 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
           amount: parseFloat(installmentData.amount),
           payment_method: installmentData.paymentMethod,
           note: installmentData.note || null,
-          performed_by: null // Will be handled by auth context
+          performed_by: currentUserId // Use the current user ID
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error inserting installment:', error);
+        throw error;
+      }
       return data;
     },
     onSuccess: (data) => {
+      console.log('Installment added successfully:', data);
       queryClient.invalidateQueries({ queryKey: ['installments', bookingId] });
       queryClient.invalidateQueries({ queryKey: ['booking-summary', bookingId] });
       
@@ -110,7 +139,7 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
     },
     onError: (error: any) => {
       console.error('Error adding installment:', error);
-      toast.error('Gagal menambahkan cicilan');
+      toast.error(`Gagal menambahkan cicilan: ${error.message || 'Unknown error'}`);
     }
   });
 
@@ -126,12 +155,19 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
       return;
     }
 
+    if (!currentUserId) {
+      toast.error('Tidak dapat menentukan pengguna yang sedang login');
+      return;
+    }
+
     const installmentAmount = parseFloat(amount);
     if (installmentAmount > remainingAmount) {
       toast.error(`Jumlah tidak boleh melebihi sisa pembayaran (Rp ${remainingAmount.toLocaleString('id-ID')})`);
       return;
     }
 
+    console.log('Adding installment with user ID:', currentUserId);
+    
     addInstallmentMutation.mutate({
       amount,
       paymentMethod,
@@ -221,11 +257,17 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
           
           <Button 
             onClick={handleAddInstallment}
-            disabled={addInstallmentMutation.isPending || !amount}
+            disabled={addInstallmentMutation.isPending || !amount || !currentUserId}
             className="w-full"
           >
             {addInstallmentMutation.isPending ? 'Menambahkan...' : 'Tambah Pembayaran'}
           </Button>
+          
+          {!currentUserId && (
+            <p className="text-sm text-red-500">
+              Tidak dapat menentukan pengguna yang sedang login
+            </p>
+          )}
         </CardContent>
       </Card>
 
