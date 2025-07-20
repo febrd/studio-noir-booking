@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,7 +20,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarIcon, Plus, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TimeExtensionManager from './TimeExtensionManager';
-import InstallmentManager from './InstallmentManager';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { formatUTCToDatetimeLocal, parseWITAToUTC } from '@/utils/timezoneUtils';
 
@@ -81,6 +81,8 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       additional_services: []
     }
   });
+
+  // ... keep existing code (fetch customers, studios, categories, packages, additional services queries)
 
   // Fetch customers
   const { data: customers } = useQuery({
@@ -185,6 +187,8 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   // Get selected package details
   const selectedPackageId = form.watch('package_id');
   const selectedPackage = packages?.find(pkg => pkg.id === selectedPackageId);
+
+  // ... keep existing code (load booking data for editing effects)
 
   // Load booking data for editing - Only run once when all data is available
   useEffect(() => {
@@ -310,6 +314,8 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       return null;
     }
   };
+
+  // ... keep existing code (handle service quantity change, package quantity change, reset fields effects)
 
   // Handle service quantity change
   const handleServiceQuantityChange = (serviceId: string, quantity: number) => {
@@ -511,6 +517,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
             <CardTitle>Customer</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* ... keep existing code (customer selection) */}
             <Controller
               name="customer_type"
               control={form.control}
@@ -576,6 +583,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
             <CardTitle>Detail Booking</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* ... keep existing code (studio, category, package selection, date/time inputs, payment method, status) */}
             <div>
               <Label htmlFor="studio_id">Studio *</Label>
               <Select value={form.watch('studio_id')} onValueChange={(value) => form.setValue('studio_id', value)}>
@@ -878,15 +886,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           />
         </CardContent>
       </Card>
-
-      {/* Installment Manager for offline bookings */}
-      {booking && form.watch('payment_method') === 'offline' && (
-        <InstallmentManager 
-          bookingId={booking.id} 
-          totalAmount={totalAmount} 
-          currentStatus={form.watch('status')}
-        />
-      )}
 
       <div className="flex justify-end gap-4">
         <Button type="button" variant="outline" onClick={() => onSuccess()}>
