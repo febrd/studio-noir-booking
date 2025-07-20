@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +10,7 @@ import { format, parseISO, isSameDay, isBefore, startOfDay, addMinutes } from 'd
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useAuth } from '@/hooks/useAuth';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 
 interface Package {
   id: string;
@@ -54,7 +53,7 @@ const RegularCheckoutPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const packageId = searchParams.get('package');
-  const { user } = useAuth();
+  const { user } = useJWTAuth();
   
   // Package quantity is fixed at 1 for regular packages
   const packageQuantity = 1;
