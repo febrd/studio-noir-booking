@@ -279,7 +279,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     return packagePrice + extensionCost + servicesTotal;
   };
 
-  // Calculate end time
+  // Calculate end time with proper validation
   const calculateEndTime = () => {
     const startTime = form.watch('start_time');
     const bookingDate = form.watch('booking_date');
@@ -288,11 +288,25 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     
     try {
       const startDateTime = new Date(`${format(bookingDate, 'yyyy-MM-dd')}T${startTime}`);
+      
+      // Check if the created date is valid
+      if (isNaN(startDateTime.getTime())) {
+        console.log('Invalid start date time:', startDateTime);
+        return null;
+      }
+      
       const totalMinutes = (selectedPackage.base_time_minutes * packageQuantity) + additionalTime;
       const endDateTime = addMinutes(startDateTime, totalMinutes);
       
+      // Check if the end date is valid
+      if (isNaN(endDateTime.getTime())) {
+        console.log('Invalid end date time:', endDateTime);
+        return null;
+      }
+      
       return endDateTime;
     } catch (error) {
+      console.log('Error calculating end time:', error);
       return null;
     }
   };
@@ -689,7 +703,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
                   )}
                 />
                 <Input
-                  type="datetime-local"
+                  type="time"
                   {...form.register('start_time')}
                   className="flex-1"
                 />
@@ -729,7 +743,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
 
         {/* Time & Services Section */}
         <div className="space-y-4">
-          {/* Time Extension Manager - only show for existing bookings */}
+          {/* Time Extension Manager - only show for existing bookings with valid end time */}
           {booking && selectedPackage && endTime && (
             <TimeExtensionManager
               bookingId={booking.id}
