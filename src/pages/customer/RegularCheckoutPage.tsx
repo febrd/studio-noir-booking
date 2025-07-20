@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate,useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { parseWITAToUTC, formatDateTimeWITA } from '@/utils/timezoneUtils';
 
 const RegularCheckoutPage = () => {
-  const { packageId } = useParams();
+  const { packageId: paramId } = useParams();
+  const [searchParams] = useSearchParams();
+  const packageId = paramId || searchParams.get('package');
+
   const navigate = useNavigate();
   
   const [selectedDate, setSelectedDate] = useState('');
