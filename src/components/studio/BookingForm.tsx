@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -730,14 +729,17 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
 
         {/* Time & Services Section */}
         <div className="space-y-4">
-          {/* Time Extension Manager */}
-          {selectedPackage && (
+          {/* Time Extension Manager - only show for existing bookings */}
+          {booking && selectedPackage && endTime && (
             <TimeExtensionManager
-              baseTimeMinutes={selectedPackage.base_time_minutes * packageQuantity}
+              bookingId={booking.id}
+              currentEndTime={endTime.toISOString()}
               studioType={selectedStudio?.type || 'self_photo'}
-              additionalTime={additionalTime}
-              onAdditionalTimeChange={setAdditionalTime}
-              disabled={isSubmitting}
+              currentAdditionalTime={additionalTime}
+              onSuccess={() => {
+                // Refresh booking data after time extension
+                queryClient.invalidateQueries({ queryKey: ['bookings'] });
+              }}
             />
           )}
 
@@ -865,7 +867,11 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
 
       {/* Installment Manager for offline bookings */}
       {booking && form.watch('payment_method') === 'offline' && (
-        <InstallmentManager bookingId={booking.id} totalAmount={totalAmount} />
+        <InstallmentManager 
+          bookingId={booking.id} 
+          totalAmount={totalAmount} 
+          currentStatus={form.watch('status')}
+        />
       )}
 
       <div className="flex justify-end gap-4">
