@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
@@ -43,6 +42,7 @@ export const PelangganDashboard = () => {
           .select(`
             created_at,
             total_amount,
+            status,
             installments (amount)
           `)
           .eq('user_id', userProfile.id)
@@ -70,21 +70,23 @@ export const PelangganDashboard = () => {
 
   const { bookings = [], studios = [], packages = [], monthlySpending = [] } = customerData || {};
 
-  // Calculate customer statistics
-  const totalBookings = bookings.length;
-  const completedBookings = bookings.filter(b => b.status === 'completed').length;
-  const upcomingBookings = bookings.filter(b => {
+  // Calculate customer statistics - exclude cancelled orders
+  const activeBookings = bookings.filter(b => b.status !== 'cancelled');
+  const totalBookings = activeBookings.length;
+  const completedBookings = activeBookings.filter(b => b.status === 'completed').length;
+  const upcomingBookings = activeBookings.filter(b => {
     const bookingDate = new Date(b.start_time || b.created_at);
     return bookingDate > new Date() && b.status === 'confirmed';
   }).length;
 
-  const totalSpent = bookings.reduce((sum, booking) => {
+  // Calculate total spent - exclude cancelled orders
+  const totalSpent = activeBookings.reduce((sum, booking) => {
     const bookingAmount = booking.total_amount || 0;
     const installmentAmount = booking.installments?.reduce((instSum: number, inst: any) => instSum + (inst.amount || 0), 0) || 0;
     return sum + Math.max(bookingAmount, installmentAmount);
   }, 0);
 
-  // Monthly spending trend for the last 6 months
+  // Monthly spending trend for the last 6 months - exclude cancelled orders
   const monthlyTrend = eachMonthOfInterval({
     start: subMonths(new Date(), 5),
     end: new Date()
@@ -94,7 +96,7 @@ export const PelangganDashboard = () => {
     
     const monthBookings = monthlySpending.filter(booking => {
       const bookingDate = new Date(booking.created_at);
-      return bookingDate >= monthStart && bookingDate <= monthEnd;
+      return bookingDate >= monthStart && bookingDate <= monthEnd && booking.status !== 'cancelled';
     });
 
     const monthSpending = monthBookings.reduce((sum, booking) => {
@@ -110,8 +112,8 @@ export const PelangganDashboard = () => {
     };
   });
 
-  // Recent bookings (last 3)
-  const recentBookings = bookings.slice(0, 3);
+  // Recent bookings (last 3) - exclude cancelled orders
+  const recentBookings = activeBookings.slice(0, 3);
 
   const getStatusColor = (status: string) => {
     switch (status) {
