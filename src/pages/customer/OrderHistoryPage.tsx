@@ -289,7 +289,7 @@ const OrderHistoryPage = () => {
               <p className="text-gray-400 font-inter mb-8">
                 {searchTerm || statusFilter !== 'all' 
                   ? 'Tidak ada pesanan yang sesuai dengan filter Anda'
-                  : 'Anda belum membuat booking apapun'
+                  : 'Anda belum membuat booking apapun !'
                 }
               </p>
               {!searchTerm && statusFilter === 'all' && (
