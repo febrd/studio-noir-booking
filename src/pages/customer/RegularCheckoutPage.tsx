@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -11,47 +10,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, Clock, MapPin, Package, User, CreditCard, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, addMinutes, parse, startOfDay } from 'date-fns';
+import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-
-// WITA timezone utilities - WITA is GMT+8 (Waktu Indonesia Tengah - Central Indonesia Time)
-const formatDatetimeLocalWITA = (dateTimeString: string): string => {
-  if (!dateTimeString) return '';
-  
-  // Parse the datetime and format for local input (treating as WITA)
-  const date = new Date(dateTimeString);
-  // WITA is GMT+8, so we add 8 hours to get the local WITA time for display
-  const witaOffset = 8 * 60; // 8 hours in minutes
-  const witaTime = new Date(date.getTime() + (witaOffset * 60000));
-  
-  return witaTime.toISOString().slice(0, 16);
-};
-
-const parseWITAToUTC = (dateTimeString: string): Date => {
-  if (!dateTimeString) return new Date();
-  
-  // Create date object treating the input as WITA time
-  const date = new Date(dateTimeString);
-  // Subtract 8 hours to convert WITA to UTC for storage
-  const witaOffset = 8 * 60; // 8 hours in minutes
-  return new Date(date.getTime() - (witaOffset * 60000));
-};
-
-const formatDateTimeWITA = (dateTimeString: string) => {
-  if (!dateTimeString) return '';
-  const date = new Date(dateTimeString);
-  // Format in WITA timezone (GMT+8)
-  return new Intl.DateTimeFormat('id-ID', {
-    timeZone: 'Asia/Makassar', // WITA timezone
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).format(date);
-};
+import { parseWITAToUTC, formatDateTimeWITA } from '@/utils/timezoneUtils';
 
 const RegularCheckoutPage = () => {
   const { packageId } = useParams();
@@ -105,7 +67,7 @@ const RegularCheckoutPage = () => {
     enabled: !!packageData?.studio_id
   });
 
-  // Check for booking conflicts with WITA timezone handling
+  // Check for booking conflicts with proper WITA timezone handling
   const checkConflicts = async (date: string, time: string) => {
     if (!date || !time || !packageId) return;
 
@@ -192,14 +154,15 @@ const RegularCheckoutPage = () => {
     return total;
   };
 
-  // Create booking mutation with WITA timezone handling
+  // Create booking mutation with proper WITA timezone handling
   const createBookingMutation = useMutation({
     mutationFn: async (bookingData: any) => {
+      const totalAmount = calculateTotal();
       const dateTimeString = `${selectedDate}T${selectedTime}`;
       const startDateTime = parseWITAToUTC(dateTimeString).toISOString();
       const endDateTime = new Date(parseWITAToUTC(dateTimeString).getTime() + (packageData?.base_time_minutes || 60) * 60000).toISOString();
 
-      console.log('Creating booking with WITA conversion:', {
+      console.log('Creating regular booking with WITA conversion:', {
         inputWITA: dateTimeString,
         startUTC: startDateTime,
         endUTC: endDateTime
@@ -229,7 +192,7 @@ const RegularCheckoutPage = () => {
           start_time: startDateTime,
           end_time: endDateTime,
           status: 'pending',
-          total_amount: calculateTotal(),
+          total_amount: totalAmount,
           payment_method: 'online',
           type: 'regular',
         })
@@ -257,12 +220,12 @@ const RegularCheckoutPage = () => {
       return booking;
     },
     onSuccess: (booking) => {
-      toast.success('Booking berhasil dibuat');
+      toast.success('Booking regular berhasil dibuat');
       navigate(`/booking-confirmation/${booking.id}`);
     },
     onError: (error: any) => {
-      console.error('Error creating booking:', error);
-      toast.error('Gagal membuat booking');
+      console.error('Error creating regular booking:', error);
+      toast.error('Gagal membuat booking regular');
     }
   });
 
@@ -518,12 +481,12 @@ const RegularCheckoutPage = () => {
 
               {selectedDate && selectedTime && (
                 <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm">
-                  <p className="font-medium text-blue-800">Jadwal Booking (WITA):</p>
+                  <p className="font-medium text-blue-800">Jadwal Regular Photo (WITA):</p>
                   <p className="text-blue-700">
                     {format(new Date(`${selectedDate}T${selectedTime}`), 'dd MMMM yyyy')} pukul {selectedTime} WITA
                   </p>
                   <p className="text-blue-600">
-                    Durasi: {packageData.base_time_minutes} menit
+                    Durasi: {packageData?.base_time_minutes} menit
                   </p>
                 </div>
               )}

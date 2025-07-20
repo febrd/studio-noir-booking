@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import WalkinBookingForm from '@/components/studio/WalkinBookingForm';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
+import { formatTimeWITA, formatDateTimeWITA } from '@/utils/timezoneUtils';
 
 const WalkinSessionsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -285,7 +286,7 @@ const WalkinSessionsPage = () => {
           </Card>
         </div>
 
-        {/* Sessions List with consistent time formatting */}
+        {/* Sessions List with consistent WITA time formatting */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           {sessions?.map((session: any) => (
             <Card key={session.id} className="hover:shadow-md transition-shadow">
@@ -309,7 +310,7 @@ const WalkinSessionsPage = () => {
                 <div className="flex items-center text-sm">
                   <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
                   <span>
-                    {formatTimeDisplay(session.start_time)} - {formatTimeDisplay(session.end_time)}
+                    {formatTimeWITA(session.start_time)} - {formatTimeWITA(session.end_time)} WITA
                   </span>
                 </div>
                 
@@ -361,7 +362,7 @@ const WalkinSessionsPage = () => {
                 </div>
 
                 <div className="text-xs text-gray-500 border-t pt-2">
-                  <p>Dibuat: {formatDateTimeDisplay(session.created_at)}</p>
+                  <p>Dibuat: {formatDateTimeWITA(session.created_at)} WITA</p>
                   <p>Payment: {session.payment_method}</p>
                 </div>
               </CardContent>
