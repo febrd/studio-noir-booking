@@ -233,7 +233,7 @@ export function AppSidebar() {
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   {hasItems(item) ? (
-                    <Collapsible asChild defaultOpen={item.title === "Masuk Studio"}>
+                    <Collapsible asChild defaultOpen={item.title === "Masuk Studio Panel"}>
                       <SidebarMenuItem>
                         <CollapsibleTrigger asChild>
                           <SidebarMenuButton tooltip={item.title}>
