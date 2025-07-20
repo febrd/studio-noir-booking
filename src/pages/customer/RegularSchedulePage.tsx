@@ -343,7 +343,7 @@ const RegularSchedulePage: React.FC = () => {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Packages
         </Button>
-        <h1 className="text-2xl font-bold">Schedule Your Session</h1>
+        <h1 className="text-2xl font-bold">Schedule Your Session Yuk!</h1>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

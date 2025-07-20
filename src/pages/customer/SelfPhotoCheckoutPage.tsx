@@ -465,7 +465,7 @@ const SelfPhotoCheckoutPage = () => {
                     </div>
                   </div>
                   <Badge className="bg-red-50 text-red-600 border-red-200 font-peace-sans font-bold">
-                    Self Photo
+                    Self Photo Session
                   </Badge>
                 </div>
               </CardHeader>

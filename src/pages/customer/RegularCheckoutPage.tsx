@@ -397,7 +397,7 @@ const RegularCheckoutPage = () => {
         <div className="text-center">
           <h2 className="text-2xl font-peace-sans font-black mb-4">Package not found</h2>
           <Button onClick={() => navigate('/customer/regular-packages')} className="bg-black text-white font-peace-sans font-bold">
-            Back to Packages
+            Back to Packages 
           </Button>
         </div>
       </div>
