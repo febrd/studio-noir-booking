@@ -304,7 +304,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     return packagePrice + extensionCost + servicesTotal;
   };
 
-  // Calculate end time with proper validation
+  // Calculate end time with proper validation - FIXED
   const calculateEndTime = () => {
     const startTime = form.watch('start_time');
     const bookingDate = form.watch('booking_date');
@@ -312,19 +312,22 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     if (!startTime || !bookingDate || !selectedPackage) return null;
     
     try {
-      const startDateTime = new Date(`${format(bookingDate, 'yyyy-MM-dd')}T${startTime}`);
+      // Create datetime string properly - FIXED
+      const dateStr = format(bookingDate, 'yyyy-MM-dd');
+      const startDateTimeStr = `${dateStr}T${startTime}`;
+      const startDateTime = new Date(startDateTimeStr);
       
+      // Validate the start time
       if (isNaN(startDateTime.getTime())) {
-        console.log('Invalid start date time:', startDateTime);
-        return null;
+        throw new Error('Invalid start time format');
       }
       
       const totalMinutes = (selectedPackage.base_time_minutes * packageQuantity) + additionalTime;
-      const endDateTime = addMinutes(startDateTime, totalMinutes);
+      const endDateTime = new Date(startDateTime.getTime() + (totalMinutes * 60 * 1000));
       
+      // Validate the end time
       if (isNaN(endDateTime.getTime())) {
-        console.log('Invalid end date time:', endDateTime);
-        return null;
+        throw new Error('Invalid end time calculation');
       }
       
       return endDateTime;
@@ -381,14 +384,32 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const createMutation = useMutation({
     mutationKey: ['save-booking'],
     mutationFn: async (data: BookingFormData) => {
-      // Convert datetime to UTC
-      const startDateTime = parseWITAToUTC(data.start_time);
+      console.log('Creating booking with data:', data);
+      
+      // Create datetime string properly - FIXED
+      const dateStr = format(data.booking_date, 'yyyy-MM-dd');
+      const startDateTimeStr = `${dateStr}T${data.start_time}`;
+      const startDateTime = new Date(startDateTimeStr);
+      
+      // Validate the start time
+      if (isNaN(startDateTime.getTime())) {
+        throw new Error('Invalid start time format');
+      }
+      
+      // Convert to UTC using WITA timezone
+      const startDateTimeUTC = parseWITAToUTC(data.start_time, data.booking_date);
+      
       const totalMinutes = ((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime;
-      const endDateTime = new Date(startDateTime.getTime() + (totalMinutes * 60 * 1000));
+      const endDateTime = new Date(startDateTimeUTC.getTime() + (totalMinutes * 60 * 1000));
+
+      // Validate the end time
+      if (isNaN(endDateTime.getTime())) {
+        throw new Error('Invalid end time calculation');
+      }
 
       console.log('🔧 Booking WITA Times:', {
         startInput: data.start_time,
-        startDateTimeUTC: startDateTime.toISOString(),
+        startDateTimeUTC: startDateTimeUTC.toISOString(),
         endDateTimeUTC: endDateTime.toISOString(),
         totalMinutes,
         packageQuantity
@@ -433,7 +454,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         studio_package_id: data.package_id,
         package_category_id: isRegularStudio ? data.category_id : null,
         type: bookingType as 'self_photo' | 'regular',
-        start_time: startDateTime.toISOString(),
+        start_time: startDateTimeUTC.toISOString(),
         end_time: endDateTime.toISOString(),
         additional_time_minutes: additionalTime > 0 ? additionalTime : null,
         payment_method: data.payment_method,

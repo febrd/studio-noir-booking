@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,6 +50,12 @@ interface BookingWithDetails {
   remaining_amount?: number;
   installment_count?: number;
   payment_status?: BookingStatus;
+  additional_services?: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    price: number;
+  }>;
 }
 
 const BookingsPage = () => {
@@ -87,7 +94,7 @@ const BookingsPage = () => {
     }
   });
 
-  // Enhanced query with date filtering
+  // Enhanced query with date filtering and additional services
   const { data: bookings, isLoading } = useQuery({
     queryKey: ['bookings-enhanced', debouncedSearchQuery, statusFilter, studioFilter, dateRange],
     queryFn: async () => {
@@ -152,6 +159,7 @@ const BookingsPage = () => {
       const studioIds = [...new Set(bookingsData.map(b => b.studio_id))];
       const packageIds = [...new Set(bookingsData.map(b => b.studio_package_id))];
       const categoryIds = [...new Set(bookingsData.map(b => b.package_category_id).filter(Boolean))];
+      const bookingIds = bookingsData.map(b => b.id);
 
       // Fetch users
       const { data: usersData } = await supabase
@@ -177,6 +185,20 @@ const BookingsPage = () => {
         .select('id, name')
         .in('id', categoryIds) : { data: [] };
 
+      // Fetch additional services for all bookings
+      const { data: additionalServicesData } = await supabase
+        .from('booking_additional_services')
+        .select(`
+          booking_id,
+          quantity,
+          additional_services:additional_service_id (
+            id,
+            name,
+            price
+          )
+        `)
+        .in('booking_id', bookingIds);
+
       // Create lookup maps with proper typing
       const usersMap = new Map<string, any>();
       usersData?.forEach(u => usersMap.set(u.id, u));
@@ -190,12 +212,28 @@ const BookingsPage = () => {
       const categoriesMap = new Map<string, any>();
       categoriesData?.forEach(c => categoriesMap.set(c.id, c));
 
+      // Create additional services map
+      const additionalServicesMap = new Map<string, any[]>();
+      additionalServicesData?.forEach(service => {
+        if (!additionalServicesMap.has(service.booking_id)) {
+          additionalServicesMap.set(service.booking_id, []);
+        }
+        const services = additionalServicesMap.get(service.booking_id)!;
+        services.push({
+          id: service.additional_services.id,
+          name: service.additional_services.name,
+          quantity: service.quantity,
+          price: service.additional_services.price
+        });
+      });
+
       // Transform and filter the data
       let transformedBookings = bookingsData.map(booking => {
         const user = usersMap.get(booking.user_id);
         const studio = studiosMap.get(booking.studio_id);
         const packageInfo = packagesMap.get(booking.studio_package_id);
         const category = booking.package_category_id ? categoriesMap.get(booking.package_category_id) : null;
+        const additionalServices = additionalServicesMap.get(booking.id) || [];
 
         return {
           ...booking,
@@ -205,7 +243,8 @@ const BookingsPage = () => {
           package_price: packageInfo?.price || 0,
           studio_name: studio?.name || 'Unknown Studio',
           studio_type: studio?.type || 'regular',
-          category_name: category?.name || undefined
+          category_name: category?.name || undefined,
+          additional_services: additionalServices
         };
       });
 
@@ -418,7 +457,7 @@ const BookingsPage = () => {
                 Tambah Booking
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+            <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden">
               <DialogHeader>
                 <DialogTitle>Tambah Booking Baru</DialogTitle>
               </DialogHeader>
@@ -607,6 +646,19 @@ const BookingsPage = () => {
                       {actualStatus}
                     </Badge>
                   </div>
+
+                  {/* Additional Services Display */}
+                  {booking.additional_services && booking.additional_services.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-gray-700">Layanan Tambahan:</p>
+                      {booking.additional_services.map((service, index) => (
+                        <div key={index} className="text-xs text-gray-600 flex justify-between">
+                          <span>{service.name} (x{service.quantity})</span>
+                          <span>{formatPrice(service.price * service.quantity)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   
                   <div className="flex gap-2 pt-2">
                     {(actualStatus === 'pending' || actualStatus === 'installment') && (
@@ -676,7 +728,7 @@ const BookingsPage = () => {
 
         {/* Edit Dialog */}
         <Dialog open={!!editingBooking} onOpenChange={() => setEditingBooking(null)}>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+          <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Edit Booking</DialogTitle>
             </DialogHeader>
