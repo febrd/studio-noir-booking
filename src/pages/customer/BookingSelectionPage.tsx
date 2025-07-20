@@ -93,15 +93,10 @@ const BookingSelectionPage = () => {
           {/* Clean Header */}
           <div className="text-center mb-16">
             <div className="flex justify-center items-center gap-4 mb-8">
-              <Link to="/dashboard">
-                <Button variant="outline" size="sm" className="border border-gray-200 text-gray-600 hover:bg-gray-50 font-inter font-medium">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Kembali
-                </Button>
-              </Link>
+            
             </div>
             <h1 className="text-6xl font-peace-sans font-black mb-4 tracking-tight text-black">
-              Pilih Studio
+              Tentukan Dahulu !
             </h1>
             <p className="text-xl font-inter text-gray-500 max-w-lg mx-auto">
               Setiap pilihan memiliki keunikan tersendiri
