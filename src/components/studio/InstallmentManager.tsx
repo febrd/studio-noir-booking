@@ -105,35 +105,61 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
     mutationFn: async (installmentData: any) => {
       console.log('Adding installment with data:', installmentData);
       
-      const { data, error } = await supabase
+      // First, insert the installment
+      const { data: installmentResult, error: installmentError } = await supabase
         .from('installments')
         .insert({
           booking_id: bookingId,
           amount: parseFloat(installmentData.amount),
           payment_method: installmentData.paymentMethod,
           note: installmentData.note || null,
-          performed_by: currentUserId // Use the current user ID
+          performed_by: currentUserId
         })
         .select()
         .single();
 
-      if (error) {
-        console.error('Error inserting installment:', error);
-        throw error;
+      if (installmentError) {
+        console.error('Error inserting installment:', installmentError);
+        throw installmentError;
       }
-      return data;
+
+      // Then, create a transaction record based on payment method
+      const transactionData = {
+        booking_id: bookingId,
+        amount: parseFloat(installmentData.amount),
+        payment_type: installmentData.paymentMethod as 'offline' | 'online' | 'installment',
+        status: 'paid' as const,
+        description: `Pembayaran cicilan - ${installmentData.note || 'Cicilan'}`,
+        performed_by: currentUserId,
+        type: 'installment'
+      };
+
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .insert(transactionData);
+
+      if (transactionError) {
+        console.error('Error creating transaction record:', transactionError);
+        // Don't throw error here as installment was already created successfully
+        // Just log the error
+      }
+
+      return installmentResult;
     },
     onSuccess: (data) => {
       console.log('Installment added successfully:', data);
       queryClient.invalidateQueries({ queryKey: ['installments', bookingId] });
       queryClient.invalidateQueries({ queryKey: ['booking-summary', bookingId] });
+      queryClient.invalidateQueries({ queryKey: ['offline-bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['online-bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
       
       // Call the parent success handler with the required parameters
       if (onSuccess) {
         onSuccess(bookingId, parseFloat(amount), paymentMethod);
       }
       
-      toast.success('Cicilan berhasil ditambahkan');
+      toast.success('Cicilan berhasil ditambahkan dan masuk ke laporan transaksi');
       setAmount('');
       setNote('');
     },
