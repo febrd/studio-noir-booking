@@ -283,25 +283,80 @@ const SelfPhotoCheckoutPage = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Package Info */}
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <MapPin className="h-4 w-4" />
-                <span className="font-medium">{packageData.studios?.name}</span>
-                <Badge variant="secondary">Self Photo</Badge>
-              </div>
-              <div className="flex items-center gap-2 mb-2">
-                <Package className="h-4 w-4" />
-                <span>{packageData.title}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                <span>{packageData.base_time_minutes} menit</span>
-                <span className="ml-auto font-bold text-green-600">
-                  {formatPrice(packageData.price)}
-                </span>
-              </div>
-            </div>
+       
 
+            <Card className="border border-gray-100 shadow-none">
+              <CardHeader className="p-8">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-2xl font-peace-sans font-black text-black mb-2">
+                      {packageData.title}
+                    </CardTitle>
+                    <p className="text-gray-500 font-inter mb-4">{packageData.description}</p>
+                    <div className="flex items-center gap-6 text-sm font-inter text-gray-600">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        {packageData.base_time_minutes} menit
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        {packageData.studios?.name}
+                      </div>
+                    </div>
+                  </div>
+                  <Badge className="bg-red-50 text-red-600 border-red-200 font-peace-sans font-bold">
+                    Self Photo Session
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8 pt-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <span className="text-lg font-inter text-gray-600">Quantity:</span>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleQuantityChange(false)}
+                        disabled={packageQuantity <= 1}
+                        className="border-gray-200 text-gray-600 hover:bg-gray-50"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <span className="text-2xl font-peace-sans font-black min-w-[3rem] text-center">
+                        {packageQuantity}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleQuantityChange(true)}
+                        className="border-gray-200 text-gray-600 hover:bg-gray-50"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-inter text-gray-500 mb-1">Total</p>
+                    <p className="text-3xl font-peace-sans font-black text-black">
+                      {((packageData.price * packageQuantity)).toLocaleString('id-ID', { 
+                        style: 'currency', 
+                        currency: 'IDR', 
+                        minimumFractionDigits: 0 
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="text-center">
+              <Button 
+                onClick={handleContinueToServices}
+                className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-12 py-4 text-lg"
+              >
+                Continue to Additional Services
+              </Button>
             {/* Date Selection */}
             <div className="space-y-2">
               <Label htmlFor="date">Tanggal (WITA) *</Label>

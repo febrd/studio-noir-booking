@@ -267,7 +267,17 @@ const RegularCheckoutPage = () => {
   }
 
   if (!packageData) {
-    return <div className="p-6">Package not found</div>;
+    return (
+      <div className="min-h-screen bg-white flex justify-center items-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-peace-sans font-black mb-4">Package not found</h2>
+          <Button onClick={() => navigate('/customer/regular-packages')} className="bg-black text-white font-peace-sans font-bold">
+            Back to Packages 
+          </Button>
+        </div>
+      </div>
+    );
+
   }
 
   return (
