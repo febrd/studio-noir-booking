@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -62,44 +63,6 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       additional_services: []
     }
   });
-
-  // Load booking data for editing
-  useEffect(() => {
-    if (booking) {
-      console.log('Loading booking data for edit:', booking);
-      
-      form.setValue('customer_name', booking.users?.name || '');
-      form.setValue('customer_email', booking.users?.email || '');
-      form.setValue('studio_id', booking.studio_id || '');
-      form.setValue('category_id', booking.package_category_id || '');
-      form.setValue('package_id', booking.studio_package_id || '');
-      form.setValue('payment_method', booking.payment_method || 'cash');
-      form.setValue('notes', booking.notes || '');
-      
-      // Set time using WITA format
-      if (booking.start_time) {
-        const witaTime = formatUTCToDatetimeLocal(booking.start_time);
-        const timeOnly = witaTime.split('T')[1]; // Extract time part only
-        form.setValue('start_time', timeOnly);
-      }
-      
-      // Set additional time
-      if (booking.additional_time_minutes) {
-        setAdditionalTime(booking.additional_time_minutes);
-      }
-      
-      // Set package quantity if exists
-      if (booking.package_quantity) {
-        setPackageQuantity(booking.package_quantity);
-      }
-      
-      // Set selected additional services
-      if (booking.booking_additional_services) {
-        const serviceIds = booking.booking_additional_services.map((service: any) => service.additional_service_id);
-        setSelectedServices(serviceIds);
-      }
-    }
-  }, [booking, form]);
 
   // Fetch studios
   const { data: studios } = useQuery({
@@ -188,6 +151,48 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
   const selectedPackageId = form.watch('package_id');
   const selectedPackage = packages?.find(pkg => pkg.id === selectedPackageId);
 
+  // Load booking data for editing
+  useEffect(() => {
+    if (booking) {
+      console.log('Loading booking data for edit:', booking);
+      
+      // Set form values
+      form.setValue('customer_name', booking.users?.name || '');
+      form.setValue('customer_email', booking.users?.email || '');
+      form.setValue('studio_id', booking.studio_id || '');
+      form.setValue('category_id', booking.package_category_id || '');
+      form.setValue('package_id', booking.studio_package_id || '');
+      form.setValue('notes', booking.notes || '');
+      
+      // Set payment method - map offline to cash for walkin
+      const paymentMethod = booking.payment_method === 'offline' ? 'cash' : booking.payment_method;
+      form.setValue('payment_method', paymentMethod as any);
+      
+      // Set time using WITA format
+      if (booking.start_time) {
+        const witaTime = formatUTCToDatetimeLocal(booking.start_time);
+        const timeOnly = witaTime.split('T')[1]; // Extract time part only
+        form.setValue('start_time', timeOnly);
+      }
+      
+      // Set additional time
+      if (booking.additional_time_minutes) {
+        setAdditionalTime(booking.additional_time_minutes);
+      }
+      
+      // Set package quantity if exists
+      if (booking.package_quantity) {
+        setPackageQuantity(booking.package_quantity);
+      }
+      
+      // Set selected additional services
+      if (booking.booking_additional_services) {
+        const serviceIds = booking.booking_additional_services.map((service: any) => service.additional_service_id);
+        setSelectedServices(serviceIds);
+      }
+    }
+  }, [booking, form]);
+
   // Calculate total amount
   const calculateTotalAmount = () => {
     const packagePrice = (selectedPackage?.price || 0) * packageQuantity;
@@ -235,25 +240,25 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
     }
   };
 
-  // Reset category and package when studio changes
+  // Reset category and package when studio changes (but not during initial load)
   useEffect(() => {
-    if (selectedStudioId) {
+    if (selectedStudioId && !booking) {
       form.setValue('category_id', '');
       form.setValue('package_id', '');
       setAdditionalTime(0);
       setSelectedServices([]);
       setPackageQuantity(1);
     }
-  }, [selectedStudioId, form]);
+  }, [selectedStudioId, form, booking]);
 
-  // Reset package when category changes for regular studios
+  // Reset package when category changes for regular studios (but not during initial load)
   useEffect(() => {
-    if (isRegularStudio && selectedCategoryId) {
+    if (isRegularStudio && selectedCategoryId && !booking) {
       form.setValue('package_id', '');
       setAdditionalTime(0);
       setPackageQuantity(1);
     }
-  }, [selectedCategoryId, isRegularStudio, form]);
+  }, [selectedCategoryId, isRegularStudio, form, booking]);
 
   // Create/Update mutation with WITA timezone preservation
   const createMutation = useMutation({

@@ -42,15 +42,15 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const { userProfile } = useJWTAuth();
 
   const [formData, setFormData] = useState({
-    user_id: booking?.user_id || '',
-    studio_id: booking?.studio_id || '',
-    studio_package_id: booking?.studio_package_id || '',
-    package_category_id: booking?.package_category_id || '',
-    type: booking?.type || '',
-    start_time: booking?.start_time ? formatUTCToDatetimeLocal(booking.start_time) : '',
-    additional_time_minutes: booking?.additional_time_minutes || 0,
-    payment_method: booking?.payment_method || 'offline',
-    status: booking?.status || 'pending'
+    user_id: '',
+    studio_id: '',
+    studio_package_id: '',
+    package_category_id: '',
+    type: '',
+    start_time: '',
+    additional_time_minutes: 0,
+    payment_method: 'offline',
+    status: 'pending'
   });
 
   const [guestUser, setGuestUser] = useState({
@@ -72,6 +72,19 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   useEffect(() => {
     if (booking) {
       console.log('Loading booking data for edit:', booking);
+      
+      // Set form data
+      setFormData({
+        user_id: booking.user_id || '',
+        studio_id: booking.studio_id || '',
+        studio_package_id: booking.studio_package_id || '',
+        package_category_id: booking.package_category_id || '',
+        type: booking.type || '',
+        start_time: booking.start_time ? formatUTCToDatetimeLocal(booking.start_time) : '',
+        additional_time_minutes: booking.additional_time_minutes || 0,
+        payment_method: booking.payment_method || 'offline',
+        status: booking.status || 'pending'
+      });
       
       // Set package quantity if exists
       if (booking.package_quantity) {
@@ -511,8 +524,8 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     setFormData(prev => {
       const newData = { ...prev, [field]: value };
       
-      // Reset dependent fields when studio changes
-      if (field === 'studio_id') {
+      // Reset dependent fields when studio changes (but not during initial load)
+      if (field === 'studio_id' && !booking) {
         newData.package_category_id = '';
         newData.studio_package_id = '';
         newData.type = studios?.find(s => s.id === value)?.type || '';
@@ -520,8 +533,8 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         setPackageQuantity(1);
       }
       
-      // Reset package when category changes
-      if (field === 'package_category_id') {
+      // Reset package when category changes (but not during initial load)
+      if (field === 'package_category_id' && !booking) {
         newData.studio_package_id = '';
         setPackageQuantity(1);
       }
