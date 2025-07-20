@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +10,6 @@ import { toast } from 'sonner';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import WalkinBookingForm from '@/components/studio/WalkinBookingForm';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
-import { formatTimeWITA, formatDateTimeWITA } from '@/utils/timezoneUtils';
 
 const WalkinSessionsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -131,6 +129,28 @@ const WalkinSessionsPage = () => {
     setIsDialogOpen(false);
     setEditingSession(null);
     queryClient.invalidateQueries({ queryKey: ['walkin-sessions'] });
+  };
+
+  const formatTimeDisplay = (dateTimeString: string) => {
+    if (!dateTimeString) return '';
+    // Display in consistent 24-hour format
+    return new Date(dateTimeString).toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  };
+
+  const formatDateTimeDisplay = (dateTimeString: string) => {
+    if (!dateTimeString) return '';
+    return new Date(dateTimeString).toLocaleString('id-ID', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -265,7 +285,7 @@ const WalkinSessionsPage = () => {
           </Card>
         </div>
 
-        {/* Sessions List with consistent WITA time formatting */}
+        {/* Sessions List with consistent time formatting */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           {sessions?.map((session: any) => (
             <Card key={session.id} className="hover:shadow-md transition-shadow">
@@ -289,7 +309,7 @@ const WalkinSessionsPage = () => {
                 <div className="flex items-center text-sm">
                   <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
                   <span>
-                    {formatTimeWITA(session.start_time)} - {formatTimeWITA(session.end_time)} WITA
+                    {formatTimeDisplay(session.start_time)} - {formatTimeDisplay(session.end_time)}
                   </span>
                 </div>
                 
@@ -341,7 +361,7 @@ const WalkinSessionsPage = () => {
                 </div>
 
                 <div className="text-xs text-gray-500 border-t pt-2">
-                  <p>Dibuat: {formatDateTimeWITA(session.created_at)} WITA</p>
+                  <p>Dibuat: {formatDateTimeDisplay(session.created_at)}</p>
                   <p>Payment: {session.payment_method}</p>
                 </div>
               </CardContent>

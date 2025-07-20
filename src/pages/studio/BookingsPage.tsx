@@ -19,7 +19,6 @@ import { DatePickerWithRange } from '@/components/ui/date-picker';
 import { DateRange } from 'react-day-picker';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
-import { formatDateTimeWITA, formatUTCToDatetimeLocal } from '@/utils/timezoneUtils';
 
 type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'paid' | 'expired' | 'failed' | 'installment';
 
@@ -326,7 +325,7 @@ const BookingsPage = () => {
             amount: amount,
             type: 'offline',
             status: 'paid',
-            payment_type: 'offline',
+            payment_type: 'installment',
             description: `Pembayaran cicilan offline - ${amount.toLocaleString('id-ID')}`,
             performed_by: null // Will be handled by database function
           });
@@ -377,6 +376,26 @@ const BookingsPage = () => {
       style: 'currency',
       currency: 'IDR'
     }).format(price);
+  };
+
+  const formatDateTime = (dateTimeString: string) => {
+    if (!dateTimeString) return '';
+    // Format as UTC time without timezone conversion
+    const date = new Date(dateTimeString);
+    return date.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:MM
+  };
+
+  const formatDateTimeDisplay = (dateTimeString: string) => {
+    if (!dateTimeString) return '';
+    // Display in local format but keep data consistent
+    return new Date(dateTimeString).toLocaleString('id-ID', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false // Use 24-hour format
+    });
   };
 
   // Clear filters function
@@ -571,8 +590,8 @@ const BookingsPage = () => {
                     <div className="flex items-center gap-2 text-sm">
                       <Clock className="h-4 w-4 text-gray-500" />
                       <div>
-                        <p>Mulai: {formatDateTimeWITA(booking.start_time)} WITA</p>
-                        {booking.end_time && <p>Selesai: {formatDateTimeWITA(booking.end_time)} WITA</p>}
+                        <p>Mulai: {formatDateTimeDisplay(booking.start_time)}</p>
+                        {booking.end_time && <p>Selesai: {formatDateTimeDisplay(booking.end_time)}</p>}
                         {booking.additional_time_minutes && booking.additional_time_minutes > 0 && (
                           <p className="text-blue-600">+ {booking.additional_time_minutes} menit tambahan</p>
                         )}
@@ -633,7 +652,7 @@ const BookingsPage = () => {
                   </div>
                   
                   <div className="text-xs text-gray-500 border-t pt-2">
-                    <p>Dibuat: {formatDateTimeWITA(booking.created_at)} WITA</p>
+                    <p>Dibuat: {formatDateTimeDisplay(booking.created_at)}</p>
                     <p>Payment: {booking.payment_method}</p>
                     {booking.category_name && (
                       <p>Kategori: {booking.category_name}</p>

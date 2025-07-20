@@ -12,12 +12,6 @@ import { Calendar, Clock, Plus, Minus, AlertTriangle, Search } from 'lucide-reac
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
-import { 
-  formatDatetimeLocalWITA, 
-  parseWITAToUTC, 
-  formatDateTimeWITA, 
-  formatUTCToDatetimeLocal 
-} from '@/utils/timezoneUtils';
 
 interface BookingFormProps {
   booking?: any;
@@ -37,6 +31,59 @@ const isValidUUID = (uuid: string): boolean => {
   return uuidRegex.test(uuid);
 };
 
+// WITA timezone utilities - WITA is UTC+8
+const formatDatetimeLocalWITA = (dateTimeString: string): string => {
+  if (!dateTimeString) return '';
+  
+  // Parse the UTC datetime string and convert to WITA for display
+  const date = new Date(dateTimeString);
+  
+  // Get local time components in WITA (UTC+8)
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const hours = String(date.getUTCHours() + 8).padStart(2, '0'); // Add 8 hours for WITA
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  
+  // Handle hour overflow (24+ hours)
+  const totalHours = date.getUTCHours() + 8;
+  if (totalHours >= 24) {
+    const adjustedDate = new Date(date.getTime() + (8 * 60 * 60 * 1000));
+    return adjustedDate.toISOString().slice(0, 16);
+  }
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+const parseWITAToUTC = (witaDateTimeString: string): Date => {
+  if (!witaDateTimeString) return new Date();
+  
+  // Parse the WITA datetime string and convert to UTC for database storage
+  const date = new Date(witaDateTimeString);
+  
+  // Subtract 8 hours to convert from WITA to UTC
+  const utcDate = new Date(date.getTime() - (8 * 60 * 60 * 1000));
+  
+  return utcDate;
+};
+
+const formatDateTimeWITA = (dateTimeString: string): string => {
+  if (!dateTimeString) return '';
+  
+  // Parse UTC datetime and display in WITA timezone
+  const date = new Date(dateTimeString);
+  const witaDate = new Date(date.getTime() + (8 * 60 * 60 * 1000));
+  
+  return witaDate.toLocaleString('id-ID', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+};
+
 const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const { userProfile } = useJWTAuth();
 
@@ -46,7 +93,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     studio_package_id: booking?.studio_package_id || '',
     package_category_id: booking?.package_category_id || '',
     type: booking?.type || '',
-    start_time: booking?.start_time ? formatUTCToDatetimeLocal(booking.start_time) : '',
+    start_time: booking?.start_time ? formatDatetimeLocalWITA(booking.start_time) : '',
     additional_time_minutes: booking?.additional_time_minutes || 0,
     payment_method: booking?.payment_method || 'offline',
     status: booking?.status || 'pending'
@@ -232,7 +279,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         throw new Error('User ID tidak valid atau kosong');
       }
 
-      // Convert WITA time to UTC for database storage using centralized utility
+      // Convert WITA time to UTC for database storage
       const startTimeUTC = parseWITAToUTC(data.start_time);
       const totalMinutes = (selectedPackage?.base_time_minutes || 0) + (data.additional_time_minutes || 0);
       const endTimeUTC = new Date(startTimeUTC.getTime() + (totalMinutes * 60 * 1000));

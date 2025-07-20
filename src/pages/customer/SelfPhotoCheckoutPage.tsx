@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -13,7 +14,44 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { parseWITAToUTC, formatDateTimeWITA } from '@/utils/timezoneUtils';
+
+// WITA timezone utilities - WITA is GMT+8 (Waktu Indonesia Tengah - Central Indonesia Time)
+const formatDatetimeLocalWITA = (dateTimeString: string): string => {
+  if (!dateTimeString) return '';
+  
+  // Parse the datetime and format for local input (treating as WITA)
+  const date = new Date(dateTimeString);
+  // WITA is GMT+8, so we add 8 hours to get the local WITA time for display
+  const witaOffset = 8 * 60; // 8 hours in minutes
+  const witaTime = new Date(date.getTime() + (witaOffset * 60000));
+  
+  return witaTime.toISOString().slice(0, 16);
+};
+
+const parseWITAToUTC = (dateTimeString: string): Date => {
+  if (!dateTimeString) return new Date();
+  
+  // Create date object treating the input as WITA time
+  const date = new Date(dateTimeString);
+  // Subtract 8 hours to convert WITA to UTC for storage
+  const witaOffset = 8 * 60; // 8 hours in minutes
+  return new Date(date.getTime() - (witaOffset * 60000));
+};
+
+const formatDateTimeWITA = (dateTimeString: string) => {
+  if (!dateTimeString) return '';
+  const date = new Date(dateTimeString);
+  // Format in WITA timezone (GMT+8)
+  return new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Makassar', // WITA timezone
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date);
+};
 
 const SelfPhotoCheckoutPage = () => {
   const { packageId } = useParams();
@@ -66,7 +104,7 @@ const SelfPhotoCheckoutPage = () => {
     enabled: !!packageData?.studio_id
   });
 
-  // Check for booking conflicts with proper WITA timezone handling
+  // Check for booking conflicts with WITA timezone handling
   const checkConflicts = async (date: string, time: string) => {
     if (!date || !time || !packageId) return;
 
@@ -153,7 +191,7 @@ const SelfPhotoCheckoutPage = () => {
     return total;
   };
 
-  // Create booking mutation with proper WITA timezone handling
+  // Create booking mutation with WITA timezone handling
   const createBookingMutation = useMutation({
     mutationFn: async (bookingData: any) => {
       const totalAmount = calculateTotal();
