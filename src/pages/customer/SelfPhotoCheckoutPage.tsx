@@ -1,88 +1,137 @@
-
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Clock, MapPin, Package, User, CreditCard, AlertCircle, Minus, Plus } from 'lucide-react';
-import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { parseWITAToUTC, formatDateTimeWITA } from '@/utils/timezoneUtils';
+import { Calendar } from '@/components/ui/calendar';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ArrowLeft, Plus, Minus, Clock, Users, MapPin, Calendar as CalendarIcon } from 'lucide-react';
+import { format, isSameDay, parseISO, isBefore, startOfDay, addMinutes } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
+
+interface Package {
+  id: string;
+  title: string;
+  price: number;
+  base_time_minutes: number;
+  description: string;
+  studios: {
+    name: string;
+    id: string;
+  } | null;
+}
+
+interface AdditionalService {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+}
+
+interface TimeSlot {
+  id: string;
+  startTime: string;
+  endTime: string;
+  available: boolean;
+  bookingId?: string;
+}
+
+interface BookedSlot {
+  start_time: string;
+  end_time: string;
+  id: string;
+}
 
 const SelfPhotoCheckoutPage = () => {
-  const { packageId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const packageId = searchParams.get('package');
+  const { userProfile } = useJWTAuth();
   
-  const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTime, setSelectedTime] = useState('');
-  const [customerInfo, setCustomerInfo] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    notes: ''
-  });
-  const [selectedServices, setSelectedServices] = useState<any[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [conflictingBookings, setConflictingBookings] = useState<any[]>([]);
+  // Package quantity is now dynamic instead of fixed
   const [packageQuantity, setPackageQuantity] = useState(1);
+  
+  // Multi-step state
+  const [currentStep, setCurrentStep] = useState<'package' | 'services' | 'schedule'>('package');
+  const [selectedServices, setSelectedServices] = useState<{[key: string]: number}>({});
+  
+  // Schedule selection state
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [bookedSlots, setBookedSlots] = useState<{[key: string]: BookedSlot[]}>({});
+  const [bookingLoading, setBookingLoading] = useState(false);
 
   // Fetch package details
-  const { data: packageData, isLoading } = useQuery({
+  const { data: packageData, isLoading: packageLoading } = useQuery({
     queryKey: ['self-photo-package', packageId],
     queryFn: async () => {
+      if (!packageId) return null;
+      
       const { data, error } = await supabase
         .from('studio_packages')
         .select(`
-          *,
-          studios (id, name, location, type)
+          id,
+          title,
+          price,
+          base_time_minutes,
+          description,
+          studios!inner(id, name, type)
         `)
         .eq('id', packageId)
+        .eq('studios.type', 'self_photo')
         .single();
-      
+
       if (error) throw error;
-      return data;
-    }
+      return data as Package;
+    },
+    enabled: !!packageId
   });
 
-  // Fetch additional services
-  const { data: additionalServices } = useQuery({
-    queryKey: ['self-photo-additional-services', packageData?.studio_id],
+  // Fetch additional services for the studio
+  const { data: additionalServices = [] } = useQuery({
+    queryKey: ['additional-services', packageData?.studios?.id],
     queryFn: async () => {
-      if (!packageData?.studio_id) return [];
+      if (!packageData?.studios?.id) return [];
       
       const { data, error } = await supabase
         .from('additional_services')
         .select('*')
-        .eq('studio_id', packageData.studio_id);
-      
+        .eq('studio_id', packageData.studios.id);
+
       if (error) throw error;
-      return data;
+      return data as AdditionalService[];
     },
-    enabled: !!packageData?.studio_id
+    enabled: !!packageData?.studios?.id
   });
 
-  // Check for booking conflicts with proper WITA timezone handling
-  const checkConflicts = async (date: string, time: string) => {
-    if (!date || !time || !packageId) return;
+  // Fetch booked slots when on schedule step
+  useEffect(() => {
+    if (currentStep === 'schedule' && packageId) {
+      fetchBookedSlots();
+    }
+  }, [currentStep, packageId]);
 
+  // Generate time slots when date is selected
+  useEffect(() => {
+    if (selectedDate && packageData) {
+      generateTimeSlots();
+    }
+  }, [selectedDate, bookedSlots, packageData]);
+
+  const handleQuantityChange = (increment: boolean) => {
+    if (increment) {
+      setPackageQuantity(prev => prev + 1);
+    } else if (packageQuantity > 1) {
+      setPackageQuantity(prev => prev - 1);
+    }
+  };
+
+  const fetchBookedSlots = async () => {
     try {
-      const dateTimeString = `${date}T${time}`;
-      const startDateTime = parseWITAToUTC(dateTimeString).toISOString();
-      const endDateTime = new Date(parseWITAToUTC(dateTimeString).getTime() + (packageData?.base_time_minutes || 60) * 60000).toISOString();
-
-      console.log('Checking conflicts for WITA times:', {
-        input: dateTimeString,
-        startUTC: startDateTime,
-        endUTC: endDateTime
-      });
-
       const { data, error } = await supabase
         .from('bookings')
         .select('start_time, end_time, id')
@@ -91,115 +140,203 @@ const SelfPhotoCheckoutPage = () => {
 
       if (error) throw error;
 
-      const conflicts = data?.filter(booking => {
-        const bookingStart = new Date(booking.start_time).getTime();
-        const bookingEnd = new Date(booking.end_time).getTime();
-        const newStart = new Date(startDateTime).getTime();
-        const newEnd = new Date(endDateTime).getTime();
+      // Group bookings by date
+      const groupedBookings: {[key: string]: BookedSlot[]} = {};
+      data.forEach(booking => {
+        if (booking.start_time && booking.end_time) {
+          const dateKey = format(parseISO(booking.start_time), 'yyyy-MM-dd');
+          if (!groupedBookings[dateKey]) {
+            groupedBookings[dateKey] = [];
+          }
+          groupedBookings[dateKey].push({
+            start_time: booking.start_time,
+            end_time: booking.end_time,
+            id: booking.id
+          });
+        }
+      });
 
-        return (
-          (newStart >= bookingStart && newStart < bookingEnd) ||
-          (newEnd > bookingStart && newEnd <= bookingEnd) ||
-          (newStart <= bookingStart && newEnd >= bookingEnd)
-        );
-      }) || [];
-
-      setConflictingBookings(conflicts);
+      setBookedSlots(groupedBookings);
     } catch (error) {
-      console.error('Error checking conflicts:', error);
+      console.error('Error fetching booked slots:', error);
     }
   };
 
-  // Handle date/time changes
-  useEffect(() => {
-    if (selectedDate && selectedTime) {
-      checkConflicts(selectedDate, selectedTime);
-    }
-  }, [selectedDate, selectedTime, packageId]);
-
-  // Generate time slots (WITA)
   const generateTimeSlots = () => {
-    const slots = [];
-    for (let hour = 8; hour <= 20; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        slots.push(timeString);
+    if (!selectedDate || !packageData) return;
+
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    const dayBookings = bookedSlots[dateKey] || [];
+    const slots: TimeSlot[] = [];
+
+    // Generate time slots from 9 AM to 9 PM
+    for (let hour = 9; hour <= 21; hour++) {
+      const startTime = `${hour.toString().padStart(2, '0')}:00`;
+      const startDateTime = new Date(`${dateKey}T${startTime}:00`);
+      const endDateTime = addMinutes(startDateTime, packageData.base_time_minutes);
+      const endTime = format(endDateTime, 'HH:mm');
+
+      // Check if this slot conflicts with any existing booking
+      const isBooked = dayBookings.some(booking => {
+        const bookingStart = parseISO(booking.start_time);
+        const bookingEnd = parseISO(booking.end_time);
+        const slotStart = startDateTime;
+        const slotEnd = endDateTime;
+
+        // Check for overlap
+        return (slotStart < bookingEnd && slotEnd > bookingStart);
+      });
+
+      slots.push({
+        id: `${dateKey}-${startTime}`,
+        startTime,
+        endTime,
+        available: !isBooked,
+        bookingId: isBooked ? dayBookings.find(b => {
+          const bookingStart = parseISO(b.start_time);
+          const bookingEnd = parseISO(b.end_time);
+          return (startDateTime < bookingEnd && endDateTime > bookingStart);
+        })?.id : undefined
+      });
+    }
+
+    setTimeSlots(slots);
+  };
+
+  const handleServiceQuantityChange = (serviceId: string, increment: boolean) => {
+    setSelectedServices(prev => {
+      const current = prev[serviceId] || 0;
+      if (increment) {
+        return { ...prev, [serviceId]: current + 1 };
+      } else if (current > 0) {
+        return { ...prev, [serviceId]: current - 1 };
       }
+      return prev;
+    });
+  };
+
+  const handleDateSelect = (date: Date | undefined) => {
+    setSelectedDate(date);
+    setSelectedTimeSlot(null);
+  };
+
+  const handleTimeSlotSelect = (timeSlot: TimeSlot) => {
+    if (timeSlot.available) {
+      setSelectedTimeSlot(timeSlot);
     }
-    return slots;
-  };
-
-  const handleQuantityChange = (increase: boolean) => {
-    if (increase) {
-      setPackageQuantity(prev => prev + 1);
-    } else if (packageQuantity > 1) {
-      setPackageQuantity(prev => prev - 1);
-    }
-  };
-
-  const handleContinueToServices = () => {
-    // This can be used to scroll to services section or show next step
-    console.log('Continue to additional services');
-  };
-
-  const handleServiceToggle = (service: any, checked: boolean) => {
-    if (checked) {
-      setSelectedServices(prev => [...prev, { ...service, quantity: 1 }]);
-    } else {
-      setSelectedServices(prev => prev.filter(s => s.id !== service.id));
-    }
-  };
-
-  const updateServiceQuantity = (serviceId: string, quantity: number) => {
-    if (quantity < 1) return;
-    
-    setSelectedServices(prev =>
-      prev.map(service =>
-        service.id === serviceId ? { ...service, quantity } : service
-      )
-    );
   };
 
   const calculateTotal = () => {
-    let total = (packageData?.price || 0) * packageQuantity;
-    selectedServices.forEach(service => {
-      total += service.price * service.quantity;
-    });
-    return total;
+    const packageTotal = (packageData?.price || 0) * packageQuantity;
+    const servicesTotal = additionalServices.reduce((sum, service) => {
+      const serviceQuantity = selectedServices[service.id] || 0;
+      return sum + (service.price * serviceQuantity);
+    }, 0);
+    return packageTotal + servicesTotal;
   };
 
-  // Create booking mutation with proper WITA timezone handling
-  const createBookingMutation = useMutation({
-    mutationFn: async (bookingData: any) => {
+  const handleContinueToServices = () => {
+    setCurrentStep('services');
+  };
+
+  const handleContinueToSchedule = () => {
+    setCurrentStep('schedule');
+  };
+
+  const handleBackToPackage = () => {
+    setCurrentStep('package');
+  };
+
+  const handleBackToServices = () => {
+    setCurrentStep('services');
+  };
+
+  const isDateUnavailable = (date: Date) => {
+    const today = startOfDay(new Date());
+    if (isBefore(date, today)) return true;
+
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const dayBookings = bookedSlots[dateKey] || [];
+    
+    // Check if all time slots are booked for this date
+    const totalSlots = 13; // 9 AM to 9 PM = 13 hours
+    return dayBookings.length >= totalSlots;
+  };
+
+  const getDateTooltipContent = (date: Date) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const dayBookings = bookedSlots[dateKey] || [];
+    
+    if (dayBookings.length === 0) return null;
+    
+    return (
+      <div className="text-sm">
+        <div className="font-medium mb-1">Booked times:</div>
+        {dayBookings.map((booking, index) => (
+          <div key={index}>
+            {format(parseISO(booking.start_time), 'HH:mm')} - {format(parseISO(booking.end_time), 'HH:mm')}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const CustomDay = ({ date, displayMonth }: { date: Date; displayMonth: Date }) => {
+    const isUnavailable = isDateUnavailable(date);
+    const isSelected = selectedDate && isSameDay(date, selectedDate);
+    const isToday = isSameDay(date, new Date());
+    const tooltipContent = getDateTooltipContent(date);
+
+    const dayComponent = (
+      <button
+        className={`
+          w-9 h-9 text-sm rounded-md transition-colors
+          ${isSelected ? 'bg-primary text-primary-foreground' : ''}
+          ${isUnavailable ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-green-500 hover:bg-green-50 cursor-pointer'}
+          ${isToday && !isSelected ? 'border-2 border-blue-500' : ''}
+        `}
+        onClick={() => !isUnavailable && handleDateSelect(date)}
+        disabled={isUnavailable}
+      >
+        {date.getDate()}
+      </button>
+    );
+
+    if (tooltipContent && isUnavailable) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {dayComponent}
+            </TooltipTrigger>
+            <TooltipContent>
+              {tooltipContent}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    return dayComponent;
+  };
+
+  const handleFinalBooking = async () => {
+    if (!selectedDate || !selectedTimeSlot || !userProfile || !packageData) {
+      toast.error('Please select a date and time slot');
+      return;
+    }
+
+    setBookingLoading(true);
+
+    try {
+      const startDateTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.startTime}:00`;
+      const endDateTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.endTime}:00`;
       const totalAmount = calculateTotal();
-      const dateTimeString = `${selectedDate}T${selectedTime}`;
-      const startDateTime = parseWITAToUTC(dateTimeString).toISOString();
-      const endDateTime = new Date(parseWITAToUTC(dateTimeString).getTime() + (packageData?.base_time_minutes || 60) * 60000).toISOString();
 
-      console.log('Creating self-photo booking with WITA conversion:', {
-        inputWITA: dateTimeString,
-        startUTC: startDateTime,
-        endUTC: endDateTime
-      });
-
-      // Create user first
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .insert({
-          name: customerInfo.name,
-          email: customerInfo.email,
-          role: 'pelanggan'
-        })
-        .select()
-        .single();
-
-      if (userError) throw userError;
-
-      // Create booking with proper WITA to UTC conversion
-      const { data: booking, error: bookingError } = await supabase
+      const { data, error } = await supabase
         .from('bookings')
         .insert({
-          user_id: userData.id,
+          user_id: userProfile.id,
           studio_package_id: packageId,
           studio_id: packageData.studios?.id,
           start_time: startDateTime,
@@ -208,96 +345,106 @@ const SelfPhotoCheckoutPage = () => {
           total_amount: totalAmount,
           payment_method: 'online',
           type: 'self_photo',
+          performed_by: userProfile.id
         })
         .select()
         .single();
 
-      if (bookingError) throw bookingError;
+      if (error) throw error;
 
-      // Add additional services if any
-      if (selectedServices.length > 0) {
-        const serviceData = selectedServices.map(service => ({
-          booking_id: booking.id,
-          additional_service_id: service.id,
-          quantity: service.quantity,
-          total_price: service.price * service.quantity
-        }));
+      // Add selected services to booking
+      if (Object.keys(selectedServices).length > 0) {
+        const serviceInserts = Object.entries(selectedServices)
+          .filter(([_, quantity]) => quantity > 0)
+          .map(([serviceId, quantity]) => ({
+            booking_id: data.id,
+            additional_service_id: serviceId,
+            quantity: quantity
+          }));
 
-        const { error: serviceError } = await supabase
-          .from('booking_additional_services')
-          .insert(serviceData);
+        if (serviceInserts.length > 0) {
+          const { error: servicesError } = await supabase
+            .from('booking_additional_services')
+            .insert(serviceInserts);
 
-        if (serviceError) throw serviceError;
+          if (servicesError) {
+            console.error('Error adding services:', servicesError);
+          }
+        }
       }
 
-      return booking;
-    },
-    onSuccess: (booking) => {
-      toast.success('Booking self-photo berhasil dibuat');
-      navigate(`/booking-confirmation/${booking.id}`);
-    },
-    onError: (error: any) => {
-      console.error('Error creating self-photo booking:', error);
-      toast.error('Gagal membuat booking self-photo');
-    }
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (conflictingBookings.length > 0) {
-      toast.error('Jadwal yang dipilih bertabrakan dengan booking lain');
-      return;
-    }
-
-    if (!selectedDate || !selectedTime) {
-      toast.error('Pilih tanggal dan waktu');
-      return;
-    }
-
-    if (!customerInfo.name || !customerInfo.email) {
-      toast.error('Lengkapi informasi customer');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await createBookingMutation.mutateAsync({});
+      toast.success('Booking berhasil dibuat!');
+      navigate('/customer/order-history');
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      toast.error('Gagal membuat booking');
     } finally {
-      setIsSubmitting(false);
+      setBookingLoading(false);
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR'
-    }).format(price);
-  };
-
-  if (isLoading) {
-    return <div className="p-6">Loading...</div>;
+  if (packageLoading) {
+    return (
+      <div className="min-h-screen bg-white flex justify-center items-center">
+        <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin"></div>
+      </div>
+    );
   }
 
   if (!packageData) {
-    return <div className="p-6">Package not found</div>;
+    return (
+      <div className="min-h-screen bg-white flex justify-center items-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-peace-sans font-black mb-4">Package not found</h2>
+          <Button onClick={() => navigate('/customer/self-photo-packages')} className="bg-black text-white font-peace-sans font-bold">
+            Back to Packages
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Package className="h-6 w-6" />
-        <h1 className="text-2xl font-bold">Self-Photo Checkout - {packageData.title}</h1>
+    <div className="min-h-screen bg-white">
+      {/* Clean Header */}
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-8 py-6">
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (currentStep === 'package') {
+                  navigate('/customer/self-photo-packages');
+                } else if (currentStep === 'services') {
+                  handleBackToPackage();
+                } else {
+                  handleBackToServices();
+                }
+              }}
+              className="border border-gray-200 text-gray-600 hover:bg-gray-50 font-inter font-medium"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Kembali
+            </Button>
+            <h1 className="text-3xl font-peace-sans font-black text-black">
+              {currentStep === 'package' && 'Checkout'}
+              {currentStep === 'services' && 'Additional Services'}
+              {currentStep === 'schedule' && 'Select Schedule'}
+            </h1>
+            <div className="w-20"></div>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Booking Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Detail Booking Self-Photo</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Package Info */}
+      <div className="max-w-4xl mx-auto px-8 py-12">
+        {currentStep === 'package' && (
+          /* Package Selection */
+          <div className="space-y-12">
+            <div className="text-center">
+              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Self Photo Package</h2>
+              <p className="text-lg font-inter text-gray-500">Choose your quantity</p>
+            </div>
+
             <Card className="border border-gray-100 shadow-none">
               <CardHeader className="p-8">
                 <div className="flex justify-between items-start">
@@ -318,7 +465,7 @@ const SelfPhotoCheckoutPage = () => {
                     </div>
                   </div>
                   <Badge className="bg-red-50 text-red-600 border-red-200 font-peace-sans font-bold">
-                    Self Photo Session
+                    Self Photo Session 
                   </Badge>
                 </div>
               </CardHeader>
@@ -371,204 +518,309 @@ const SelfPhotoCheckoutPage = () => {
                 Continue to Additional Services
               </Button>
             </div>
+          </div>
+        )}
 
-            {/* Date Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="date">Tanggal (WITA) *</Label>
-              <Input
-                id="date"
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                min={format(new Date(), 'yyyy-MM-dd')}
-                required
-              />
+        {currentStep === 'services' && (
+          /* Additional Services */
+          <div className="space-y-12">
+            <div className="text-center">
+              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Additional Services</h2>
+              <p className="text-lg font-inter text-gray-500">Enhance your experience (optional)</p>
             </div>
 
-            {/* Time Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="time">Waktu (WITA) *</Label>
-              <Select value={selectedTime} onValueChange={setSelectedTime}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih waktu (WITA)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {generateTimeSlots().map((time) => (
-                    <SelectItem key={time} value={time}>
-                      {time} WITA
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500">Waktu Indonesia Tengah (GMT+8)</p>
-            </div>
-
-            {/* Conflict Warning */}
-            {conflictingBookings.length > 0 && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Jadwal yang dipilih bertabrakan dengan booking lain. Silakan pilih waktu yang berbeda.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Customer Info */}
-            <div className="space-y-4">
-              <h3 className="font-semibold flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Informasi Customer
-              </h3>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nama *</Label>
-                  <Input
-                    id="name"
-                    value={customerInfo.name}
-                    onChange={(e) => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))}
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={customerInfo.email}
-                    onChange={(e) => setCustomerInfo(prev => ({ ...prev, email: e.target.value }))}
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="phone">No. HP</Label>
-                <Input
-                  id="phone"
-                  value={customerInfo.phone}
-                  onChange={(e) => setCustomerInfo(prev => ({ ...prev, phone: e.target.value }))}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="notes">Catatan</Label>
-                <Textarea
-                  id="notes"
-                  value={customerInfo.notes}
-                  onChange={(e) => setCustomerInfo(prev => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Permintaan khusus atau catatan..."
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Additional Services & Summary */}
-        <div className="space-y-6">
-          {/* Additional Services */}
-          {additionalServices && additionalServices.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Layanan Tambahan</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {additionalServices.map((service) => {
-                  const selectedService = selectedServices.find(s => s.id === service.id);
-                  const isSelected = !!selectedService;
-                  
-                  return (
-                    <div key={service.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => handleServiceToggle(service, e.target.checked)}
-                          className="rounded"
-                        />
-                        <div>
-                          <p className="font-medium">{service.name}</p>
-                          <p className="text-sm text-gray-600">{formatPrice(service.price)}</p>
+            <div className="space-y-6">
+              {additionalServices.length > 0 ? (
+                additionalServices.map((service) => (
+                  <Card key={service.id} className="border border-gray-100 shadow-none">
+                    <CardContent className="p-8">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h3 className="text-xl font-peace-sans font-black text-black mb-2">
+                            {service.name}
+                          </h3>
+                          <p className="text-gray-500 font-inter mb-2">{service.description}</p>
+                          <p className="text-lg font-peace-sans font-bold text-blue-600">
+                            {service.price.toLocaleString('id-ID', { 
+                              style: 'currency', 
+                              currency: 'IDR', 
+                              minimumFractionDigits: 0 
+                            })}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleServiceQuantityChange(service.id, false)}
+                            disabled={(selectedServices[service.id] || 0) <= 0}
+                            className="border-gray-200 text-gray-600 hover:bg-gray-50"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <span className="text-xl font-peace-sans font-black min-w-[3rem] text-center">
+                            {selectedServices[service.id] || 0}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleServiceQuantityChange(service.id, true)}
+                            className="border-gray-200 text-gray-600 hover:bg-gray-50"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                      
-                      {isSelected && (
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateServiceQuantity(service.id, selectedService.quantity - 1)}
-                          >
-                            -
-                          </Button>
-                          <span className="w-8 text-center">{selectedService.quantity}</span>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateServiceQuantity(service.id, selectedService.quantity + 1)}
-                          >
-                            +
-                          </Button>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <Card className="border border-gray-100 shadow-none">
+                  <CardContent className="p-8 text-center">
+                    <p className="text-gray-500 font-inter">No additional services available for this package.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Order Summary */}
+            <Card className="border border-gray-100 shadow-none bg-gray-50">
+              <CardContent className="p-8">
+                <h3 className="text-2xl font-peace-sans font-black text-black mb-6">Order Summary</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="font-inter text-gray-600">
+                      {packageData.title} × {packageQuantity}
+                    </span>
+                    <span className="font-peace-sans font-bold">
+                      {(packageData.price * packageQuantity).toLocaleString('id-ID', { 
+                        style: 'currency', 
+                        currency: 'IDR', 
+                        minimumFractionDigits: 0 
+                      })}
+                    </span>
+                  </div>
+                  {additionalServices.map((service) => {
+                    const serviceQuantity = selectedServices[service.id] || 0;
+                    if (serviceQuantity > 0) {
+                      return (
+                        <div key={service.id} className="flex justify-between items-center">
+                          <span className="font-inter text-gray-600">
+                            {service.name} × {serviceQuantity}
+                          </span>
+                          <span className="font-peace-sans font-bold">
+                            {(service.price * serviceQuantity).toLocaleString('id-ID', { 
+                              style: 'currency', 
+                              currency: 'IDR', 
+                              minimumFractionDigits: 0 
+                            })}
+                          </span>
                         </div>
-                      )}
+                      );
+                    }
+                    return null;
+                  })}
+                  <div className="border-t border-gray-200 pt-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xl font-peace-sans font-black text-black">Total</span>
+                      <span className="text-2xl font-peace-sans font-black text-black">
+                        {calculateTotal().toLocaleString('id-ID', { 
+                          style: 'currency', 
+                          currency: 'IDR', 
+                          minimumFractionDigits: 0 
+                        })}
+                      </span>
                     </div>
-                  );
-                })}
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          )}
 
-          {/* Order Summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Ringkasan Pesanan
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between">
-                <span>Paket: {packageData.title} × {packageQuantity}</span>
-                <span>{formatPrice(packageData.price * packageQuantity)}</span>
-              </div>
-              
-              {selectedServices.map((service) => (
-                <div key={service.id} className="flex justify-between text-sm">
-                  <span>{service.name} × {service.quantity}</span>
-                  <span>{formatPrice(service.price * service.quantity)}</span>
-                </div>
-              ))}
-              
-              <div className="border-t pt-3 flex justify-between font-bold text-lg">
-                <span>Total</span>
-                <span className="text-green-600">{formatPrice(calculateTotal())}</span>
-              </div>
-
-              {selectedDate && selectedTime && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm">
-                  <p className="font-medium text-blue-800">Jadwal Self-Photo (WITA):</p>
-                  <p className="text-blue-700">
-                    {format(new Date(`${selectedDate}T${selectedTime}`), 'dd MMMM yyyy')} pukul {selectedTime} WITA
-                  </p>
-                  <p className="text-blue-600">
-                    Durasi: {packageData.base_time_minutes} menit
-                  </p>
-                </div>
-              )}
-              
+            <div className="text-center">
               <Button 
-                onClick={handleSubmit} 
-                className="w-full" 
-                disabled={isSubmitting || conflictingBookings.length > 0}
+                onClick={handleContinueToSchedule}
+                className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-12 py-4 text-lg"
               >
-                {isSubmitting ? 'Processing...' : 'Buat Booking Self-Photo'}
+                Continue to Schedule Selection
               </Button>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </div>
+        )}
+
+        {currentStep === 'schedule' && (
+          /* Schedule Selection */
+          <div className="space-y-12">
+            <div className="text-center">
+              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Select Your Schedule</h2>
+              <p className="text-lg font-inter text-gray-500">Choose your preferred date and time</p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Package Summary */}
+              <Card className="border border-gray-100 shadow-none">
+                <CardHeader className="p-6">
+                  <CardTitle className="flex items-center gap-2 text-xl font-peace-sans font-black">
+                    <CalendarIcon className="w-5 h-5" />
+                    Package Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 pt-0 space-y-4">
+                  <div>
+                    <h3 className="font-peace-sans font-bold text-lg">{packageData.title}</h3>
+                    <p className="text-gray-600 font-inter text-sm">{packageData.description}</p>
+                  </div>
+                  
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      <span>{packageData.base_time_minutes} minutes</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <MapPin className="w-4 h-4" />
+                    <span>{packageData.studios?.name}</span>
+                  </div>
+                  
+                  <div className="pt-2 border-t">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Total Amount:</span>
+                      <span className="text-lg font-peace-sans font-bold text-primary">
+                        {calculateTotal().toLocaleString('id-ID', { 
+                          style: 'currency', 
+                          currency: 'IDR', 
+                          minimumFractionDigits: 0 
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Date Selection */}
+              <Card className="border border-gray-100 shadow-none">
+                <CardHeader className="p-6">
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="font-peace-sans font-black">Select Date</span>
+                    <div className="flex items-center gap-4 text-xs font-inter">
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 bg-white border border-green-500 rounded"></div>
+                        <span>Available</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 bg-gray-200 rounded"></div>
+                        <span>Unavailable</span>
+                      </div>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 pt-0">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={handleDateSelect}
+                    disabled={isDateUnavailable}
+                    initialFocus
+                    className="rounded-md border"
+                    components={{
+                      Day: CustomDay
+                    }}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Time Slots */}
+            {selectedDate && (
+              <Card className="border border-gray-100 shadow-none">
+                <CardHeader className="p-6">
+                  <CardTitle className="font-peace-sans font-black">Available Time Slots</CardTitle>
+                  <p className="text-sm text-gray-600 font-inter">
+                    {format(selectedDate, 'EEEE, MMMM dd, yyyy')}
+                  </p>
+                </CardHeader>
+                <CardContent className="p-6 pt-0">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {timeSlots.map((slot) => (
+                      <Button
+                        key={slot.id}
+                        variant={selectedTimeSlot?.id === slot.id ? "default" : "outline"}
+                        className={`flex flex-col py-3 h-auto font-inter ${
+                          !slot.available 
+                            ? 'opacity-50 cursor-not-allowed' 
+                            : 'cursor-pointer'
+                        }`}
+                        disabled={!slot.available}
+                        onClick={() => handleTimeSlotSelect(slot)}
+                      >
+                        <div className="font-medium">{slot.startTime} - {slot.endTime}</div>
+                        <div className="text-xs opacity-75">{packageData.base_time_minutes} min</div>
+                      </Button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Final Booking Summary */}
+            {selectedDate && selectedTimeSlot && (
+              <Card className="border border-gray-100 shadow-none bg-gray-50">
+                <CardHeader className="p-6">
+                  <CardTitle className="font-peace-sans font-black">Final Booking Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 pt-0 space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="font-inter">Package:</span>
+                      <span className="font-peace-sans font-bold">{packageData.title}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-inter">Date:</span>
+                      <span className="font-peace-sans font-bold">{format(selectedDate, 'EEEE, MMMM dd, yyyy')}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-inter">Time:</span>
+                      <span className="font-peace-sans font-bold">{selectedTimeSlot.startTime} - {selectedTimeSlot.endTime}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-inter">Duration:</span>
+                      <span className="font-peace-sans font-bold">{packageData.base_time_minutes} minutes</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-inter">Studio:</span>
+                      <span className="font-peace-sans font-bold">{packageData.studios?.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-inter">Quantity:</span>
+                      <span className="font-peace-sans font-bold">{packageQuantity}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="border-t border-gray-200 pt-4">
+                    <div className="flex justify-between items-center text-lg font-peace-sans font-black">
+                      <span>Total Price:</span>
+                      <span className="text-primary">
+                        {calculateTotal().toLocaleString('id-ID', { 
+                          style: 'currency', 
+                          currency: 'IDR', 
+                          minimumFractionDigits: 0 
+                        })}
+                      </span>
+                    </div>
+                  </div>
+
+                  <Button 
+                    onClick={handleFinalBooking} 
+                    disabled={bookingLoading}
+                    className="w-full bg-black text-white hover:bg-gray-800 font-peace-sans font-bold py-3"
+                  >
+                    {bookingLoading ? 'Creating Booking...' : 'Confirm Booking'}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
