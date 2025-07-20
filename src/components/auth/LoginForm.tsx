@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
+import { SimpleCaptcha } from './SimpleCaptcha';
 
 interface LoginFormProps {
   onError: (error: string) => void;
@@ -15,6 +16,8 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
   const { signIn, userProfile } = useJWTAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [isCaptchaValid, setIsCaptchaValid] = useState(false);
+  const [captchaReset, setCaptchaReset] = useState(false);
 
   // If user is already authenticated, redirect to dashboard
   if (userProfile) {
@@ -29,6 +32,11 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
       return;
     }
 
+    if (!isCaptchaValid) {
+      onError('Silakan selesaikan verifikasi captcha terlebih dahulu');
+      return;
+    }
+
     setIsSubmitting(true);
     onError(''); // Clear previous errors
 
@@ -39,6 +47,8 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
       if (!result.success) {
         console.error('Login failed:', result.error);
         onError(result.error || 'Login gagal. Periksa email dan password Anda.');
+        // Reset captcha on failed login
+        setCaptchaReset(!captchaReset);
       } else {
         console.log('Login successful, redirecting...');
         // Force page reload to ensure clean state
@@ -47,6 +57,8 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
     } catch (err) {
       console.error('Unexpected login error:', err);
       onError('Terjadi kesalahan yang tidak terduga');
+      // Reset captcha on error
+      setCaptchaReset(!captchaReset);
     } finally {
       setIsSubmitting(false);
     }
@@ -78,11 +90,16 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
           autoComplete="current-password"
         />
       </div>
+
+      <SimpleCaptcha 
+        onValidation={setIsCaptchaValid}
+        reset={captchaReset}
+      />
       
       <Button 
         type="submit" 
         className="w-full"
-        disabled={isSubmitting}
+        disabled={isSubmitting || !isCaptchaValid}
       >
         {isSubmitting ? (
           <>

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
+import { SimpleCaptcha } from './SimpleCaptcha';
 
 interface RegisterFormProps {
   onError: (error: string) => void;
@@ -20,6 +21,8 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
     confirmPassword: '', 
     name: '' 
   });
+  const [isCaptchaValid, setIsCaptchaValid] = useState(false);
+  const [captchaReset, setCaptchaReset] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +42,11 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
       return;
     }
 
+    if (!isCaptchaValid) {
+      onError('Silakan selesaikan verifikasi captcha terlebih dahulu');
+      return;
+    }
+
     setIsSubmitting(true);
     onError(''); // Clear previous errors
 
@@ -49,6 +57,8 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
       if (!result.success) {
         console.error('Registration failed:', result.error);
         onError(result.error || 'Registrasi gagal. Coba lagi.');
+        // Reset captcha on failed registration
+        setCaptchaReset(!captchaReset);
       } else {
         console.log('Registration successful');
         onSuccess('Registrasi berhasil! Silakan login dengan akun baru Anda.');
@@ -65,6 +75,8 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
     } catch (err) {
       console.error('Unexpected registration error:', err);
       onError('Terjadi kesalahan yang tidak terduga');
+      // Reset captcha on error
+      setCaptchaReset(!captchaReset);
     } finally {
       setIsSubmitting(false);
     }
@@ -120,10 +132,16 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
           autoComplete="new-password"
         />
       </div>
+
+      <SimpleCaptcha 
+        onValidation={setIsCaptchaValid}
+        reset={captchaReset}
+      />
+      
       <Button 
         type="submit" 
         className="w-full"
-        disabled={isSubmitting}
+        disabled={isSubmitting || !isCaptchaValid}
       >
         {isSubmitting ? (
           <>
