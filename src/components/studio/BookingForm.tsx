@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -81,8 +80,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       additional_services: []
     }
   });
-
-  // ... keep existing code (fetch customers, studios, categories, packages, additional services queries)
 
   // Fetch customers
   const { data: customers } = useQuery({
@@ -188,9 +185,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const selectedPackageId = form.watch('package_id');
   const selectedPackage = packages?.find(pkg => pkg.id === selectedPackageId);
 
-  // ... keep existing code (load booking data for editing effects)
-
-  // Load booking data for editing - Only run once when all data is available
+  // Load booking data for editing
   useEffect(() => {
     if (booking && customers && studios && !isDataLoaded) {
       console.log('Loading booking data for edit:', booking);
@@ -256,14 +251,16 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   }, [booking, isDataLoaded, packages, form]);
 
-  // Load additional services after they're fetched
+  // Load additional services after they're fetched - FIXED: Load selected services from booking
   useEffect(() => {
     if (booking && isDataLoaded && additionalServices && Object.keys(selectedServices).length === 0) {
+      console.log('Loading additional services for booking:', booking.booking_additional_services);
       if (booking.booking_additional_services && booking.booking_additional_services.length > 0) {
         const services: { [key: string]: number } = {};
         booking.booking_additional_services.forEach((service: any) => {
           services[service.additional_service_id] = service.quantity || 1;
         });
+        console.log('Setting selected services:', services);
         setSelectedServices(services);
       }
     }
@@ -314,8 +311,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       return null;
     }
   };
-
-  // ... keep existing code (handle service quantity change, package quantity change, reset fields effects)
 
   // Handle service quantity change
   const handleServiceQuantityChange = (serviceId: string, quantity: number) => {
@@ -517,7 +512,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
             <CardTitle>Customer</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* ... keep existing code (customer selection) */}
             <Controller
               name="customer_type"
               control={form.control}
@@ -583,7 +577,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
             <CardTitle>Detail Booking</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* ... keep existing code (studio, category, package selection, date/time inputs, payment method, status) */}
             <div>
               <Label htmlFor="studio_id">Studio *</Label>
               <Select value={form.watch('studio_id')} onValueChange={(value) => form.setValue('studio_id', value)}>
@@ -662,7 +655,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
                     value={packageQuantity}
                     onChange={(e) => setPackageQuantity(Math.max(1, parseInt(e.target.value) || 1))}
                     className="w-20 text-center"
-                    min="1"
                   />
                   <Button
                     type="button"
