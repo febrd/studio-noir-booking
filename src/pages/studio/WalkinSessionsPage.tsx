@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -130,28 +131,6 @@ const WalkinSessionsPage = () => {
     setIsDialogOpen(false);
     setEditingSession(null);
     queryClient.invalidateQueries({ queryKey: ['walkin-sessions'] });
-  };
-
-  const formatTimeDisplay = (dateTimeString: string) => {
-    if (!dateTimeString) return '';
-    // Display in consistent 24-hour format
-    return new Date(dateTimeString).toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-  };
-
-  const formatDateTimeDisplay = (dateTimeString: string) => {
-    if (!dateTimeString) return '';
-    return new Date(dateTimeString).toLocaleString('id-ID', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
   };
 
   const getStatusBadge = (status: string) => {
