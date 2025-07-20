@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,32 +16,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfDay, endOfDay, addMinutes } from 'date-fns';
 import { WalkinTimeExtensionManager } from './WalkinTimeExtensionManager';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
-
-// WITA timezone utilities - WITA is GMT+8 (Waktu Indonesia Tengah - Central Indonesia Time)
-const parseWITADateTime = (dateTimeString: string): Date => {
-  if (!dateTimeString) return new Date();
-  
-  // Create date object treating the input as WITA time
-  const date = new Date(dateTimeString);
-  // Subtract 8 hours to convert WITA to UTC for storage
-  const witaOffset = 8 * 60; // 8 hours in minutes
-  return new Date(date.getTime() - (witaOffset * 60000));
-};
-
-const formatDateTimeWITA = (dateTimeString: string) => {
-  if (!dateTimeString) return '';
-  const date = new Date(dateTimeString);
-  // Format in WITA timezone (GMT+8)
-  return new Intl.DateTimeFormat('id-ID', {
-    timeZone: 'Asia/Makassar', // WITA timezone
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).format(date);
-};
+import { formatUTCToDatetimeLocal, parseWITAToUTC } from '@/utils/timezoneUtils';
+import { Plus, Minus } from 'lucide-react';
 
 const walkinBookingSchema = z.object({
   customer_name: z.string().min(1, 'Nama customer wajib diisi'),
@@ -58,13 +35,14 @@ type WalkinBookingFormData = z.infer<typeof walkinBookingSchema>;
 
 interface WalkinBookingFormProps {
   booking?: any;
-  onSuccess: () => void;
+  onSuccess: (bookingData?: any) => void;
 }
 
 const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [additionalTime, setAdditionalTime] = useState(0);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [packageQuantity, setPackageQuantity] = useState(1);
   const queryClient = useQueryClient();
   
   const today = new Date();
@@ -74,17 +52,55 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
   const form = useForm<WalkinBookingFormData>({
     resolver: zodResolver(walkinBookingSchema),
     defaultValues: {
-      customer_name: booking?.customer_name || '',
-      customer_email: booking?.customer_email || '',
-      studio_id: booking?.studio_id || '',
-      category_id: booking?.package_category_id || '',
-      package_id: booking?.studio_package_id || '',
-      start_time: booking?.start_time ? format(new Date(booking.start_time), 'HH:mm') : '',
-      payment_method: booking?.payment_method || 'cash',
+      customer_name: '',
+      customer_email: '',
+      studio_id: '',
+      category_id: '',
+      package_id: '',
+      start_time: '',
+      payment_method: 'cash',
       notes: '',
       additional_services: []
     }
   });
+
+  // Load booking data for editing
+  useEffect(() => {
+    if (booking) {
+      console.log('Loading booking data for edit:', booking);
+      
+      form.setValue('customer_name', booking.users?.name || '');
+      form.setValue('customer_email', booking.users?.email || '');
+      form.setValue('studio_id', booking.studio_id || '');
+      form.setValue('category_id', booking.package_category_id || '');
+      form.setValue('package_id', booking.studio_package_id || '');
+      form.setValue('payment_method', booking.payment_method || 'cash');
+      form.setValue('notes', booking.notes || '');
+      
+      // Set time using WITA format
+      if (booking.start_time) {
+        const witaTime = formatUTCToDatetimeLocal(booking.start_time);
+        const timeOnly = witaTime.split('T')[1]; // Extract time part only
+        form.setValue('start_time', timeOnly);
+      }
+      
+      // Set additional time
+      if (booking.additional_time_minutes) {
+        setAdditionalTime(booking.additional_time_minutes);
+      }
+      
+      // Set package quantity if exists
+      if (booking.package_quantity) {
+        setPackageQuantity(booking.package_quantity);
+      }
+      
+      // Set selected additional services
+      if (booking.booking_additional_services) {
+        const serviceIds = booking.booking_additional_services.map((service: any) => service.additional_service_id);
+        setSelectedServices(serviceIds);
+      }
+    }
+  }, [booking, form]);
 
   // Fetch studios
   const { data: studios } = useQuery({
@@ -105,6 +121,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
   const selectedStudioId = form.watch('studio_id');
   const selectedStudio = studios?.find(studio => studio.id === selectedStudioId);
   const isRegularStudio = selectedStudio?.type === 'regular';
+  const isSelfPhotoStudio = selectedStudio?.type === 'self_photo';
 
   // Fetch categories for regular studios
   const { data: categories } = useQuery({
@@ -174,7 +191,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
 
   // Calculate total amount
   const calculateTotalAmount = () => {
-    const packagePrice = selectedPackage?.price || 0;
+    const packagePrice = (selectedPackage?.price || 0) * packageQuantity;
     const extensionCost = additionalTime > 0 ? 
       Math.ceil(additionalTime / 5) * (isRegularStudio ? 15000 : 5000) : 0;
     
@@ -195,7 +212,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
     const startDate = new Date();
     startDate.setHours(hours, minutes, 0, 0);
     
-    const totalMinutes = selectedPackage.base_time_minutes + additionalTime;
+    const totalMinutes = (selectedPackage.base_time_minutes * packageQuantity) + additionalTime;
     const endDate = addMinutes(startDate, totalMinutes);
     
     return format(endDate, 'HH:mm');
@@ -210,6 +227,15 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
     }
   };
 
+  // Handle quantity change
+  const handleQuantityChange = (increment: boolean) => {
+    if (increment) {
+      setPackageQuantity(prev => prev + 1);
+    } else if (packageQuantity > 1) {
+      setPackageQuantity(prev => prev - 1);
+    }
+  };
+
   // Reset category and package when studio changes
   useEffect(() => {
     if (selectedStudioId) {
@@ -217,6 +243,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       form.setValue('package_id', '');
       setAdditionalTime(0);
       setSelectedServices([]);
+      setPackageQuantity(1);
     }
   }, [selectedStudioId, form]);
 
@@ -225,6 +252,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
     if (isRegularStudio && selectedCategoryId) {
       form.setValue('package_id', '');
       setAdditionalTime(0);
+      setPackageQuantity(1);
     }
   }, [selectedCategoryId, isRegularStudio, form]);
 
@@ -234,23 +262,24 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
     mutationFn: async (data: WalkinBookingFormData) => {
       // Create full datetime string with WITA consistency
       const startTimeString = `${todayString}T${data.start_time}:00`;
-      const startDateTime = parseWITADateTime(startTimeString);
-      const totalMinutes = (selectedPackage?.base_time_minutes || 0) + additionalTime;
+      const startDateTime = parseWITAToUTC(startTimeString);
+      const totalMinutes = ((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime;
       const endDateTime = new Date(startDateTime.getTime() + (totalMinutes * 60 * 1000));
 
       console.log('🔧 Walk-in WITA Times:', {
         startInput: startTimeString,
         startDateTimeUTC: startDateTime.toISOString(),
         endDateTimeUTC: endDateTime.toISOString(),
-        totalMinutes
+        totalMinutes,
+        packageQuantity
       });
 
-      // Check for conflicts with regular bookings only (exclude walk-in sessions from conflict check)
+      // Check for conflicts with regular bookings only
       const { data: conflicts, error: conflictError } = await supabase
         .from('bookings')
         .select('id, start_time, end_time, is_walking_session')
         .eq('studio_id', data.studio_id)
-        .eq('is_walking_session', false) // Only check regular bookings for conflicts
+        .eq('is_walking_session', false)
         .not('status', 'in', '(cancelled,failed)')
         .gte('start_time', startOfDay(today).toISOString())
         .lte('start_time', endOfDay(today).toISOString());
@@ -260,32 +289,18 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
         throw new Error('Gagal memeriksa konflik waktu');
       }
 
-      console.log('Found potential conflicts:', conflicts);
-
       if (conflicts && conflicts.length > 0) {
-        // Check for actual time overlap, excluding current booking if editing
         const hasConflict = conflicts.some(conflict => {
           if (booking && conflict.id === booking.id) return false;
           
           const conflictStart = new Date(conflict.start_time);
           const conflictEnd = new Date(conflict.end_time);
           
-          const overlaps = (
+          return (
             (startDateTime >= conflictStart && startDateTime < conflictEnd) ||
             (endDateTime > conflictStart && endDateTime <= conflictEnd) ||
             (startDateTime <= conflictStart && endDateTime >= conflictEnd)
           );
-          
-          console.log('Checking overlap:', {
-            conflictId: conflict.id,
-            conflictStart: conflictStart.toISOString(),
-            conflictEnd: conflictEnd.toISOString(),
-            newStart: startDateTime.toISOString(),
-            newEnd: endDateTime.toISOString(),
-            overlaps
-          });
-          
-          return overlaps;
         });
         
         if (hasConflict) {
@@ -323,20 +338,26 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
 
       const totalAmount = calculateTotalAmount();
 
+      const bookingData = {
+        studio_id: data.studio_id,
+        studio_package_id: data.package_id,
+        package_category_id: isRegularStudio ? data.category_id : null,
+        start_time: startDateTime.toISOString(),
+        end_time: endDateTime.toISOString(),
+        additional_time_minutes: additionalTime > 0 ? additionalTime : null,
+        payment_method: 'offline',
+        total_amount: totalAmount,
+        is_walking_session: true,
+        package_quantity: isSelfPhotoStudio ? packageQuantity : null,
+        notes: data.notes || null
+      };
+
       if (booking) {
-        // Update existing booking - maintain WITA times
+        // Update existing booking
         const { error } = await supabase
           .from('bookings')
           .update({
-            studio_id: data.studio_id,
-            studio_package_id: data.package_id,
-            package_category_id: isRegularStudio ? data.category_id : null,
-            start_time: startDateTime.toISOString(),
-            end_time: endDateTime.toISOString(),
-            additional_time_minutes: additionalTime > 0 ? additionalTime : null,
-            payment_method: 'offline',
-            total_amount: totalAmount,
-            is_walking_session: true,
+            ...bookingData,
             updated_at: new Date().toISOString()
           })
           .eq('id', booking.id);
@@ -362,38 +383,17 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
             .insert(servicesToAdd);
         }
 
-        // Create transaction record
-        await supabase
-          .from('transactions')
-          .insert({
-            booking_id: booking.id,
-            amount: totalAmount,
-            payment_type: 'offline',
-            type: 'offline',
-            status: 'paid',
-            description: `Walk-in session payment - ${data.payment_method}`,
-            performed_by: userProfile.id
-          });
-
-        return { id: booking.id };
+        return { id: booking.id, ...bookingData };
       } else {
-        // Create new booking - maintain WITA times
+        // Create new booking
         const { data: newBooking, error } = await supabase
           .from('bookings')
           .insert({
             user_id: customerId,
-            studio_id: data.studio_id,
-            studio_package_id: data.package_id,
-            package_category_id: isRegularStudio ? data.category_id : null,
-            start_time: startDateTime.toISOString(),
-            end_time: endDateTime.toISOString(),
-            additional_time_minutes: additionalTime > 0 ? additionalTime : null,
-            payment_method: 'offline',
             type: 'self_photo',
             status: 'confirmed',
-            total_amount: totalAmount,
-            performed_by: userProfile.id,
-            is_walking_session: true
+            performed_by: userProfile?.id,
+            ...bookingData
           })
           .select('id')
           .single();
@@ -413,27 +413,13 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
             .insert(servicesToAdd);
         }
 
-        // Create transaction record
-        await supabase
-          .from('transactions')
-          .insert({
-            booking_id: newBooking.id,
-            amount: totalAmount,
-            payment_type: 'offline',
-            type: 'offline',
-            status: 'paid',
-            description: `Walk-in session payment - ${data.payment_method}`,
-            performed_by: userProfile.id
-          });
-
-        return newBooking;
+        return { ...newBooking, ...bookingData };
       }
     },
-    onSuccess: () => {
+    onSuccess: (bookingData) => {
       queryClient.invalidateQueries({ queryKey: ['walkin-sessions'] });
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
       toast.success(booking ? 'Walk-in session berhasil diupdate' : 'Walk-in session berhasil dibuat');
-      onSuccess();
+      onSuccess(bookingData);
     },
     onError: (error: any) => {
       console.error('Error saving walk-in session:', error);
@@ -559,6 +545,43 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
               )}
             </div>
 
+            {/* Package Quantity - only for self photo studios */}
+            {isSelfPhotoStudio && selectedPackage && (
+              <div>
+                <Label htmlFor="package_quantity">Jumlah Package</Label>
+                <div className="flex items-center space-x-2 mt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleQuantityChange(false)}
+                    disabled={packageQuantity <= 1}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <Input
+                    id="package_quantity"
+                    type="number"
+                    value={packageQuantity}
+                    onChange={(e) => setPackageQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-20 text-center"
+                    min="1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleQuantityChange(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Total waktu: {(selectedPackage.base_time_minutes * packageQuantity)} menit
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="start_time">Waktu Mulai (WITA) *</Label>
@@ -642,7 +665,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
         <div className="space-y-4">
           {selectedPackage && (
             <WalkinTimeExtensionManager
-              baseTimeMinutes={selectedPackage.base_time_minutes}
+              baseTimeMinutes={selectedPackage.base_time_minutes * packageQuantity}
               studioType={selectedStudio?.type || 'self_photo'}
               additionalTime={additionalTime}
               onAdditionalTimeChange={setAdditionalTime}
@@ -657,8 +680,8 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Paket:</span>
-                <span>Rp {(selectedPackage?.price || 0).toLocaleString('id-ID')}</span>
+                <span>Paket{isSelfPhotoStudio && packageQuantity > 1 ? ` (x${packageQuantity})` : ''}:</span>
+                <span>Rp {((selectedPackage?.price || 0) * packageQuantity).toLocaleString('id-ID')}</span>
               </div>
               {additionalTime > 0 && (
                 <div className="flex justify-between text-sm">
@@ -687,7 +710,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       </div>
 
       <div className="flex justify-end gap-4">
-        <Button type="button" variant="outline" onClick={onSuccess}>
+        <Button type="button" variant="outline" onClick={() => onSuccess()}>
           Batal
         </Button>
         <Button type="submit" disabled={isSubmitting}>
