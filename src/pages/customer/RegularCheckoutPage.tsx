@@ -131,7 +131,7 @@ const RegularCheckoutPage = () => {
         .from('bookings')
         .select('start_time, end_time, id')
         .eq('studio_package_id', packageId)
-        .eq('status', 'confirmed');
+        .eq('status', 'pending');
 
       if (error) throw error;
 
@@ -342,7 +342,7 @@ const RegularCheckoutPage = () => {
           studio_id: packageData.studios?.id,
           start_time: startDateTime,
           end_time: endDateTime,
-          status: 'confirmed',
+          status: 'pending',
           total_amount: calculateTotal(),
           payment_method: 'online',
           type: 'regular',
