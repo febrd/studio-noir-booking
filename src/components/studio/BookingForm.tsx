@@ -19,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarIcon, Plus, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
-import { formatUTCToDatetimeLocal, parseWITAToUTC } from '@/utils/timezoneUtils';
+import { formatUTCToDatetimeLocal } from '@/utils/timezoneUtils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const bookingSchema = z.object({
@@ -52,6 +52,13 @@ interface BookingFormProps {
   booking?: any;
   onSuccess: (bookingData?: any) => void;
 }
+
+// Helper function to convert WITA time to UTC
+const parseWITAToUTC = (timeString: string, date: Date): Date => {
+  const dateStr = format(date, 'yyyy-MM-dd');
+  const witaDateTime = new Date(`${dateStr}T${timeString}+08:00`);
+  return new Date(witaDateTime.getTime() - (8 * 60 * 60 * 1000)); // Convert WITA (+8) to UTC
+};
 
 const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -312,14 +319,22 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     if (!startTime || !bookingDate || !selectedPackage) return null;
     
     try {
+      // Validate time format first
+      const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      if (!timeRegex.test(startTime)) {
+        console.log('Invalid time format:', startTime);
+        return null;
+      }
+      
       // Create datetime string properly - FIXED
       const dateStr = format(bookingDate, 'yyyy-MM-dd');
-      const startDateTimeStr = `${dateStr}T${startTime}`;
+      const startDateTimeStr = `${dateStr}T${startTime}:00`;
       const startDateTime = new Date(startDateTimeStr);
       
       // Validate the start time
       if (isNaN(startDateTime.getTime())) {
-        throw new Error('Invalid start time format');
+        console.log('Invalid start time created:', startDateTimeStr);
+        return null;
       }
       
       const totalMinutes = (selectedPackage.base_time_minutes * packageQuantity) + additionalTime;
@@ -327,7 +342,8 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       
       // Validate the end time
       if (isNaN(endDateTime.getTime())) {
-        throw new Error('Invalid end time calculation');
+        console.log('Invalid end time calculation');
+        return null;
       }
       
       return endDateTime;
@@ -386,18 +402,19 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     mutationFn: async (data: BookingFormData) => {
       console.log('Creating booking with data:', data);
       
-      // Create datetime string properly - FIXED
-      const dateStr = format(data.booking_date, 'yyyy-MM-dd');
-      const startDateTimeStr = `${dateStr}T${data.start_time}`;
-      const startDateTime = new Date(startDateTimeStr);
-      
-      // Validate the start time
-      if (isNaN(startDateTime.getTime())) {
-        throw new Error('Invalid start time format');
+      // Validate time format first
+      const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      if (!timeRegex.test(data.start_time)) {
+        throw new Error('Invalid time format. Please use HH:MM format.');
       }
       
-      // Convert to UTC using WITA timezone
+      // Convert to UTC using WITA timezone - FIXED: Using correct function signature
       const startDateTimeUTC = parseWITAToUTC(data.start_time, data.booking_date);
+      
+      // Validate the converted time
+      if (isNaN(startDateTimeUTC.getTime())) {
+        throw new Error('Invalid start time. Please check your time input.');
+      }
       
       const totalMinutes = ((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime;
       const endDateTime = new Date(startDateTimeUTC.getTime() + (totalMinutes * 60 * 1000));
@@ -750,6 +767,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
                     type="time"
                     {...form.register('start_time')}
                     className="flex-1"
+                    placeholder="HH:MM"
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Waktu Indonesia Tengah (GMT+8) - Central Indonesia Time</p>
@@ -794,8 +812,8 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
                   <CardTitle className="text-sm">Jadwal Booking (WITA)</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
-                  <p>Mulai: {format(endTime, 'dd/MM/yyyy, HH.mm')}</p>
-                  <p>Selesai: {format(addMinutes(endTime, ((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime), 'dd/MM/yyyy, HH.mm')}</p>
+                  <p>Mulai: {format(endTime, 'dd/MM/yyyy, HH:mm')}</p>
+                  <p>Selesai: {format(addMinutes(endTime, ((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime), 'dd/MM/yyyy, HH:mm')}</p>
                   <p>Durasi: {((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime} menit</p>
                 </CardContent>
               </Card>
