@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,8 +51,8 @@ const SelfPhotoCheckoutPage = () => {
   const packageId = searchParams.get('package');
   const { userProfile } = useJWTAuth();
   
-  // Package quantity is fixed at 1 for self photo packages
-  const packageQuantity = 1;
+  // Package quantity is now dynamic instead of fixed
+  const [packageQuantity, setPackageQuantity] = useState(1);
   
   // Multi-step state
   const [currentStep, setCurrentStep] = useState<'package' | 'services' | 'schedule'>('package');
@@ -122,6 +121,14 @@ const SelfPhotoCheckoutPage = () => {
       generateTimeSlots();
     }
   }, [selectedDate, bookedSlots, packageData]);
+
+  const handleQuantityChange = (increment: boolean) => {
+    if (increment) {
+      setPackageQuantity(prev => prev + 1);
+    } else if (packageQuantity > 1) {
+      setPackageQuantity(prev => prev - 1);
+    }
+  };
 
   const fetchBookedSlots = async () => {
     try {
@@ -435,7 +442,7 @@ const SelfPhotoCheckoutPage = () => {
           <div className="space-y-12">
             <div className="text-center">
               <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Self Photo Package</h2>
-              <p className="text-lg font-inter text-gray-500">Package quantity is fixed at 1</p>
+              <p className="text-lg font-inter text-gray-500">Choose your quantity</p>
             </div>
 
             <Card className="border border-gray-100 shadow-none">
@@ -465,9 +472,29 @@ const SelfPhotoCheckoutPage = () => {
               <CardContent className="p-8 pt-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <Badge variant="secondary" className="text-lg px-4 py-2">
-                      Quantity: {packageQuantity} (Fixed)
-                    </Badge>
+                    <span className="text-lg font-inter text-gray-600">Quantity:</span>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleQuantityChange(false)}
+                        disabled={packageQuantity <= 1}
+                        className="border-gray-200 text-gray-600 hover:bg-gray-50"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <span className="text-2xl font-peace-sans font-black min-w-[3rem] text-center">
+                        {packageQuantity}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleQuantityChange(true)}
+                        className="border-gray-200 text-gray-600 hover:bg-gray-50"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-inter text-gray-500 mb-1">Total</p>
