@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -104,30 +103,49 @@ const RegularSchedulePage: React.FC = () => {
 
   const fetchBookedSlots = async () => {
     try {
+      console.log('Fetching booked slots for regular type...');
+      
       const { data, error } = await supabase
         .from('bookings')
-        .select('start_time, end_time, id')
+        .select('start_time, end_time, id, additional_time_minutes')
+        .eq('type', 'regular')
         .eq('studio_package_id', packageId)
-        .eq('status', 'confirmed');
+        .in('status', ['pending', 'confirmed', 'paid']);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching booked slots:', error);
+        throw error;
+      }
 
-      // Group bookings by date
+      console.log('Fetched regular bookings:', data);
+
+      // Group bookings by date (convert UTC to WITA for date comparison)
       const groupedBookings: {[key: string]: BookedSlot[]} = {};
       data.forEach(booking => {
         if (booking.start_time && booking.end_time) {
-          const dateKey = format(parseISO(booking.start_time), 'yyyy-MM-dd');
+          // Convert UTC to WITA to get the correct date
+          const utcStartDate = new Date(booking.start_time);
+          const utcEndDate = new Date(booking.end_time);
+          
+          // Add additional time if present
+          const additionalMinutes = booking.additional_time_minutes || 0;
+          const actualEndTime = addMinutes(utcEndDate, additionalMinutes);
+          
+          const witaStartDate = new Date(utcStartDate.getTime() + (8 * 60 * 60 * 1000));
+          const dateKey = format(witaStartDate, 'yyyy-MM-dd');
+          
           if (!groupedBookings[dateKey]) {
             groupedBookings[dateKey] = [];
           }
           groupedBookings[dateKey].push({
             start_time: booking.start_time,
-            end_time: booking.end_time,
+            end_time: actualEndTime.toISOString(),
             id: booking.id
           });
         }
       });
 
+      console.log('Grouped regular bookings by date:', groupedBookings);
       setBookedSlots(groupedBookings);
     } catch (error) {
       console.error('Error fetching booked slots:', error);
@@ -141,36 +159,83 @@ const RegularSchedulePage: React.FC = () => {
     const dayBookings = bookedSlots[dateKey] || [];
     const slots: TimeSlot[] = [];
 
-    // Generate time slots from 9 AM to 9 PM
-    for (let hour = 9; hour <= 21; hour++) {
-      const startTime = `${hour.toString().padStart(2, '0')}:00`;
-      const startDateTime = new Date(`${dateKey}T${startTime}:00`);
-      const endDateTime = addMinutes(startDateTime, selectedPackage.base_time_minutes);
-      const endTime = format(endDateTime, 'HH:mm');
+    console.log(`Generating dynamic time slots for regular booking ${dateKey}:`, dayBookings);
 
-      // Check if this slot conflicts with any existing booking
-      const isBooked = dayBookings.some(booking => {
-        const bookingStart = parseISO(booking.start_time);
-        const bookingEnd = parseISO(booking.end_time);
-        const slotStart = startDateTime;
-        const slotEnd = endDateTime;
+    // Convert all booking times to WITA for easier comparison
+    const witaBookings = dayBookings.map(booking => {
+      const startUTC = new Date(booking.start_time);
+      const endUTC = new Date(booking.end_time);
+      const startWITA = new Date(startUTC.getTime() + (8 * 60 * 60 * 1000));
+      const endWITA = new Date(endUTC.getTime() + (8 * 60 * 60 * 1000));
+      
+      return {
+        ...booking,
+        startWITA,
+        endWITA
+      };
+    });
 
-        // Check for overlap
-        return (slotStart < bookingEnd && slotEnd > bookingStart);
+    // Operating hours: 10:00 - 20:30 WITA (same as self-photo)
+    const slotDuration = selectedPackage.base_time_minutes; // Dynamic duration based on package
+    const slotGap = 5; // 5 minutes gap between slots
+
+    // Create initial time (10:00 WITA)
+    let currentTime = new Date(`${dateKey}T10:00:00`);
+    const endBoundary = new Date(`${dateKey}T20:30:00`);
+
+    let slotCounter = 1;
+
+    while (currentTime < endBoundary) {
+      // Calculate slot end time
+      const slotEnd = addMinutes(currentTime, slotDuration);
+      
+      // Stop if slot would start at or after 20:30
+      if (currentTime >= endBoundary) {
+        break;
+      }
+
+      // Stop if slot would end after 20:30
+      if (slotEnd > endBoundary) {
+        break;
+      }
+
+      // Check for conflicts with existing bookings
+      const hasConflict = witaBookings.some(booking => {
+        // Check if slot overlaps with any booking
+        // Slot conflicts if: booking.start < slotEnd AND booking.end > slotStart
+        const conflict = booking.startWITA < slotEnd && booking.endWITA > currentTime;
+        
+        if (conflict) {
+          console.log(`Slot ${format(currentTime, 'HH:mm')}-${format(slotEnd, 'HH:mm')} conflicts with booking:`, {
+            bookingStart: format(booking.startWITA, 'HH:mm'),
+            bookingEnd: format(booking.endWITA, 'HH:mm')
+          });
+        }
+        
+        return conflict;
       });
 
-      slots.push({
-        id: `${dateKey}-${startTime}`,
-        startTime,
-        endTime,
-        available: !isBooked,
-        bookingId: isBooked ? dayBookings.find(b => {
-          const bookingStart = parseISO(b.start_time);
-          const bookingEnd = parseISO(b.end_time);
-          return (startDateTime < bookingEnd && endDateTime > bookingStart);
-        })?.id : undefined
-      });
+      // Only add slot if there's no conflict
+      if (!hasConflict) {
+        slots.push({
+          id: `${dateKey}-${format(currentTime, 'HH:mm')}`,
+          startTime: format(currentTime, 'HH:mm'),
+          endTime: format(slotEnd, 'HH:mm'),
+          available: true
+        });
+
+        console.log(`Added available regular slot: ${format(currentTime, 'HH:mm')} - ${format(slotEnd, 'HH:mm')}`);
+      }
+
+      // Move to next slot time (current slot end + 5 minutes gap)
+      currentTime = addMinutes(slotEnd, slotGap);
+      slotCounter++;
     }
+
+    console.log(`Generated ${slots.length} available dynamic regular slots with ${slotDuration}-minute duration and ${slotGap}-minute gap (10:00-20:30 WITA):`);
+    slots.forEach(slot => {
+      console.log(`- ${slot.startTime} to ${slot.endTime}`);
+    });
 
     setTimeSlots(slots);
   };
@@ -199,8 +264,23 @@ const RegularSchedulePage: React.FC = () => {
     setBookingLoading(true);
 
     try {
-      const startDateTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.startTime}:00`;
-      const endDateTime = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.endTime}:00`;
+      // Convert selected WITA time to UTC for database storage
+      const startDateTimeWITA = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.startTime}:00`;
+      const endDateTimeWITA = `${format(selectedDate, 'yyyy-MM-dd')}T${selectedTimeSlot.endTime}:00`;
+      
+      // Convert WITA to UTC by subtracting 8 hours
+      const startDateTimeUTC = new Date(startDateTimeWITA);
+      startDateTimeUTC.setHours(startDateTimeUTC.getHours() - 8);
+      
+      const endDateTimeUTC = new Date(endDateTimeWITA);
+      endDateTimeUTC.setHours(endDateTimeUTC.getHours() - 8);
+
+      console.log('Creating regular booking with times:', {
+        startWITA: startDateTimeWITA,
+        endWITA: endDateTimeWITA,
+        startUTC: startDateTimeUTC.toISOString(),
+        endUTC: endDateTimeUTC.toISOString()
+      });
 
       const { data, error } = await supabase
         .from('bookings')
@@ -208,8 +288,8 @@ const RegularSchedulePage: React.FC = () => {
           user_id: user.id,
           studio_package_id: packageId,
           studio_id: selectedPackage.studio_id,
-          start_time: startDateTime,
-          end_time: endDateTime,
+          start_time: startDateTimeUTC.toISOString(),
+          end_time: endDateTimeUTC.toISOString(),
           status: 'confirmed',
           total_amount: selectedPackage.price,
           payment_method: 'online',
@@ -246,9 +326,8 @@ const RegularSchedulePage: React.FC = () => {
     const dateKey = format(date, 'yyyy-MM-dd');
     const dayBookings = bookedSlots[dateKey] || [];
     
-    // Check if all time slots are booked for this date
-    const totalSlots = 13; // 9 AM to 9 PM = 13 hours
-    return dayBookings.length >= totalSlots;
+    // Updated calculation for 10:00-20:30 operating hours
+    return dayBookings.length >= 20; // Conservative estimate for fully booked day
   };
 
   const getDateTooltipContent = (date: Date) => {
@@ -260,11 +339,19 @@ const RegularSchedulePage: React.FC = () => {
     return (
       <div className="text-sm">
         <div className="font-medium mb-1">Booked times:</div>
-        {dayBookings.map((booking, index) => (
-          <div key={index}>
-            {format(parseISO(booking.start_time), 'HH:mm')} - {format(parseISO(booking.end_time), 'HH:mm')}
-          </div>
-        ))}
+        {dayBookings.map((booking, index) => {
+          // Convert UTC to WITA for display
+          const startUTC = new Date(booking.start_time);
+          const endUTC = new Date(booking.end_time);
+          const startWITA = new Date(startUTC.getTime() + (8 * 60 * 60 * 1000));
+          const endWITA = new Date(endUTC.getTime() + (8 * 60 * 60 * 1000));
+          
+          return (
+            <div key={index}>
+              {format(startWITA, 'HH:mm')} - {format(endWITA, 'HH:mm')}
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -427,7 +514,7 @@ const RegularSchedulePage: React.FC = () => {
           <CardHeader>
             <CardTitle>Available Time Slots</CardTitle>
             <p className="text-sm text-gray-600">
-              {format(selectedDate, 'EEEE, MMMM dd, yyyy')}
+              {format(selectedDate, 'EEEE, MMMM dd, yyyy')} (WITA) - Slot {selectedPackage.base_time_minutes} menit dengan jeda 5 menit (10:00-20:30)
             </p>
           </CardHeader>
           <CardContent>
@@ -438,17 +525,23 @@ const RegularSchedulePage: React.FC = () => {
                   variant={selectedTimeSlot?.id === slot.id ? "default" : "outline"}
                   className={`flex flex-col py-3 h-auto ${
                     !slot.available 
-                      ? 'opacity-50 cursor-not-allowed' 
+                      ? 'opacity-50 cursor-not-allowed bg-gray-200 text-gray-500' 
                       : 'cursor-pointer'
                   }`}
                   disabled={!slot.available}
                   onClick={() => handleTimeSlotSelect(slot)}
                 >
                   <div className="font-medium">{slot.startTime} - {slot.endTime}</div>
-                  <div className="text-xs opacity-75">{selectedPackage.base_time_minutes} min</div>
+                  <div className="text-xs opacity-75">{selectedPackage.base_time_minutes} menit</div>
+                  {!slot.available && <div className="text-xs text-red-500">Tidak Tersedia</div>}
                 </Button>
               ))}
             </div>
+            {timeSlots.length === 0 && (
+              <p className="text-center text-gray-500 py-8">
+                Tidak ada slot waktu yang tersedia untuk tanggal ini
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

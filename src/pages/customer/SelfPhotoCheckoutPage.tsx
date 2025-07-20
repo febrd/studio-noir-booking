@@ -220,15 +220,15 @@ const SelfPhotoCheckoutPage = () => {
       };
     });
 
-    // Initialize slot generation
-    const startHour = 9; // 09:00 WITA
-    const endHour = 21; // 21:00 WITA
+    // Updated operating hours: 10:00 - 20:30 WITA
+    const startHour = 10; // 10:00 WITA
+    const endTime = "20:30"; // 20:30 WITA
     const slotDuration = packageData.base_time_minutes; // Dynamic duration based on package
     const slotGap = 5; // 5 minutes gap between slots
 
-    // Create initial time (09:00 WITA)
-    let currentTime = new Date(`${dateKey}T09:00:00`);
-    const endBoundary = new Date(`${dateKey}T21:00:00`);
+    // Create initial time (10:00 WITA)
+    let currentTime = new Date(`${dateKey}T10:00:00`);
+    const endBoundary = new Date(`${dateKey}T20:30:00`);
 
     let slotCounter = 1;
 
@@ -236,8 +236,13 @@ const SelfPhotoCheckoutPage = () => {
       // Calculate slot end time
       const slotEnd = addMinutes(currentTime, slotDuration);
       
-      // Stop if slot would start at or after 21:00
+      // Stop if slot would start at or after 20:30
       if (currentTime >= endBoundary) {
+        break;
+      }
+
+      // Stop if slot would end after 20:30
+      if (slotEnd > endBoundary) {
         break;
       }
 
@@ -274,7 +279,7 @@ const SelfPhotoCheckoutPage = () => {
       slotCounter++;
     }
 
-    console.log(`Generated ${slots.length} available dynamic slots with ${slotDuration}-minute duration and ${slotGap}-minute gap:`);
+    console.log(`Generated ${slots.length} available dynamic slots with ${slotDuration}-minute duration and ${slotGap}-minute gap (10:00-20:30 WITA):`);
     slots.forEach(slot => {
       console.log(`- ${slot.startTime} to ${slot.endTime}`);
     });
@@ -337,9 +342,10 @@ const SelfPhotoCheckoutPage = () => {
     const dateKey = format(date, 'yyyy-MM-dd');
     const dayBookings = bookedSlots[dateKey] || [];
     
-    // Check if all time slots are booked for this date
-    const totalSlots = 13; // 9 AM to 9 PM = 13 hours
-    return dayBookings.length >= totalSlots;
+    // Updated calculation for 10:00-20:30 operating hours
+    // Total available time: 10.5 hours (630 minutes)
+    // But since slots are dynamic based on package duration, we use a different approach
+    return dayBookings.length >= 20; // Conservative estimate for fully booked day
   };
 
   const getDateTooltipContent = (date: Date) => {
