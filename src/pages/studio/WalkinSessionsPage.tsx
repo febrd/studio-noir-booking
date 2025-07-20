@@ -113,7 +113,7 @@ const WalkinSessionsPage = () => {
             amount: bookingData.total_amount,
             type: 'offline',
             status: 'paid',
-            payment_type: 'full_payment',
+            payment_type: 'offline',
             description: `Walk-in session offline - ${bookingData.studio_packages?.title || 'Package'}`,
             performed_by: null // Will be handled by database function
           });
