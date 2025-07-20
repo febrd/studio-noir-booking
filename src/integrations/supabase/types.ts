@@ -82,6 +82,13 @@ export type Database = {
             referencedRelation: "bookings"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_additional_service_id"
+            columns: ["additional_service_id"]
+            isOneToOne: false
+            referencedRelation: "additional_services"
+            referencedColumns: ["id"]
+          },
         ]
       }
       booking_logs: {
@@ -174,6 +181,7 @@ export type Database = {
           id: string
           is_walking_session: boolean
           package_category_id: string | null
+          package_quantity: number | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           performed_by: string | null
           start_time: string | null
@@ -192,6 +200,7 @@ export type Database = {
           id?: string
           is_walking_session?: boolean
           package_category_id?: string | null
+          package_quantity?: number | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           performed_by?: string | null
           start_time?: string | null
@@ -210,6 +219,7 @@ export type Database = {
           id?: string
           is_walking_session?: boolean
           package_category_id?: string | null
+          package_quantity?: number | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           performed_by?: string | null
           start_time?: string | null
