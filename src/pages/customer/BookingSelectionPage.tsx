@@ -90,23 +90,25 @@ const BookingSelectionPage = () => {
     <ModernLayout>
       <div className="min-h-screen bg-white">
         <div className="max-w-5xl mx-auto px-8 py-12">
-          {/* Clean Header */}
-          <div className="text-center mb-16">
-            <div className="flex justify-center items-center gap-4 mb-8">
-              <Link to="/dashboard">
-                <Button variant="outline" size="sm" className="border border-gray-200 text-gray-600 hover:bg-gray-50 font-inter font-medium">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Kembali
-                </Button>
-              </Link>
+          {/* Clean Header - Only show when not in category selection */}
+          {selectedType !== 'regular' && (
+            <div className="text-center mb-16">
+              <div className="flex justify-center items-center gap-4 mb-8">
+                <Link to="/dashboard">
+                  <Button variant="outline" size="sm" className="border border-gray-200 text-gray-600 hover:bg-gray-50 font-inter font-medium">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Kembali
+                  </Button>
+                </Link>
+              </div>
+              <h1 className="text-6xl font-peace-sans font-black mb-4 tracking-tight text-black">
+                Pilih Studio
+              </h1>
+              <p className="text-xl font-inter text-gray-500 max-w-lg mx-auto">
+                Setiap pilihan memiliki keunikan tersendiri
+              </p>
             </div>
-            <h1 className="text-6xl font-peace-sans font-black mb-4 tracking-tight text-black">
-              Pilih Studio
-            </h1>
-            <p className="text-xl font-inter text-gray-500 max-w-lg mx-auto">
-              Setiap pilihan memiliki keunikan tersendiri
-            </p>
-          </div>
+          )}
 
           {!selectedType ? (
             /* Studio Type Selection */
@@ -252,18 +254,20 @@ const BookingSelectionPage = () => {
             </div>
           ) : null}
 
-          {/* Simple CTA */}
-          <div className="text-center mt-20">
-            <div className="bg-gray-50 border border-gray-100 p-12 max-w-2xl mx-auto">
-              <h3 className="text-3xl font-peace-sans font-black mb-4 text-black">Butuh Bantuan?</h3>
-              <p className="text-base mb-8 font-inter text-gray-600">
-                Tim kami siap membantu Anda menemukan paket foto yang sempurna
-              </p>
-              <Button className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold py-3 px-8 text-base">
-                Hubungi Kami
-              </Button>
+          {/* Simple CTA - Only show when not in category selection */}
+          {selectedType !== 'regular' && (
+            <div className="text-center mt-20">
+              <div className="bg-gray-50 border border-gray-100 p-12 max-w-2xl mx-auto">
+                <h3 className="text-3xl font-peace-sans font-black mb-4 text-black">Butuh Bantuan?</h3>
+                <p className="text-base mb-8 font-inter text-gray-600">
+                  Tim kami siap membantu Anda menemukan paket foto yang sempurna
+                </p>
+                <Button className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold py-3 px-8 text-base">
+                  Hubungi Kami
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </ModernLayout>
