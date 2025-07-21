@@ -12,6 +12,7 @@ import { id } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import QRISPaymentDialog from '@/components/QRISPaymentDialog';
+import { formatDateTimeWITA } from '@/utils/timezoneUtils';
 
 const PelangganDashboard = () => {
   const { userProfile } = useJWTAuth();
@@ -246,7 +247,7 @@ const PelangganDashboard = () => {
                       </div>
                       <div className="flex items-center gap-1">
                         <CalendarDays className="w-4 h-4" />
-                        <span>{format(new Date(booking.start_time || booking.created_at), 'dd MMM yyyy, HH:mm', { locale: id })}</span>
+                        <span>{formatDateTimeWITA(booking.start_time || booking.created_at)}</span>
                       </div>
                     </div>
                   </div>
@@ -276,14 +277,14 @@ const PelangganDashboard = () => {
       {/* Chart and Recent Bookings Side by Side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Spending Chart */}
-        {spendingData.length > 0 && (
-          <Card className="border border-gray-100 shadow-sm">
-            <CardHeader className="p-4 md:p-6">
-              <CardTitle className="font-peace-sans font-black text-gray-900">
-                Grafik Pengeluaran
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 md:p-6 pt-0">
+        <Card className="border border-gray-100 shadow-sm">
+          <CardHeader className="p-4 md:p-6">
+            <CardTitle className="font-peace-sans font-black text-gray-900">
+              Grafik Pengeluaran
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            {spendingData.length > 0 ? (
               <div className="w-full h-[250px] md:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
@@ -342,26 +343,33 @@ const PelangganDashboard = () => {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            ) : (
+              <div className="flex items-center justify-center h-[250px] md:h-[300px] text-gray-500">
+                <div className="text-center">
+                  <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm font-inter">Belum ada data pengeluaran</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Recent Bookings */}
-        {recentBookings.length > 0 && (
-          <Card className="border border-gray-100 shadow-sm">
-            <CardHeader className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <CardTitle className="font-peace-sans font-black text-gray-900">
-                  Booking Terbaru
-                </CardTitle>
-                <Link to="/customer/order-history">
-                  <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 font-inter">
-                    Lihat Semua
-                  </Button>
-                </Link>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 md:p-6 pt-0">
+        <Card className="border border-gray-100 shadow-sm">
+          <CardHeader className="p-4 md:p-6">
+            <div className="flex items-center justify-between">
+              <CardTitle className="font-peace-sans font-black text-gray-900">
+                Booking Terbaru
+              </CardTitle>
+              <Link to="/customer/order-history">
+                <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 font-inter">
+                  Lihat Semua
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            {recentBookings.length > 0 ? (
               <div className="space-y-4">
                 {recentBookings.map((booking) => (
                   <div key={booking.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 rounded-lg gap-3">
@@ -376,7 +384,7 @@ const PelangganDashboard = () => {
                         </div>
                         <div className="flex items-center gap-1">
                           <CalendarDays className="w-4 h-4" />
-                          <span>{format(new Date(booking.start_time || booking.created_at), 'dd MMM yyyy, HH:mm', { locale: id })}</span>
+                          <span>{formatDateTimeWITA(booking.start_time || booking.created_at)}</span>
                         </div>
                       </div>
                       
@@ -404,9 +412,16 @@ const PelangganDashboard = () => {
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        )}
+            ) : (
+              <div className="flex items-center justify-center h-[250px] md:h-[300px] text-gray-500">
+                <div className="text-center">
+                  <Camera className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm font-inter">Belum ada booking terbaru</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Empty State */}

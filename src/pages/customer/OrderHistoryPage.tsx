@@ -7,17 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, ArrowLeft, Search, Filter, Clock, Camera } from 'lucide-react';
+import { Calendar, ArrowLeft, Search, Filter, Clock, Camera, CreditCard } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { useState } from 'react';
 import { formatDateTimeWITA } from '@/utils/timezoneUtils';
 import { toast } from 'sonner';
+import QRISPaymentDialog from '@/components/QRISPaymentDialog';
 
 const OrderHistoryPage = () => {
   const { userProfile } = useJWTAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<any>(null);
 
   const { data: bookings = [], isLoading, refetch } = useQuery({
     queryKey: ['customer-bookings', userProfile?.id],
@@ -30,7 +32,11 @@ const OrderHistoryPage = () => {
           *,
           studios (name, type),
           studio_packages (title, price, base_time_minutes),
-          installments (amount, paid_at, payment_method)
+          installments (amount, paid_at, payment_method),
+          booking_additional_services(
+            quantity,
+            additional_services(name)
+          )
         `)
         .eq('user_id', userProfile.id)
         .order('created_at', { ascending: false });
@@ -67,6 +73,10 @@ const OrderHistoryPage = () => {
       console.error('Error cancelling booking:', error);
       toast.error('Gagal membatalkan pesanan');
     }
+  };
+
+  const handlePayment = (booking: any) => {
+    setSelectedBookingForPayment(booking);
   };
 
   const getStatusColor = (status: string) => {
@@ -177,7 +187,7 @@ const OrderHistoryPage = () => {
                             <div className="flex items-center gap-4 text-sm text-gray-400 font-inter">
                               <span className="flex items-center">
                                 <Calendar className="h-4 w-4 mr-1" />
-                                {booking.start_time ? formatDateTimeWITA(booking.start_time) : formatDateTimeWITA(booking.created_at)}
+                                {formatDateTimeWITA(booking.start_time || booking.created_at)}
                               </span>
                               <span className="flex items-center">
                                 <Clock className="h-4 w-4 mr-1" />
@@ -225,8 +235,12 @@ const OrderHistoryPage = () => {
                       <div className="flex flex-col sm:flex-row gap-3">
                         {booking.status === 'pending' && (
                           <>
-                            <Button variant="outline" size="sm" className="border-yellow-200 text-yellow-600 hover:bg-yellow-50 font-peace-sans font-bold">
-                              Menunggu Konfirmasi
+                            <Button
+                              onClick={() => handlePayment(booking)}
+                              className="bg-green-600 hover:bg-green-700 text-white font-peace-sans font-bold"
+                            >
+                              <CreditCard className="h-4 w-4 mr-2" />
+                              Bayar Sekarang
                             </Button>
                             <Button 
                               variant="outline" 
@@ -285,6 +299,15 @@ const OrderHistoryPage = () => {
           )}
         </div>
       </div>
+
+      {/* QRIS Payment Dialog */}
+      {selectedBookingForPayment && (
+        <QRISPaymentDialog
+          isOpen={!!selectedBookingForPayment}
+          onClose={() => setSelectedBookingForPayment(null)}
+          booking={selectedBookingForPayment}
+        />
+      )}
     </ModernLayout>
   );
 };
