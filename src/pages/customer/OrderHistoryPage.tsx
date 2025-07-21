@@ -97,7 +97,7 @@ const OrderHistoryPage = () => {
       case 'confirmed': return 'Dikonfirmasi';
       case 'pending': return 'Pending';
       case 'completed': return 'Selesai';
-      case 'cancelled': return 'Cancelled';
+      case 'cancelled': return 'Revoked';
       case 'paid': return 'Dibayar';
       default: return status;
     }
@@ -185,8 +185,6 @@ const OrderHistoryPage = () => {
                             </h3>
                             <p className="text-gray-500 font-inter mb-2">
                               {booking.studio_packages?.title}
-                            </p>
-                            <p className="text-gray-500 font-inter mb-2">
                               <Badge className={getStatusColor(booking.status) + ' font-peace-sans font-bold border'}>
                                 {getStatusText(booking.status)}
                               </Badge>
@@ -253,12 +251,30 @@ const OrderHistoryPage = () => {
                               onClick={() => handleCancelBooking(booking.id)}
                               className="border-red-200 text-red-600 hover:bg-red-50 font-peace-sans font-bold"
                             >
-                              Cancel Pesanan
+                              Batalkan Pesanan
                             </Button>
                           </>
                         )}
-
-                    
+                        {booking.status === 'confirmed' && (
+                          <Button variant="outline" size="sm" className="border-green-200 text-green-600 hover:bg-green-50 font-peace-sans font-bold">
+                            Siap Difoto
+                          </Button>
+                        )}
+                        {booking.status === 'completed' && (
+                          <Button variant="outline" size="sm" className="border-blue-200 text-blue-600 hover:bg-blue-50 font-peace-sans font-bold">
+                            Selesai
+                          </Button>
+                        )}
+                        {booking.status === 'paid' && (
+                          <Button variant="outline" size="sm" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-peace-sans font-bold">
+                            Dibayar
+                          </Button>
+                        )}
+                        {booking.status === 'cancelled' && (
+                          <Button variant="outline" size="sm" className="border-red-200 text-red-600 hover:bg-red-50 font-peace-sans font-bold" disabled>
+                            Dibatalkan
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
