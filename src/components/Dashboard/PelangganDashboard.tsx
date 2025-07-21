@@ -4,16 +4,18 @@ import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, Package, Clock, MapPin, Camera } from 'lucide-react';
+import { CalendarDays, Package, Clock, MapPin, Camera, CreditCard } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import QRISPaymentDialog from '@/components/QRISPaymentDialog';
 
 const PelangganDashboard = () => {
   const { userProfile } = useJWTAuth();
+  const [selectedBookingForPayment, setSelectedBookingForPayment] = React.useState<any>(null);
 
   // Fetch user's bookings
   const { data: bookings = [], isLoading } = useQuery({
@@ -33,7 +35,11 @@ const PelangganDashboard = () => {
           created_at,
           studio_packages!inner(title, description),
           studios!inner(name, type),
-          installments(amount, paid_at)
+          installments(amount, paid_at),
+          booking_additional_services(
+            quantity,
+            additional_services(name)
+          )
         `)
         .eq('user_id', userProfile.id)
         .order('created_at', { ascending: false });
@@ -87,6 +93,7 @@ const PelangganDashboard = () => {
   }, [bookings]);
 
   const recentBookings = bookings.slice(0, 5);
+  const pendingBookings = bookings.filter(b => b.status === 'pending');
 
   const getStatusBadgeStyle = (status: string) => {
     switch (status) {
@@ -114,6 +121,10 @@ const PelangganDashboard = () => {
       case 'paid': return 'Dibayar';
       default: return status;
     }
+  };
+
+  const handlePayment = (booking: any) => {
+    setSelectedBookingForPayment(booking);
   };
 
   if (isLoading) {
@@ -189,77 +200,6 @@ const PelangganDashboard = () => {
         </Card>
       </div>
 
-      {/* Spending Chart - Show if there's spending data */}
-      {spendingData.length > 0 && (
-        <Card className="border border-gray-100 shadow-sm">
-          <CardHeader className="p-4 md:p-6">
-            <CardTitle className="font-peace-sans font-black text-gray-900">
-              Grafik Pengeluaran (6 Bulan Terakhir)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 md:p-6 pt-0">
-            <div className="w-full h-[250px] md:h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={spendingData}
-                  margin={{
-                    top: 10,
-                    right: 10,
-                    left: 10,
-                    bottom: 40,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="month" 
-                    stroke="#666"
-                    fontSize={10}
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                    interval={0}
-                  />
-                  <YAxis 
-                    stroke="#666"
-                    fontSize={10}
-                    tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
-                    width={40}
-                  />
-                  <Tooltip
-                    formatter={(value: number) => [
-                      value.toLocaleString('id-ID', { 
-                        style: 'currency', 
-                        currency: 'IDR', 
-                        minimumFractionDigits: 0 
-                      }),
-                      'Pengeluaran'
-                    ]}
-                    labelStyle={{ fontSize: '11px' }}
-                    contentStyle={{ 
-                      fontSize: '11px', 
-                      maxWidth: '180px',
-                      backgroundColor: 'white',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px'
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: '11px' }} />
-                  <Line
-                    type="monotone"
-                    dataKey="amount"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    dot={{ fill: '#3b82f6', strokeWidth: 1, r: 3 }}
-                    name="Pengeluaran"
-                    connectNulls={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Quick Actions */}
       <Card className="border border-gray-100 shadow-sm">
         <CardHeader className="p-4 md:p-6">
@@ -283,25 +223,18 @@ const PelangganDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Recent Bookings */}
-      {recentBookings.length > 0 && (
-        <Card className="border border-gray-100 shadow-sm">
+      {/* Pending Payments Section */}
+      {pendingBookings.length > 0 && (
+        <Card className="border border-orange-200 shadow-sm bg-orange-50">
           <CardHeader className="p-4 md:p-6">
-            <div className="flex items-center justify-between">
-              <CardTitle className="font-peace-sans font-black text-gray-900">
-                Booking Terbaru
-              </CardTitle>
-              <Link to="/customer/order-history">
-                <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 font-inter">
-                  Lihat Semua
-                </Button>
-              </Link>
-            </div>
+            <CardTitle className="font-peace-sans font-black text-orange-900">
+              Booking Menunggu Pembayaran
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
-            <div className="space-y-4">
-              {recentBookings.map((booking) => (
-                <div key={booking.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 rounded-lg gap-3">
+            <div className="space-y-3">
+              {pendingBookings.map((booking) => (
+                <div key={booking.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white rounded-lg gap-3 border border-orange-200">
                   <div className="flex-1 min-w-0">
                     <h3 className="font-peace-sans font-bold text-gray-900 truncate">
                       {booking.studio_packages?.title}
@@ -316,20 +249,8 @@ const PelangganDashboard = () => {
                         <span>{format(new Date(booking.start_time || booking.created_at), 'dd MMM yyyy, HH:mm', { locale: id })}</span>
                       </div>
                     </div>
-                    
-                    {/* Show installment info if available */}
-                    {booking.installments && booking.installments.length > 0 && (
-                      <div className="mt-2">
-                        <Badge className="bg-purple-100 text-purple-800 border-purple-300 text-xs">
-                          Cicilan: {booking.installments.length}x pembayaran
-                        </Badge>
-                      </div>
-                    )}
                   </div>
-                  <div className="flex items-center justify-between md:justify-end gap-3">
-                    <Badge className={`${getStatusBadgeStyle(booking.status)} border font-peace-sans font-bold whitespace-nowrap`}>
-                      {getStatusText(booking.status)}
-                    </Badge>
+                  <div className="flex items-center gap-3">
                     <p className="text-sm font-peace-sans font-bold text-gray-900 whitespace-nowrap">
                       {(booking.total_amount || 0).toLocaleString('id-ID', { 
                         style: 'currency', 
@@ -337,6 +258,13 @@ const PelangganDashboard = () => {
                         minimumFractionDigits: 0 
                       })}
                     </p>
+                    <Button
+                      onClick={() => handlePayment(booking)}
+                      className="bg-green-600 hover:bg-green-700 text-white font-peace-sans font-bold"
+                    >
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Bayar
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -344,6 +272,142 @@ const PelangganDashboard = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Chart and Recent Bookings Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Spending Chart */}
+        {spendingData.length > 0 && (
+          <Card className="border border-gray-100 shadow-sm">
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="font-peace-sans font-black text-gray-900">
+                Grafik Pengeluaran
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0">
+              <div className="w-full h-[250px] md:h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={spendingData}
+                    margin={{
+                      top: 10,
+                      right: 10,
+                      left: 10,
+                      bottom: 40,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="month" 
+                      stroke="#666"
+                      fontSize={10}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                      interval={0}
+                    />
+                    <YAxis 
+                      stroke="#666"
+                      fontSize={10}
+                      tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
+                      width={40}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => [
+                        value.toLocaleString('id-ID', { 
+                          style: 'currency', 
+                          currency: 'IDR', 
+                          minimumFractionDigits: 0 
+                        }),
+                        'Pengeluaran'
+                      ]}
+                      labelStyle={{ fontSize: '11px' }}
+                      contentStyle={{ 
+                        fontSize: '11px', 
+                        maxWidth: '180px',
+                        backgroundColor: 'white',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px'
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    <Line
+                      type="monotone"
+                      dataKey="amount"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      dot={{ fill: '#3b82f6', strokeWidth: 1, r: 3 }}
+                      name="Pengeluaran"
+                      connectNulls={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Recent Bookings */}
+        {recentBookings.length > 0 && (
+          <Card className="border border-gray-100 shadow-sm">
+            <CardHeader className="p-4 md:p-6">
+              <div className="flex items-center justify-between">
+                <CardTitle className="font-peace-sans font-black text-gray-900">
+                  Booking Terbaru
+                </CardTitle>
+                <Link to="/customer/order-history">
+                  <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 font-inter">
+                    Lihat Semua
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0">
+              <div className="space-y-4">
+                {recentBookings.map((booking) => (
+                  <div key={booking.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 rounded-lg gap-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-peace-sans font-bold text-gray-900 truncate">
+                        {booking.studio_packages?.title}
+                      </h3>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1 text-sm text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <MapPin className="w-4 h-4" />
+                          <span className="truncate">{booking.studios?.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <CalendarDays className="w-4 h-4" />
+                          <span>{format(new Date(booking.start_time || booking.created_at), 'dd MMM yyyy, HH:mm', { locale: id })}</span>
+                        </div>
+                      </div>
+                      
+                      {/* Show installment info if available */}
+                      {booking.installments && booking.installments.length > 0 && (
+                        <div className="mt-2">
+                          <Badge className="bg-purple-100 text-purple-800 border-purple-300 text-xs">
+                            Cicilan: {booking.installments.length}x pembayaran
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between md:justify-end gap-3">
+                      <Badge className={`${getStatusBadgeStyle(booking.status)} border font-peace-sans font-bold whitespace-nowrap`}>
+                        {getStatusText(booking.status)}
+                      </Badge>
+                      <p className="text-sm font-peace-sans font-bold text-gray-900 whitespace-nowrap">
+                        {(booking.total_amount || 0).toLocaleString('id-ID', { 
+                          style: 'currency', 
+                          currency: 'IDR', 
+                          minimumFractionDigits: 0 
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* Empty State */}
       {bookings.length === 0 && (
@@ -364,6 +428,15 @@ const PelangganDashboard = () => {
             </Link>
           </CardContent>
         </Card>
+      )}
+
+      {/* QRIS Payment Dialog */}
+      {selectedBookingForPayment && (
+        <QRISPaymentDialog
+          isOpen={!!selectedBookingForPayment}
+          onClose={() => setSelectedBookingForPayment(null)}
+          booking={selectedBookingForPayment}
+        />
       )}
     </div>
   );
