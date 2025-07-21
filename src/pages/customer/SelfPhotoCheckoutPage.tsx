@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Plus, Minus, Clock, Users, MapPin, Calendar as CalendarIcon } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, Clock, Users, MapPin, Calendar as CalendarIcon, CreditCard } from 'lucide-react';
 import { format, isSameDay, parseISO, isBefore, startOfDay, addMinutes } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { formatDateTimeWITA, parseWITAToUTC } from '@/utils/timezoneUtils';
+import QRISPaymentDialog from '@/components/QRISPaymentDialog';
 
 interface Package {
   id: string;
@@ -67,6 +68,44 @@ const SelfPhotoCheckoutPage = () => {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [bookedSlots, setBookedSlots] = useState<{[key: string]: BookedSlot[]}>({});
   const [bookingLoading, setBookingLoading] = useState(false);
+
+  // Payment dialog state
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [selectedPendingBooking, setSelectedPendingBooking] = useState<any>(null);
+
+  // Check for pending bookings
+  const { data: pendingBookings = [], refetch: refetchPendingBookings } = useQuery({
+    queryKey: ['pending-bookings-self-photo', userProfile?.id],
+    queryFn: async () => {
+      if (!userProfile?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          start_time,
+          end_time,
+          total_amount,
+          status,
+          studio_packages!inner(title),
+          booking_additional_services(
+            quantity,
+            additional_services(name)
+          )
+        `)
+        .eq('user_id', userProfile.id)
+        .eq('status', 'pending')
+        .eq('type', 'self_photo');
+
+      if (error) {
+        console.error('Error fetching pending bookings:', error);
+        return [];
+      }
+
+      return data || [];
+    },
+    enabled: !!userProfile?.id
+  });
 
   // Fetch package details
   const { data: packageData, isLoading: packageLoading, error: packageError } = useQuery({
@@ -415,6 +454,12 @@ const SelfPhotoCheckoutPage = () => {
   };
 
   const handleFinalBooking = async () => {
+    // Check if user has pending bookings
+    if (pendingBookings.length > 0) {
+      toast.error('Anda memiliki booking yang belum diselesaikan. Silakan selesaikan pembayaran terlebih dahulu.');
+      return;
+    }
+
     if (!selectedDate || !selectedTimeSlot || !userProfile || !packageData) {
       toast.error('Silakan pilih tanggal dan waktu');
       return;
@@ -478,7 +523,8 @@ const SelfPhotoCheckoutPage = () => {
         }
       }
 
-      toast.success('Booking berhasil dibuat!');
+      toast.success('Booking berhasil dibuat! Silakan lakukan pembayaran.');
+      refetchPendingBookings();
       navigate('/customer/order-history');
     } catch (error) {
       console.error('Error creating booking:', error);
@@ -486,6 +532,11 @@ const SelfPhotoCheckoutPage = () => {
     } finally {
       setBookingLoading(false);
     }
+  };
+
+  const handlePayment = (booking: any) => {
+    setSelectedPendingBooking(booking);
+    setShowPaymentDialog(true);
   };
 
   if (packageLoading) {
@@ -543,396 +594,453 @@ const SelfPhotoCheckoutPage = () => {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 md:px-8 py-8 md:py-12">
-        {currentStep === 'package' && (
-          /* Package Selection */
-          <div className="space-y-8 md:space-y-12">
-            <div className="text-center">
-              <h2 className="text-3xl md:text-5xl font-peace-sans font-black mb-4 text-black">Paket Self Photo</h2>
-              <p className="text-base md:text-lg font-inter text-gray-500">Pilih jumlah yang Anda inginkan</p>
-            </div>
-
-            <Card className="border border-gray-100 shadow-none">
-              <CardHeader className="p-6 md:p-8">
-                <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
-                  <div className="flex-1">
-                    <CardTitle className="text-xl md:text-2xl font-peace-sans font-black text-black mb-2">
-                      {packageData.title}
-                    </CardTitle>
-                    <p className="text-gray-500 font-inter mb-4">{packageData.description}</p>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 md:gap-6 text-sm font-inter text-gray-600">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        {packageData.base_time_minutes} menit
+        {/* Show pending bookings warning */}
+        {pendingBookings.length > 0 && (
+          <Card className="border-orange-200 bg-orange-50 mb-8">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-lg font-peace-sans font-black text-orange-800 mb-2">
+                    Booking Menunggu Pembayaran
+                  </h3>
+                  <p className="text-sm text-orange-700 mb-4">
+                    Anda memiliki {pendingBookings.length} booking yang belum diselesaikan. Silakan selesaikan pembayaran terlebih dahulu sebelum membuat booking baru.
+                  </p>
+                  <div className="space-y-3">
+                    {pendingBookings.map((booking) => (
+                      <div key={booking.id} className="bg-white p-4 rounded-lg border border-orange-200">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-peace-sans font-bold text-sm">{booking.studio_packages.title}</h4>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {format(new Date(booking.start_time), 'dd MMMM yyyy HH:mm')}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              Total: {booking.total_amount?.toLocaleString('id-ID', { 
+                                style: 'currency', 
+                                currency: 'IDR', 
+                                minimumFractionDigits: 0 
+                              })}
+                            </p>
+                          </div>
+                          <Button
+                            onClick={() => handlePayment(booking)}
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white font-peace-sans font-bold"
+                          >
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Bayar
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        {packageData.studios?.name}
-                      </div>
-                    </div>
-                  </div>
-                  <Badge className="bg-red-50 text-red-600 border-red-200 font-peace-sans font-bold self-start">
-                    Sesi Self Photo 
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6 md:p-8 pt-0">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <span className="text-base md:text-lg font-inter text-gray-600">Jumlah:</span>
-                    <div className="flex items-center gap-3">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleQuantityChange(false)}
-                        disabled={packageQuantity <= 1}
-                        className="border-gray-200 text-gray-600 hover:bg-gray-50"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="text-xl md:text-2xl font-peace-sans font-black min-w-[3rem] text-center">
-                        {packageQuantity}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => handleQuantityChange(true)}
-                        className="border-gray-200 text-gray-600 hover:bg-gray-50"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="text-left md:text-right">
-                    <p className="text-sm font-inter text-gray-500 mb-1">Total</p>
-                    <p className="text-2xl md:text-3xl font-peace-sans font-black text-black break-words">
-                      {((packageData.price * packageQuantity)).toLocaleString('id-ID', { 
-                        style: 'currency', 
-                        currency: 'IDR', 
-                        minimumFractionDigits: 0 
-                      })}
-                    </p>
+                    ))}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            <div className="text-center">
-              <Button 
-                onClick={handleContinueToServices}
-                className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-8 md:px-12 py-3 md:py-4 text-base md:text-lg w-full sm:w-auto"
-              >
-                Lanjut ke Layanan Tambahan
-              </Button>
-            </div>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
-        {currentStep === 'services' && (
-          /* Additional Services */
-          <div className="space-y-8 md:space-y-12">
-            <div className="text-center">
-              <h2 className="text-3xl md:text-5xl font-peace-sans font-black mb-4 text-black">Layanan Tambahan</h2>
-              <p className="text-base md:text-lg font-inter text-gray-500">Tingkatkan pengalaman Anda (opsional)</p>
-            </div>
+        {/* Disable checkout steps if there are pending bookings */}
+        <div className={pendingBookings.length > 0 ? 'opacity-50 pointer-events-none' : ''}>
+          {/* Package Selection */}
+          {currentStep === 'package' && (
+            <div className="space-y-8 md:space-y-12">
+              <div className="text-center">
+                <h2 className="text-3xl md:text-5xl font-peace-sans font-black mb-4 text-black">Paket Self Photo</h2>
+                <p className="text-base md:text-lg font-inter text-gray-500">Pilih jumlah yang Anda inginkan</p>
+              </div>
 
-            <div className="space-y-6">
-              {additionalServices.length > 0 ? (
-                additionalServices.map((service) => (
-                  <Card key={service.id} className="border border-gray-100 shadow-none">
-                    <CardContent className="p-6 md:p-8">
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="text-lg md:text-xl font-peace-sans font-black text-black mb-2">
-                            {service.name}
-                          </h3>
-                          <p className="text-gray-500 font-inter mb-2">{service.description}</p>
-                          <p className="text-base md:text-lg font-peace-sans font-bold text-blue-600">
-                            {service.price.toLocaleString('id-ID', { 
-                              style: 'currency', 
-                              currency: 'IDR', 
-                              minimumFractionDigits: 0 
-                            })}
-                          </p>
+              <Card className="border border-gray-100 shadow-none">
+                <CardHeader className="p-6 md:p-8">
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+                    <div className="flex-1">
+                      <CardTitle className="text-xl md:text-2xl font-peace-sans font-black text-black mb-2">
+                        {packageData.title}
+                      </CardTitle>
+                      <p className="text-gray-500 font-inter mb-4">{packageData.description}</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 md:gap-6 text-sm font-inter text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          {packageData.base_time_minutes} menit
                         </div>
-                        <div className="flex items-center gap-4 self-start md:self-center">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleServiceQuantityChange(service.id, false)}
-                            disabled={(selectedServices[service.id] || 0) <= 0}
-                            className="border-gray-200 text-gray-600 hover:bg-gray-50"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <span className="text-lg md:text-xl font-peace-sans font-black min-w-[3rem] text-center">
-                            {selectedServices[service.id] || 0}
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleServiceQuantityChange(service.id, true)}
-                            className="border-gray-200 text-gray-600 hover:bg-gray-50"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          {packageData.studios?.name}
                         </div>
                       </div>
+                    </div>
+                    <Badge className="bg-red-50 text-red-600 border-red-200 font-peace-sans font-bold self-start">
+                      Sesi Self Photo 
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6 md:p-8 pt-0">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                      <span className="text-base md:text-lg font-inter text-gray-600">Jumlah:</span>
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleQuantityChange(false)}
+                          disabled={packageQuantity <= 1}
+                          className="border-gray-200 text-gray-600 hover:bg-gray-50"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="text-xl md:text-2xl font-peace-sans font-black min-w-[3rem] text-center">
+                          {packageQuantity}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleQuantityChange(true)}
+                          className="border-gray-200 text-gray-600 hover:bg-gray-50"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="text-left md:text-right">
+                      <p className="text-sm font-inter text-gray-500 mb-1">Total</p>
+                      <p className="text-2xl md:text-3xl font-peace-sans font-black text-black break-words">
+                        {((packageData.price * packageQuantity)).toLocaleString('id-ID', { 
+                          style: 'currency', 
+                          currency: 'IDR', 
+                          minimumFractionDigits: 0 
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="text-center">
+                <Button 
+                  onClick={handleContinueToServices}
+                  className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-8 md:px-12 py-3 md:py-4 text-base md:text-lg w-full sm:w-auto"
+                >
+                  Lanjut ke Layanan Tambahan
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Additional Services */}
+          {currentStep === 'services' && (
+            <div className="space-y-8 md:space-y-12">
+              <div className="text-center">
+                <h2 className="text-3xl md:text-5xl font-peace-sans font-black mb-4 text-black">Layanan Tambahan</h2>
+                <p className="text-base md:text-lg font-inter text-gray-500">Tingkatkan pengalaman Anda (opsional)</p>
+              </div>
+
+              <div className="space-y-6">
+                {additionalServices.length > 0 ? (
+                  additionalServices.map((service) => (
+                    <Card key={service.id} className="border border-gray-100 shadow-none">
+                      <CardContent className="p-6 md:p-8">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                          <div className="flex-1">
+                            <h3 className="text-lg md:text-xl font-peace-sans font-black text-black mb-2">
+                              {service.name}
+                            </h3>
+                            <p className="text-gray-500 font-inter mb-2">{service.description}</p>
+                            <p className="text-base md:text-lg font-peace-sans font-bold text-blue-600">
+                              {service.price.toLocaleString('id-ID', { 
+                                style: 'currency', 
+                                currency: 'IDR', 
+                                minimumFractionDigits: 0 
+                              })}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-4 self-start md:self-center">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => handleServiceQuantityChange(service.id, false)}
+                              disabled={(selectedServices[service.id] || 0) <= 0}
+                              className="border-gray-200 text-gray-600 hover:bg-gray-50"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="text-lg md:text-xl font-peace-sans font-black min-w-[3rem] text-center">
+                              {selectedServices[service.id] || 0}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => handleServiceQuantityChange(service.id, true)}
+                              className="border-gray-200 text-gray-600 hover:bg-gray-50"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <Card className="border border-gray-100 shadow-none">
+                    <CardContent className="p-6 md:p-8 text-center">
+                      <p className="text-gray-500 font-inter">Tidak ada layanan tambahan tersedia untuk paket ini.</p>
                     </CardContent>
                   </Card>
-                ))
-              ) : (
+                )}
+              </div>
+
+              {/* Order Summary - Fixed price alignment */}
+              <Card className="border border-gray-100 shadow-none bg-gray-50">
+                <CardContent className="p-6 md:p-8">
+                  <h3 className="text-xl md:text-2xl font-peace-sans font-black text-black mb-6">Ringkasan Pesanan</h3>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-start gap-4">
+                      <span className="font-inter text-gray-600 flex-1">
+                        {packageData.title} × {packageQuantity}
+                      </span>
+                      <span className="font-peace-sans font-bold text-right break-words">
+                        {(packageData.price * packageQuantity).toLocaleString('id-ID', { 
+                          style: 'currency', 
+                          currency: 'IDR', 
+                          minimumFractionDigits: 0 
+                        })}
+                      </span>
+                    </div>
+                    {additionalServices.map((service) => {
+                      const serviceQuantity = selectedServices[service.id] || 0;
+                      if (serviceQuantity > 0) {
+                        return (
+                          <div key={service.id} className="flex justify-between items-start gap-4">
+                            <span className="font-inter text-gray-600 flex-1">
+                              {service.name} × {serviceQuantity}
+                            </span>
+                            <span className="font-peace-sans font-bold text-right break-words">
+                              {(service.price * serviceQuantity).toLocaleString('id-ID', { 
+                                style: 'currency', 
+                                currency: 'IDR', 
+                                minimumFractionDigits: 0 
+                              })}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
+                    <div className="border-t border-gray-200 pt-4">
+                      <div className="flex justify-between items-start gap-4">
+                        <span className="text-lg md:text-xl font-peace-sans font-black text-black">Total</span>
+                        <span className="text-xl md:text-2xl font-peace-sans font-black text-black text-right break-words">
+                          {calculateTotal().toLocaleString('id-ID', { 
+                            style: 'currency', 
+                            currency: 'IDR', 
+                            minimumFractionDigits: 0 
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="text-center">
+                <Button 
+                  onClick={handleContinueToSchedule}
+                  className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-8 md:px-12 py-3 md:py-4 text-base md:text-lg w-full sm:w-auto"
+                >
+                  Lanjut ke Pilih Jadwal
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Schedule Selection */}
+          {currentStep === 'schedule' && (
+            <div className="space-y-8 md:space-y-12">
+              <div className="text-center">
+                <h2 className="text-3xl md:text-5xl font-peace-sans font-black mb-4 text-black">Pilih Jadwal Anda</h2>
+                <p className="text-base md:text-lg font-inter text-gray-500">Pilih tanggal dan waktu yang Anda inginkan</p>
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* Package Summary */}
                 <Card className="border border-gray-100 shadow-none">
-                  <CardContent className="p-6 md:p-8 text-center">
-                    <p className="text-gray-500 font-inter">Tidak ada layanan tambahan tersedia untuk paket ini.</p>
+                  <CardHeader className="p-4 md:p-6">
+                    <CardTitle className="flex items-center gap-2 text-lg md:text-xl font-peace-sans font-black">
+                      <CalendarIcon className="w-5 h-5" />
+                      Ringkasan Paket
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 md:p-6 pt-0 space-y-4">
+                    <div>
+                      <h3 className="font-peace-sans font-bold text-base md:text-lg">{packageData.title}</h3>
+                      <p className="text-gray-600 font-inter text-sm">{packageData.description}</p>
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        <span>{packageData.base_time_minutes} menit</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <MapPin className="w-4 h-4" />
+                        <span>{packageData.studios?.name}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="pt-2 border-t">
+                      <div className="flex justify-between items-start gap-4">
+                        <span className="text-sm text-gray-600">Total Harga:</span>
+                        <span className="text-base md:text-lg font-peace-sans font-bold text-primary text-right break-words">
+                          {calculateTotal().toLocaleString('id-ID', { 
+                            style: 'currency', 
+                            currency: 'IDR', 
+                            minimumFractionDigits: 0 
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Date Selection */}
+                <Card className="border border-gray-100 shadow-none">
+                  <CardHeader className="p-4 md:p-6">
+                    <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <span className="font-peace-sans font-black">Pilih Tanggal</span>
+                      <div className="flex items-center gap-4 text-xs font-inter">
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 bg-white border border-green-500 rounded"></div>
+                          <span>Tersedia</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 bg-gray-200 rounded"></div>
+                          <span>Tidak Tersedia</span>
+                        </div>
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 md:p-6 pt-0">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={handleDateSelect}
+                      disabled={isDateUnavailable}
+                      initialFocus
+                      className="rounded-md border w-full"
+                      components={{
+                        Day: CustomDay
+                      }}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Time Slots */}
+              {selectedDate && (
+                <Card className="border border-gray-100 shadow-none">
+                  <CardHeader className="p-4 md:p-6">
+                    <CardTitle className="font-peace-sans font-black">Waktu Tersedia</CardTitle>
+                    <p className="text-sm text-gray-600 font-inter">
+                      {format(selectedDate, 'EEEE, dd MMMM yyyy')} (WITA) - Slot {packageData.base_time_minutes} menit dengan jeda 5 menit
+                    </p>
+                  </CardHeader>
+                  <CardContent className="p-4 md:p-6 pt-0">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {timeSlots.map((slot) => (
+                        <Button
+                          key={slot.id}
+                          variant={selectedTimeSlot?.id === slot.id ? "default" : "outline"}
+                          className={`flex flex-col py-3 h-auto font-inter text-xs md:text-sm ${
+                            !slot.available 
+                              ? 'opacity-50 cursor-not-allowed bg-gray-200 text-gray-500' 
+                              : 'cursor-pointer'
+                          }`}
+                          disabled={!slot.available}
+                          onClick={() => handleTimeSlotSelect(slot)}
+                        >
+                          <div className="font-medium">{slot.startTime} - {slot.endTime}</div>
+                          <div className="text-xs opacity-75">{packageData.base_time_minutes} menit</div>
+                          {!slot.available && <div className="text-xs text-red-500">Tidak Tersedia</div>}
+                        </Button>
+                      ))}
+                    </div>
+                    {timeSlots.length === 0 && (
+                      <p className="text-center text-gray-500 py-8">
+                        Tidak ada slot waktu yang tersedia untuk tanggal ini
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Final Booking Summary - Fixed price alignment */}
+              {selectedDate && selectedTimeSlot && (
+                <Card className="border border-gray-100 shadow-none bg-gray-50">
+                  <CardHeader className="p-4 md:p-6">
+                    <CardTitle className="font-peace-sans font-black">Konfirmasi Pesanan</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 md:p-6 pt-0 space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-start gap-4">
+                        <span className="font-inter">Paket:</span>
+                        <span className="font-peace-sans font-bold text-right break-words">{packageData.title}</span>
+                      </div>
+                      <div className="flex justify-between items-start gap-4">
+                        <span className="font-inter">Tanggal:</span>
+                        <span className="font-peace-sans font-bold text-right break-words">{format(selectedDate, 'EEEE, dd MMMM yyyy')}</span>
+                      </div>
+                      <div className="flex justify-between items-start gap-4">
+                        <span className="font-inter">Waktu:</span>
+                        <span className="font-peace-sans font-bold text-right break-words">{selectedTimeSlot.startTime} - {selectedTimeSlot.endTime} (WITA)</span>
+                      </div>
+                      <div className="flex justify-between items-start gap-4">
+                        <span className="font-inter">Durasi:</span>
+                        <span className="font-peace-sans font-bold text-right break-words">{packageData.base_time_minutes} menit</span>
+                      </div>
+                      <div className="flex justify-between items-start gap-4">
+                        <span className="font-inter">Studio:</span>
+                        <span className="font-peace-sans font-bold text-right break-words">{packageData.studios?.name}</span>
+                      </div>
+                      <div className="flex justify-between items-start gap-4">
+                        <span className="font-inter">Jumlah:</span>
+                        <span className="font-peace-sans font-bold text-right break-words">{packageQuantity}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="border-t border-gray-200 pt-4">
+                      <div className="flex justify-between items-start gap-4 text-base md:text-lg font-peace-sans font-black">
+                        <span>Total Harga:</span>
+                        <span className="text-primary text-right break-words">
+                          {calculateTotal().toLocaleString('id-ID', { 
+                            style: 'currency', 
+                            currency: 'IDR', 
+                            minimumFractionDigits: 0 
+                          })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <Button 
+                      onClick={handleFinalBooking} 
+                      disabled={bookingLoading}
+                      className="w-full bg-black text-white hover:bg-gray-800 font-peace-sans font-bold py-3"
+                    >
+                      {bookingLoading ? 'Membuat Pesanan...' : 'Konfirmasi Pesanan'}
+                    </Button>
                   </CardContent>
                 </Card>
               )}
             </div>
-
-            {/* Order Summary - Fixed price alignment */}
-            <Card className="border border-gray-100 shadow-none bg-gray-50">
-              <CardContent className="p-6 md:p-8">
-                <h3 className="text-xl md:text-2xl font-peace-sans font-black text-black mb-6">Ringkasan Pesanan</h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-start gap-4">
-                    <span className="font-inter text-gray-600 flex-1">
-                      {packageData.title} × {packageQuantity}
-                    </span>
-                    <span className="font-peace-sans font-bold text-right break-words">
-                      {(packageData.price * packageQuantity).toLocaleString('id-ID', { 
-                        style: 'currency', 
-                        currency: 'IDR', 
-                        minimumFractionDigits: 0 
-                      })}
-                    </span>
-                  </div>
-                  {additionalServices.map((service) => {
-                    const serviceQuantity = selectedServices[service.id] || 0;
-                    if (serviceQuantity > 0) {
-                      return (
-                        <div key={service.id} className="flex justify-between items-start gap-4">
-                          <span className="font-inter text-gray-600 flex-1">
-                            {service.name} × {serviceQuantity}
-                          </span>
-                          <span className="font-peace-sans font-bold text-right break-words">
-                            {(service.price * serviceQuantity).toLocaleString('id-ID', { 
-                              style: 'currency', 
-                              currency: 'IDR', 
-                              minimumFractionDigits: 0 
-                            })}
-                          </span>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })}
-                  <div className="border-t border-gray-200 pt-4">
-                    <div className="flex justify-between items-start gap-4">
-                      <span className="text-lg md:text-xl font-peace-sans font-black text-black">Total</span>
-                      <span className="text-xl md:text-2xl font-peace-sans font-black text-black text-right break-words">
-                        {calculateTotal().toLocaleString('id-ID', { 
-                          style: 'currency', 
-                          currency: 'IDR', 
-                          minimumFractionDigits: 0 
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="text-center">
-              <Button 
-                onClick={handleContinueToSchedule}
-                className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-8 md:px-12 py-3 md:py-4 text-base md:text-lg w-full sm:w-auto"
-              >
-                Lanjut ke Pilih Jadwal
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {currentStep === 'schedule' && (
-          /* Schedule Selection */
-          <div className="space-y-8 md:space-y-12">
-            <div className="text-center">
-              <h2 className="text-3xl md:text-5xl font-peace-sans font-black mb-4 text-black">Pilih Jadwal Anda</h2>
-              <p className="text-base md:text-lg font-inter text-gray-500">Pilih tanggal dan waktu yang Anda inginkan</p>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              {/* Package Summary */}
-              <Card className="border border-gray-100 shadow-none">
-                <CardHeader className="p-4 md:p-6">
-                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl font-peace-sans font-black">
-                    <CalendarIcon className="w-5 h-5" />
-                    Ringkasan Paket
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 md:p-6 pt-0 space-y-4">
-                  <div>
-                    <h3 className="font-peace-sans font-bold text-base md:text-lg">{packageData.title}</h3>
-                    <p className="text-gray-600 font-inter text-sm">{packageData.description}</p>
-                  </div>
-                  
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      <span>{packageData.base_time_minutes} menit</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
-                      <span>{packageData.studios?.name}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="pt-2 border-t">
-                    <div className="flex justify-between items-start gap-4">
-                      <span className="text-sm text-gray-600">Total Harga:</span>
-                      <span className="text-base md:text-lg font-peace-sans font-bold text-primary text-right break-words">
-                        {calculateTotal().toLocaleString('id-ID', { 
-                          style: 'currency', 
-                          currency: 'IDR', 
-                          minimumFractionDigits: 0 
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Date Selection */}
-              <Card className="border border-gray-100 shadow-none">
-                <CardHeader className="p-4 md:p-6">
-                  <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <span className="font-peace-sans font-black">Pilih Tanggal</span>
-                    <div className="flex items-center gap-4 text-xs font-inter">
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 bg-white border border-green-500 rounded"></div>
-                        <span>Tersedia</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 bg-gray-200 rounded"></div>
-                        <span>Tidak Tersedia</span>
-                      </div>
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 md:p-6 pt-0">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={handleDateSelect}
-                    disabled={isDateUnavailable}
-                    initialFocus
-                    className="rounded-md border w-full"
-                    components={{
-                      Day: CustomDay
-                    }}
-                  />
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Time Slots */}
-            {selectedDate && (
-              <Card className="border border-gray-100 shadow-none">
-                <CardHeader className="p-4 md:p-6">
-                  <CardTitle className="font-peace-sans font-black">Waktu Tersedia</CardTitle>
-                  <p className="text-sm text-gray-600 font-inter">
-                    {format(selectedDate, 'EEEE, dd MMMM yyyy')} (WITA) - Slot {packageData.base_time_minutes} menit dengan jeda 5 menit
-                  </p>
-                </CardHeader>
-                <CardContent className="p-4 md:p-6 pt-0">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {timeSlots.map((slot) => (
-                      <Button
-                        key={slot.id}
-                        variant={selectedTimeSlot?.id === slot.id ? "default" : "outline"}
-                        className={`flex flex-col py-3 h-auto font-inter text-xs md:text-sm ${
-                          !slot.available 
-                            ? 'opacity-50 cursor-not-allowed bg-gray-200 text-gray-500' 
-                            : 'cursor-pointer'
-                        }`}
-                        disabled={!slot.available}
-                        onClick={() => handleTimeSlotSelect(slot)}
-                      >
-                        <div className="font-medium">{slot.startTime} - {slot.endTime}</div>
-                        <div className="text-xs opacity-75">{packageData.base_time_minutes} menit</div>
-                        {!slot.available && <div className="text-xs text-red-500">Tidak Tersedia</div>}
-                      </Button>
-                    ))}
-                  </div>
-                  {timeSlots.length === 0 && (
-                    <p className="text-center text-gray-500 py-8">
-                      Tidak ada slot waktu yang tersedia untuk tanggal ini
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Final Booking Summary - Fixed price alignment */}
-            {selectedDate && selectedTimeSlot && (
-              <Card className="border border-gray-100 shadow-none bg-gray-50">
-                <CardHeader className="p-4 md:p-6">
-                  <CardTitle className="font-peace-sans font-black">Konfirmasi Pesanan</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 md:p-6 pt-0 space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-start gap-4">
-                      <span className="font-inter">Paket:</span>
-                      <span className="font-peace-sans font-bold text-right break-words">{packageData.title}</span>
-                    </div>
-                    <div className="flex justify-between items-start gap-4">
-                      <span className="font-inter">Tanggal:</span>
-                      <span className="font-peace-sans font-bold text-right break-words">{format(selectedDate, 'EEEE, dd MMMM yyyy')}</span>
-                    </div>
-                    <div className="flex justify-between items-start gap-4">
-                      <span className="font-inter">Waktu:</span>
-                      <span className="font-peace-sans font-bold text-right break-words">{selectedTimeSlot.startTime} - {selectedTimeSlot.endTime} (WITA)</span>
-                    </div>
-                    <div className="flex justify-between items-start gap-4">
-                      <span className="font-inter">Durasi:</span>
-                      <span className="font-peace-sans font-bold text-right break-words">{packageData.base_time_minutes} menit</span>
-                    </div>
-                    <div className="flex justify-between items-start gap-4">
-                      <span className="font-inter">Studio:</span>
-                      <span className="font-peace-sans font-bold text-right break-words">{packageData.studios?.name}</span>
-                    </div>
-                    <div className="flex justify-between items-start gap-4">
-                      <span className="font-inter">Jumlah:</span>
-                      <span className="font-peace-sans font-bold text-right break-words">{packageQuantity}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="border-t border-gray-200 pt-4">
-                    <div className="flex justify-between items-start gap-4 text-base md:text-lg font-peace-sans font-black">
-                      <span>Total Harga:</span>
-                      <span className="text-primary text-right break-words">
-                        {calculateTotal().toLocaleString('id-ID', { 
-                          style: 'currency', 
-                          currency: 'IDR', 
-                          minimumFractionDigits: 0 
-                        })}
-                      </span>
-                    </div>
-                  </div>
-
-                  <Button 
-                    onClick={handleFinalBooking} 
-                    disabled={bookingLoading}
-                    className="w-full bg-black text-white hover:bg-gray-800 font-peace-sans font-bold py-3"
-                  >
-                    {bookingLoading ? 'Membuat Pesanan...' : 'Konfirmasi Pesanan'}
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+      {/* QRIS Payment Dialog */}
+      <QRISPaymentDialog
+        isOpen={showPaymentDialog}
+        onClose={() => setShowPaymentDialog(false)}
+        booking={selectedPendingBooking}
+      />
     </div>
   );
 };
