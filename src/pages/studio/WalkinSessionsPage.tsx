@@ -12,15 +12,20 @@ import { format, startOfDay, endOfDay } from 'date-fns';
 import WalkinBookingForm from '@/components/studio/WalkinBookingForm';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { formatTimeWITA, formatDateTimeWITA } from '@/utils/timezoneUtils';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 
 const WalkinSessionsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
   const queryClient = useQueryClient();
+  const { profile } = useJWTAuth();
   
   const today = new Date();
   const startOfDayUtc = startOfDay(today).toISOString();
   const endOfDayUtc = endOfDay(today).toISOString();
+
+  // Check if user is owner
+  const isOwner = profile?.role === 'owner';
 
   // Fetch today's walking sessions with UTC consistency
   const { data: sessions, isLoading, error } = useQuery({
@@ -60,28 +65,85 @@ const WalkinSessionsPage = () => {
     }
   });
 
-  // Delete mutation with offline transaction cleanup
+  // Delete mutation with proper cleanup and owner-only access
   const deleteMutation = useMutation({
     mutationFn: async (sessionId: string) => {
-      // Delete related offline transactions first
-      await supabase
+      // Check if user is owner
+      if (!isOwner) {
+        throw new Error('Hanya owner yang dapat menghapus walk-in session');
+      }
+
+      console.log('Deleting walk-in session:', sessionId);
+
+      // Delete related records in order to maintain referential integrity
+      
+      // 1. Delete transactions first
+      const { error: transactionError } = await supabase
         .from('transactions')
         .delete()
         .eq('booking_id', sessionId);
+      
+      if (transactionError) {
+        console.error('Error deleting transactions:', transactionError);
+        // Continue even if there are no transactions to delete
+      }
 
-      // Delete additional services
-      await supabase
+      // 2. Delete booking logs
+      const { error: logsError } = await supabase
+        .from('booking_logs')
+        .delete()
+        .eq('booking_id', sessionId);
+      
+      if (logsError) {
+        console.error('Error deleting booking logs:', logsError);
+        // Continue even if there are no logs to delete
+      }
+
+      // 3. Delete installments
+      const { error: installmentsError } = await supabase
+        .from('installments')
+        .delete()
+        .eq('booking_id', sessionId);
+      
+      if (installmentsError) {
+        console.error('Error deleting installments:', installmentsError);
+        // Continue even if there are no installments to delete
+      }
+
+      // 4. Delete additional services
+      const { error: servicesError } = await supabase
         .from('booking_additional_services')
         .delete()
         .eq('booking_id', sessionId);
       
-      // Delete booking
-      const { error } = await supabase
+      if (servicesError) {
+        console.error('Error deleting additional services:', servicesError);
+        // Continue even if there are no additional services to delete
+      }
+
+      // 5. Delete booking sessions
+      const { error: sessionsError } = await supabase
+        .from('booking_sessions')
+        .delete()
+        .eq('booking_id', sessionId);
+      
+      if (sessionsError) {
+        console.error('Error deleting booking sessions:', sessionsError);
+        // Continue even if there are no booking sessions to delete
+      }
+      
+      // 6. Finally delete the main booking record
+      const { error: bookingError } = await supabase
         .from('bookings')
         .delete()
         .eq('id', sessionId);
       
-      if (error) throw error;
+      if (bookingError) {
+        console.error('Error deleting booking:', bookingError);
+        throw bookingError;
+      }
+
+      console.log('Walk-in session deleted successfully');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['walkin-sessions'] });
@@ -89,7 +151,7 @@ const WalkinSessionsPage = () => {
     },
     onError: (error: any) => {
       console.error('Error deleting session:', error);
-      toast.error('Gagal menghapus walk-in session');
+      toast.error(error.message || 'Gagal menghapus walk-in session');
     }
   });
 
@@ -99,7 +161,12 @@ const WalkinSessionsPage = () => {
   };
 
   const handleDelete = async (sessionId: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus walk-in session ini?')) {
+    if (!isOwner) {
+      toast.error('Hanya owner yang dapat menghapus walk-in session');
+      return;
+    }
+
+    if (confirm('Apakah Anda yakin ingin menghapus walk-in session ini? Data akan terhapus permanen dari database.')) {
       await deleteMutation.mutateAsync(sessionId);
     }
   };
@@ -330,19 +397,27 @@ const WalkinSessionsPage = () => {
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDelete(session.id)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isOwner && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(session.id)}
+                      className="text-red-600 hover:text-red-700"
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
 
                 <div className="text-xs text-gray-500 border-t pt-2">
                   <p>Dibuat: {formatDateTimeWITA(session.created_at)} WITA</p>
                   <p>Payment: {session.payment_method}</p>
+                  {!isOwner && (
+                    <p className="text-orange-600 text-xs mt-1">
+                      * Hanya owner yang dapat menghapus data
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>

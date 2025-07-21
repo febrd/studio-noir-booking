@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +20,7 @@ import { DateRange } from 'react-day-picker';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { formatDateTimeWITA, formatUTCToDatetimeLocal } from '@/utils/timezoneUtils';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 
 type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'paid' | 'expired' | 'failed' | 'installment';
 
@@ -64,6 +64,7 @@ const BookingsPage = () => {
   const [deletingBooking, setDeletingBooking] = useState<any>(null);
   const [installmentBooking, setInstallmentBooking] = useState<any>(null);
   const [extendTimeBooking, setExtendTimeBooking] = useState<any>(null);
+  const { profile } = useJWTAuth();
   
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,6 +79,9 @@ const BookingsPage = () => {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   
   const queryClient = useQueryClient();
+
+  // Check if user is owner
+  const isOwner = profile?.role === 'owner';
 
   // Fetch studios for filter dropdown
   const { data: studios } = useQuery({
@@ -310,25 +314,82 @@ const BookingsPage = () => {
 
   const deleteBookingMutation = useMutation({
     mutationFn: async (bookingId: string) => {
-      // Delete additional services first
-      await supabase
-        .from('booking_additional_services')
+      // Check if user is owner
+      if (!isOwner) {
+        throw new Error('Hanya owner yang dapat menghapus booking');
+      }
+
+      console.log('Deleting booking:', bookingId);
+
+      // Delete related records in order to maintain referential integrity
+      
+      // 1. Delete transactions first
+      const { error: transactionError } = await supabase
+        .from('transactions')
         .delete()
         .eq('booking_id', bookingId);
       
-      // Delete installments
-      await supabase
+      if (transactionError) {
+        console.error('Error deleting transactions:', transactionError);
+        // Continue even if there are no transactions to delete
+      }
+
+      // 2. Delete booking logs
+      const { error: logsError } = await supabase
+        .from('booking_logs')
+        .delete()
+        .eq('booking_id', bookingId);
+      
+      if (logsError) {
+        console.error('Error deleting booking logs:', logsError);
+        // Continue even if there are no logs to delete
+      }
+
+      // 3. Delete installments
+      const { error: installmentsError } = await supabase
         .from('installments')
         .delete()
         .eq('booking_id', bookingId);
       
-      // Delete booking
-      const { error } = await supabase
+      if (installmentsError) {
+        console.error('Error deleting installments:', installmentsError);
+        // Continue even if there are no installments to delete
+      }
+
+      // 4. Delete additional services
+      const { error: servicesError } = await supabase
+        .from('booking_additional_services')
+        .delete()
+        .eq('booking_id', bookingId);
+      
+      if (servicesError) {
+        console.error('Error deleting additional services:', servicesError);
+        // Continue even if there are no additional services to delete
+      }
+
+      // 5. Delete booking sessions
+      const { error: sessionsError } = await supabase
+        .from('booking_sessions')
+        .delete()
+        .eq('booking_id', bookingId);
+      
+      if (sessionsError) {
+        console.error('Error deleting booking sessions:', sessionsError);
+        // Continue even if there are no booking sessions to delete
+      }
+      
+      // 6. Finally delete the main booking record
+      const { error: bookingError } = await supabase
         .from('bookings')
         .delete()
         .eq('id', bookingId);
       
-      if (error) throw error;
+      if (bookingError) {
+        console.error('Error deleting booking:', bookingError);
+        throw bookingError;
+      }
+
+      console.log('Booking deleted successfully');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bookings-enhanced'] });
@@ -336,9 +397,9 @@ const BookingsPage = () => {
       toast.success('Booking berhasil dihapus');
       setDeletingBooking(null);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error deleting booking:', error);
-      toast.error('Gagal menghapus booking');
+      toast.error(error.message || 'Gagal menghapus booking');
     }
   });
 
@@ -390,6 +451,10 @@ const BookingsPage = () => {
   };
 
   const handleDelete = (booking: BookingWithDetails) => {
+    if (!isOwner) {
+      toast.error('Hanya owner yang dapat menghapus booking');
+      return;
+    }
     setDeletingBooking(booking);
   };
 
@@ -586,14 +651,17 @@ const BookingsPage = () => {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDelete(booking)}
-                        title="Hapus booking"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {isOwner && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(booking)}
+                          title="Hapus booking"
+                          disabled={deleteBookingMutation.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -695,6 +763,11 @@ const BookingsPage = () => {
                         Cicilan: {installmentInfo.installment_count}x pembayaran
                       </p>
                     )}
+                    {!isOwner && (
+                      <p className="text-orange-600 text-xs mt-1">
+                        * Hanya owner yang dapat menghapus data
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -785,7 +858,7 @@ const BookingsPage = () => {
               <AlertDialogTitle>Hapus Booking</AlertDialogTitle>
               <AlertDialogDescription>
                 Apakah Anda yakin ingin menghapus booking untuk "{deletingBooking?.customer_name}"? 
-                Tindakan ini tidak dapat dibatalkan dan akan menghapus semua data terkait termasuk cicilan.
+                Data akan terhapus permanen dari database dan tidak dapat dikembalikan.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -793,8 +866,9 @@ const BookingsPage = () => {
               <AlertDialogAction 
                 onClick={confirmDelete}
                 className="bg-red-600 hover:bg-red-700"
+                disabled={deleteBookingMutation.isPending}
               >
-                Hapus
+                {deleteBookingMutation.isPending ? 'Menghapus...' : 'Hapus'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
