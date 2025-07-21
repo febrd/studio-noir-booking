@@ -1,3 +1,4 @@
+
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
@@ -19,9 +20,6 @@ const OrderHistoryPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<any>(null);
-
-  // You can customize this QRIS image URL
-  const qrisImageUrl = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=400&fit=crop";
 
   const { data: bookings = [], isLoading, refetch } = useQuery({
     queryKey: ['customer-bookings', userProfile?.id],
@@ -307,7 +305,6 @@ const OrderHistoryPage = () => {
         <QRISPaymentDialog
           isOpen={!!selectedBookingForPayment}
           onClose={() => setSelectedBookingForPayment(null)}
-          qrisImageUrl={qrisImageUrl}
           booking={selectedBookingForPayment}
         />
       )}

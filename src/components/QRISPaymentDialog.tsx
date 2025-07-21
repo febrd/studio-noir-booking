@@ -8,7 +8,6 @@ import { format } from 'date-fns';
 interface QRISPaymentDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  qrisImageUrl?: string;
   booking: {
     id: string;
     studio_packages: {
@@ -25,7 +24,7 @@ interface QRISPaymentDialogProps {
   };
 }
 
-const QRISPaymentDialog = ({ isOpen, onClose, qrisImageUrl, booking }: QRISPaymentDialogProps) => {
+const QRISPaymentDialog = ({ isOpen, onClose, booking }: QRISPaymentDialogProps) => {
   const { userProfile } = useJWTAuth();
 
   const handleConfirmPayment = () => {
@@ -58,20 +57,12 @@ const QRISPaymentDialog = ({ isOpen, onClose, qrisImageUrl, booking }: QRISPayme
         <div className="space-y-6">
           {/* QRIS Code Image */}
           <div className="flex justify-center">
-            <div className="w-64 h-64 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
-              {qrisImageUrl ? (
-                <img 
-                  src={qrisImageUrl} 
-                  alt="QRIS Code" 
-                  className="w-full h-full object-contain"
-                />
-              ) : (
-                <div className="text-center">
-                  <div className="text-4xl mb-2">📱</div>
-                  <p className="text-sm text-gray-500">QRIS Code</p>
-                  <p className="text-xs text-gray-400 mt-1">Scan untuk pembayaran</p>
-                </div>
-              )}
+            <div className="w-64 h-64 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-4xl mb-2">📱</div>
+                <p className="text-sm text-gray-500">QRIS Code</p>
+                <p className="text-xs text-gray-400 mt-1">Scan untuk pembayaran</p>
+              </div>
             </div>
           </div>
           
