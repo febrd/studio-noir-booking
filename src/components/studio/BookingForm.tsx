@@ -156,6 +156,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [timeConflict, setTimeConflict] = useState<string | null>(null);
   const [isCheckingConflict, setIsCheckingConflict] = useState(false);
+  const [isEditingBooking, setIsEditingBooking] = useState(false);
   const queryClient = useQueryClient();
   const { userProfile } = useJWTAuth();
 
@@ -177,6 +178,13 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       additional_services: []
     }
   });
+
+  // Set editing flag when booking is provided
+  useEffect(() => {
+    if (booking) {
+      setIsEditingBooking(true);
+    }
+  }, [booking]);
 
   // Fetch customers
   const { data: customers } = useQuery({
@@ -282,10 +290,10 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const selectedPackageId = form.watch('package_id');
   const selectedPackage = packages?.find(pkg => pkg.id === selectedPackageId);
 
-  // Load booking data for editing
+  // Enhanced data loading for editing - load basic customer and studio data first
   useEffect(() => {
     if (booking && customers && studios && !isDataLoaded) {
-      console.log('Loading booking data for edit:', booking);
+      console.log('Loading basic booking data for edit:', booking);
       
       // Set customer type and info
       if (booking.user_id) {
@@ -297,7 +305,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         form.setValue('guest_email', booking.customer_email || '');
       }
       
-      // Set studio
+      // Set studio FIRST
       form.setValue('studio_id', booking.studio_id || '');
       
       // Set booking date and time using WITA format
@@ -305,8 +313,15 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         const bookingDate = parseISO(booking.start_time);
         form.setValue('booking_date', bookingDate);
         
-        const witaTime = formatUTCToDatetimeLocal(booking.start_time);
-        form.setValue('start_time', witaTime);
+        // Fix: Use the timezone utility function correctly
+        const timeString = formatUTCToDatetimeLocal(booking.start_time);
+        if (timeString) {
+          // Extract just the time part (HH:MM) from the datetime-local string
+          const timeMatch = timeString.match(/T(\d{2}:\d{2})/);
+          if (timeMatch) {
+            form.setValue('start_time', timeMatch[1]);
+          }
+        }
       }
       
       // Set payment method and status
@@ -332,23 +347,25 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   }, [booking, customers, studios, form, isDataLoaded]);
 
-  // Load category after studio is set - only for editing
+  // Load category after studio is loaded and categories are available
   useEffect(() => {
-    if (booking && isDataLoaded && selectedStudioId && categories && !form.getValues('category_id')) {
-      if (booking.package_category_id) {
+    if (booking && isDataLoaded && selectedStudioId && categories && categories.length > 0) {
+      if (booking.package_category_id && !form.getValues('category_id')) {
+        console.log('Setting category_id:', booking.package_category_id);
         form.setValue('category_id', booking.package_category_id);
       }
     }
   }, [booking, isDataLoaded, selectedStudioId, categories, form]);
 
-  // Load package after category is set - only for editing
+  // Load package after category is loaded and packages are available
   useEffect(() => {
-    if (booking && isDataLoaded && packages && !form.getValues('package_id')) {
-      if (booking.studio_package_id) {
+    if (booking && isDataLoaded && selectedStudioId && packages && packages.length > 0) {
+      if (booking.studio_package_id && !form.getValues('package_id')) {
+        console.log('Setting package_id:', booking.studio_package_id);
         form.setValue('package_id', booking.studio_package_id);
       }
     }
-  }, [booking, isDataLoaded, packages, form]);
+  }, [booking, isDataLoaded, selectedStudioId, packages, form]);
 
   // Load additional services
   useEffect(() => {
@@ -517,9 +534,9 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   };
 
-  // Reset dependent fields when studio changes (but not during initial load)
+  // Reset dependent fields when studio changes (but not during editing or initial load)
   useEffect(() => {
-    if (selectedStudioId && !booking && isDataLoaded) {
+    if (selectedStudioId && !isEditingBooking && isDataLoaded) {
       form.setValue('category_id', '');
       form.setValue('package_id', '');
       setAdditionalTime(0);
@@ -527,17 +544,17 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       setPackageQuantity(1);
       setTimeConflict(null);
     }
-  }, [selectedStudioId, form, booking, isDataLoaded]);
+  }, [selectedStudioId, form, isEditingBooking, isDataLoaded]);
 
-  // Reset package when category changes for regular studios (but not during initial load)
+  // Reset package when category changes for regular studios (but not during editing or initial load)
   useEffect(() => {
-    if (isRegularStudio && selectedCategoryId && !booking && isDataLoaded) {
+    if (isRegularStudio && selectedCategoryId && !isEditingBooking && isDataLoaded) {
       form.setValue('package_id', '');
       setAdditionalTime(0);
       setPackageQuantity(1);
       setTimeConflict(null);
     }
-  }, [selectedCategoryId, isRegularStudio, form, booking, isDataLoaded]);
+  }, [selectedCategoryId, isRegularStudio, form, isEditingBooking, isDataLoaded]);
 
   // Create/Update mutation
   const createMutation = useMutation({
