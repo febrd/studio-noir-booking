@@ -224,21 +224,25 @@ export function AppSidebar() {
   const menuItems = [...getMenuItems(), ...ownerOnlyItems];
 
   return (
-    <Sidebar variant="inset">
-      <SidebarContent>
+    <Sidebar 
+      variant="inset"
+      className="bg-background border-r border-border"
+    >
+      <SidebarContent className="bg-background">
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-foreground">Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   {hasItems(item) ? (
-
                     <Collapsible asChild defaultOpen={item.title === "Studio Management"}>
-
                       <SidebarMenuItem>
                         <CollapsibleTrigger asChild>
-                          <SidebarMenuButton tooltip={item.title}>
+                          <SidebarMenuButton 
+                            tooltip={item.title}
+                            className="text-foreground hover:bg-accent hover:text-accent-foreground"
+                          >
                             {item.icon && <item.icon />}
                             <span>{item.title}</span>
                             <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
@@ -248,7 +252,10 @@ export function AppSidebar() {
                           <SidebarMenuSub>
                             {item.items.map((subItem) => (
                               <SidebarMenuSubItem key={subItem.title}>
-                                <SidebarMenuSubButton asChild>
+                                <SidebarMenuSubButton 
+                                  asChild
+                                  className="text-muted-foreground hover:text-foreground hover:bg-accent"
+                                >
                                   <Link to={subItem.url}>
                                     <subItem.icon />
                                     <span>{subItem.title}</span>
@@ -261,7 +268,11 @@ export function AppSidebar() {
                       </SidebarMenuItem>
                     </Collapsible>
                   ) : hasUrl(item) ? (
-                    <SidebarMenuButton asChild tooltip={item.title}>
+                    <SidebarMenuButton 
+                      asChild 
+                      tooltip={item.title}
+                      className="text-foreground hover:bg-accent hover:text-accent-foreground"
+                    >
                       <Link to={item.url}>
                         <item.icon />
                         <span>{item.title}</span>
