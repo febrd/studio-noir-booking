@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +15,10 @@ import { formatDateTimeWITA } from '@/utils/timezoneUtils';
 
 const PelangganDashboard = () => {
   const { userProfile } = useJWTAuth();
-  const [selectedBookingForPayment, setSelectedBookingForPayment] = React.useState<any>(null);
+  const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<any>(null);
+
+  // You can customize this QRIS image URL
+  const qrisImageUrl = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=400&fit=crop";
 
   // Fetch user's bookings
   const { data: bookings = [], isLoading } = useQuery({
@@ -450,6 +452,7 @@ const PelangganDashboard = () => {
         <QRISPaymentDialog
           isOpen={!!selectedBookingForPayment}
           onClose={() => setSelectedBookingForPayment(null)}
+          qrisImageUrl={qrisImageUrl}
           booking={selectedBookingForPayment}
         />
       )}
