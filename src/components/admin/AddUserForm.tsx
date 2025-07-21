@@ -8,12 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 
 interface AddUserFormProps {
   onSuccess: () => void;
 }
 
 export const AddUserForm = ({ onSuccess }: AddUserFormProps) => {
+  const { userProfile } = useJWTAuth();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -33,6 +35,12 @@ export const AddUserForm = ({ onSuccess }: AddUserFormProps) => {
 
     if (formData.password.length < 6) {
       toast.error('Password minimal 6 karakter');
+      return;
+    }
+
+    // Check if current user can create user with this role
+    if (!canCreateRole(formData.role)) {
+      toast.error('Anda tidak memiliki akses untuk membuat user dengan role ini');
       return;
     }
 
@@ -68,6 +76,35 @@ export const AddUserForm = ({ onSuccess }: AddUserFormProps) => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const canCreateRole = (role: string) => {
+    if (userProfile?.role === 'owner') return true;
+    if (userProfile?.role === 'admin') {
+      return ['admin', 'keuangan', 'pelanggan'].includes(role);
+    }
+    return false;
+  };
+
+  const getAvailableRoles = () => {
+    if (userProfile?.role === 'owner') {
+      return [
+        { value: 'pelanggan', label: 'Pelanggan' },
+        { value: 'keuangan', label: 'Keuangan' },
+        { value: 'admin', label: 'Admin' },
+        { value: 'owner', label: 'Owner' }
+      ];
+    }
+    if (userProfile?.role === 'admin') {
+      return [
+        { value: 'pelanggan', label: 'Pelanggan' },
+        { value: 'keuangan', label: 'Keuangan' },
+        { value: 'admin', label: 'Admin' }
+      ];
+    }
+    return [
+      { value: 'pelanggan', label: 'Pelanggan' }
+    ];
   };
 
   return (
@@ -130,10 +167,11 @@ export const AddUserForm = ({ onSuccess }: AddUserFormProps) => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="pelanggan">Pelanggan</SelectItem>
-                <SelectItem value="keuangan">Keuangan</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="owner">Owner</SelectItem>
+                {getAvailableRoles().map((role) => (
+                  <SelectItem key={role.value} value={role.value}>
+                    {role.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

@@ -1,10 +1,12 @@
+
 import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Crown, Shield, CreditCard, User, Edit, Trash2, Search, Filter } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Crown, Shield, CreditCard, User, Edit, Trash2, Search, Filter, Users as UsersIcon, UserCheck } from 'lucide-react';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,7 +41,7 @@ const Users = () => {
         query = query.eq('role', roleFilter as 'owner' | 'admin' | 'keuangan' | 'pelanggan');
       }
 
-      // Apply status filter - now functional
+      // Apply status filter
       if (statusFilter !== 'all') {
         const isActive = statusFilter === 'active';
         query = query.eq('is_active', isActive);
@@ -60,6 +62,19 @@ const Users = () => {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
+      // First check if user has any bookings
+      const { data: bookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('user_id', userId)
+        .limit(1);
+
+      if (bookingsError) throw bookingsError;
+
+      if (bookings && bookings.length > 0) {
+        throw new Error('User tidak dapat dihapus karena memiliki riwayat pesanan');
+      }
+
       const { error } = await supabase
         .from('users')
         .delete()
@@ -73,7 +88,7 @@ const Users = () => {
     },
     onError: (error: any) => {
       console.error('Error deleting user:', error);
-      toast.error('Gagal menghapus pengguna: ' + error.message);
+      toast.error(error.message || 'Gagal menghapus pengguna');
     },
   });
 
@@ -107,12 +122,106 @@ const Users = () => {
   };
 
   const handleEditUser = (user: any) => {
+    // Check if current user can edit this user
+    const canEdit = canEditUser(user.role);
+    if (!canEdit) {
+      toast.error('Anda tidak memiliki akses untuk mengedit user ini');
+      return;
+    }
     setEditingUser(user);
   };
 
   const canManageUsers = userProfile?.role === 'owner' || userProfile?.role === 'admin';
 
-  const filteredUsers = users || [];
+  const canEditUser = (targetUserRole: string) => {
+    if (userProfile?.role === 'owner') return true;
+    if (userProfile?.role === 'admin') {
+      return ['admin', 'keuangan', 'pelanggan'].includes(targetUserRole);
+    }
+    return false;
+  };
+
+  const canDeleteUser = (targetUserRole: string) => {
+    if (targetUserRole === 'owner') return false;
+    return canEditUser(targetUserRole);
+  };
+
+  // Separate users into customers and internal members
+  const customers = users?.filter(user => user.role === 'pelanggan') || [];
+  const internalMembers = users?.filter(user => user.role !== 'pelanggan') || [];
+
+  const renderUserCard = (user: any) => (
+    <Card key={user.id} className="glass-elegant">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                {getRoleIcon(user.role)}
+                {user.name}
+              </CardTitle>
+              <CardDescription>{user.email}</CardDescription>
+              <div className="mt-2 flex gap-2">
+                <Badge className={getRoleColor(user.role)}>
+                  {user.role}
+                </Badge>
+                <Badge variant="outline" className={user.is_active ? "text-green-600" : "text-red-600"}>
+                  {user.is_active ? 'Aktif' : 'Tidak Aktif'}
+                </Badge>
+              </div>
+            </div>
+          </div>
+          
+          {canManageUsers && (
+            <div className="flex space-x-2">
+              {canEditUser(user.role) && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleEditUser(user)}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              )}
+              {canDeleteUser(user.role) && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleDeleteUser(user.id, user.role)}
+                  className="text-destructive hover:text-destructive"
+                  disabled={deleteUserMutation.isPending}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div>
+            <p className="font-medium text-muted-foreground">User ID</p>
+            <p className="font-mono text-xs">{user.id}</p>
+          </div>
+          <div>
+            <p className="font-medium text-muted-foreground">Dibuat</p>
+            <p>{new Date(user.created_at).toLocaleDateString('id-ID')}</p>
+          </div>
+          <div>
+            <p className="font-medium text-muted-foreground">Diperbarui</p>
+            <p>{new Date(user.updated_at).toLocaleDateString('id-ID')}</p>
+          </div>
+          <div>
+            <p className="font-medium text-muted-foreground">Status</p>
+            <Badge variant="outline" className={user.is_active ? "text-green-600" : "text-red-600"}>
+              {user.is_active ? 'Aktif' : 'Tidak Aktif'}
+            </Badge>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <ModernLayout>
@@ -187,100 +296,63 @@ const Users = () => {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4">
-          {isLoading ? (
-            <Card>
-              <CardContent className="p-6">
-                <p>Memuat pengguna...</p>
-              </CardContent>
-            </Card>
-          ) : filteredUsers && filteredUsers.length > 0 ? (
-            filteredUsers.map((user) => (
-              <Card key={user.id} className="glass-elegant">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          {getRoleIcon(user.role)}
-                          {user.name}
-                        </CardTitle>
-                        <CardDescription>{user.email}</CardDescription>
-                        <div className="mt-2 flex gap-2">
-                          <Badge className={getRoleColor(user.role)}>
-                            {user.role}
-                          </Badge>
-                          <Badge variant="outline" className={user.is_active ? "text-green-600" : "text-red-600"}>
-                            {user.is_active ? 'Aktif' : 'Tidak Aktif'}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {canManageUsers && (
-                      <div className="flex space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleEditUser(user)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {user.role !== 'owner' && (
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleDeleteUser(user.id, user.role)}
-                            className="text-destructive hover:text-destructive"
-                            disabled={deleteUserMutation.isPending}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="font-medium text-muted-foreground">User ID</p>
-                      <p className="font-mono text-xs">{user.id}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium text-muted-foreground">Dibuat</p>
-                      <p>{new Date(user.created_at).toLocaleDateString('id-ID')}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium text-muted-foreground">Diperbarui</p>
-                      <p>{new Date(user.updated_at).toLocaleDateString('id-ID')}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium text-muted-foreground">Status</p>
-                      <Badge variant="outline" className={user.is_active ? "text-green-600" : "text-red-600"}>
-                        {user.is_active ? 'Aktif' : 'Tidak Aktif'}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <Card>
-              <CardContent className="p-6 text-center">
-                <p className="text-muted-foreground mb-4">
-                  {searchTerm || roleFilter !== 'all' || statusFilter !== 'all' ? 'Tidak ada pengguna yang sesuai dengan filter' : 'Belum ada pengguna yang terdaftar'}
-                </p>
-                {canManageUsers && !searchTerm && roleFilter === 'all' && (
-                  <AddUserForm onSuccess={() => {
-                    refetch();
-                    queryClient.invalidateQueries({ queryKey: ['users'] });
-                  }} />
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        {/* Tabs for separating customers and internal members */}
+        <Tabs defaultValue="internal" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="internal" className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              Anggota Internal ({internalMembers.length})
+            </TabsTrigger>
+            <TabsTrigger value="customers" className="flex items-center gap-2">
+              <UsersIcon className="h-4 w-4" />
+              Pelanggan ({customers.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="internal" className="space-y-4">
+            <div className="grid gap-4">
+              {isLoading ? (
+                <Card>
+                  <CardContent className="p-6">
+                    <p>Memuat anggota internal...</p>
+                  </CardContent>
+                </Card>
+              ) : internalMembers.length > 0 ? (
+                internalMembers.map(renderUserCard)
+              ) : (
+                <Card>
+                  <CardContent className="p-6 text-center">
+                    <p className="text-muted-foreground mb-4">
+                      Tidak ada anggota internal yang sesuai dengan filter
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="customers" className="space-y-4">
+            <div className="grid gap-4">
+              {isLoading ? (
+                <Card>
+                  <CardContent className="p-6">
+                    <p>Memuat pelanggan...</p>
+                  </CardContent>
+                </Card>
+              ) : customers.length > 0 ? (
+                customers.map(renderUserCard)
+              ) : (
+                <Card>
+                  <CardContent className="p-6 text-center">
+                    <p className="text-muted-foreground mb-4">
+                      Tidak ada pelanggan yang sesuai dengan filter
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
 
         {editingUser && (
           <EditUserForm 
