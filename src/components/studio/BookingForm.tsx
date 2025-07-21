@@ -16,11 +16,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, addMinutes } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, Minus } from 'lucide-react';
+import { CalendarIcon, Plus, Minus, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { formatUTCToDatetimeLocal } from '@/utils/timezoneUtils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const bookingSchema = z.object({
   customer_type: z.enum(['existing', 'guest']),
@@ -60,12 +61,49 @@ const parseWITAToUTC = (timeString: string, date: Date): Date => {
   return new Date(witaDateTime.getTime() - (8 * 60 * 60 * 1000)); // Convert WITA (+8) to UTC
 };
 
+// Helper function to check booking conflicts
+const checkBookingConflict = async (
+  studioId: string, 
+  startTime: Date, 
+  endTime: Date, 
+  excludeBookingId?: string
+) => {
+  const { data: conflicts, error } = await supabase
+    .from('bookings')
+    .select('id, start_time, end_time, type')
+    .eq('studio_id', studioId)
+    .not('status', 'in', '(cancelled,failed)')
+    .gte('start_time', format(startTime, 'yyyy-MM-dd'))
+    .lte('start_time', format(endTime, 'yyyy-MM-dd'));
+
+  if (error) {
+    console.error('Error checking conflicts:', error);
+    return false;
+  }
+
+  if (!conflicts || conflicts.length === 0) return false;
+
+  return conflicts.some(conflict => {
+    if (excludeBookingId && conflict.id === excludeBookingId) return false;
+    
+    const conflictStart = new Date(conflict.start_time);
+    const conflictEnd = new Date(conflict.end_time);
+    
+    // Check if time ranges overlap
+    return (
+      (startTime < conflictEnd && endTime > conflictStart)
+    );
+  });
+};
+
 const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [additionalTime, setAdditionalTime] = useState(0);
   const [selectedServices, setSelectedServices] = useState<{ [key: string]: number }>({});
   const [packageQuantity, setPackageQuantity] = useState(1);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [timeConflict, setTimeConflict] = useState<string | null>(null);
+  const [isCheckingConflict, setIsCheckingConflict] = useState(false);
   const queryClient = useQueryClient();
   const { userProfile } = useJWTAuth();
 
@@ -233,7 +271,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         setPackageQuantity(booking.package_quantity);
       }
       
-      // Set notes - FIXED: Load notes properly
+      // Set notes
       if (booking.notes) {
         form.setValue('notes', booking.notes);
       }
@@ -260,14 +298,13 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   }, [booking, isDataLoaded, packages, form]);
 
-  // Load additional services - FIXED: Properly load selected services from booking
+  // Load additional services
   useEffect(() => {
     const loadAdditionalServices = async () => {
       if (booking && isDataLoaded && additionalServices && Object.keys(selectedServices).length === 0) {
         console.log('Loading additional services for booking ID:', booking.id);
         
         try {
-          // Fetch booking additional services from database
           const { data: bookingServices, error } = await supabase
             .from('booking_additional_services')
             .select('additional_service_id, quantity')
@@ -278,14 +315,11 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
             return;
           }
           
-          console.log('Fetched booking services:', bookingServices);
-          
           if (bookingServices && bookingServices.length > 0) {
             const services: { [key: string]: number } = {};
             bookingServices.forEach((service: any) => {
               services[service.additional_service_id] = service.quantity || 1;
             });
-            console.log('Setting selected services:', services);
             setSelectedServices(services);
           }
         } catch (error) {
@@ -296,6 +330,52 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     
     loadAdditionalServices();
   }, [booking, isDataLoaded, additionalServices, selectedServices]);
+
+  // Check for time conflicts when date, time, or package changes
+  useEffect(() => {
+    const checkConflicts = async () => {
+      const startTime = form.watch('start_time');
+      const bookingDate = form.watch('booking_date');
+      
+      if (!startTime || !bookingDate || !selectedPackage || !selectedStudioId) {
+        setTimeConflict(null);
+        return;
+      }
+
+      // Only check conflicts for self photo studios or if explicitly requested
+      if (!isSelfPhotoStudio && !isRegularStudio) return;
+
+      try {
+        setIsCheckingConflict(true);
+        
+        // Calculate start and end times in UTC
+        const startDateTimeUTC = parseWITAToUTC(startTime, bookingDate);
+        const endDateTimeUTC = new Date(startDateTimeUTC.getTime() + (selectedPackage.base_time_minutes * 60 * 1000));
+        
+        const hasConflict = await checkBookingConflict(
+          selectedStudioId, 
+          startDateTimeUTC, 
+          endDateTimeUTC,
+          booking?.id
+        );
+        
+        if (hasConflict) {
+          setTimeConflict('Waktu yang Anda pilih sudah dibooking. Silakan pilih waktu lain.');
+        } else {
+          setTimeConflict(null);
+        }
+      } catch (error) {
+        console.error('Error checking conflicts:', error);
+        setTimeConflict('Gagal memeriksa konflik waktu');
+      } finally {
+        setIsCheckingConflict(false);
+      }
+    };
+
+    // Debounce the conflict check
+    const timeoutId = setTimeout(checkConflicts, 500);
+    return () => clearTimeout(timeoutId);
+  }, [form.watch('start_time'), form.watch('booking_date'), selectedPackage, selectedStudioId, isSelfPhotoStudio, isRegularStudio, booking?.id]);
 
   // Calculate total amount
   const calculateTotalAmount = () => {
@@ -311,44 +391,44 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     return packagePrice + extensionCost + servicesTotal;
   };
 
-  // Calculate end time with proper validation - FIXED
-  const calculateEndTime = () => {
+  // Calculate actual total duration (FIXED: base time only, not multiplied by quantity)
+  const calculateTotalDuration = () => {
+    if (!selectedPackage) return 0;
+    // For self photo: total time is base_time_minutes only (quantity doesn't affect duration)
+    // For regular: total time includes additional time
+    return selectedPackage.base_time_minutes + additionalTime;
+  };
+
+  // Calculate booking schedule times (FIXED)
+  const calculateBookingTimes = () => {
     const startTime = form.watch('start_time');
     const bookingDate = form.watch('booking_date');
     
     if (!startTime || !bookingDate || !selectedPackage) return null;
     
     try {
-      // Validate time format first
+      // Validate time format
       const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
       if (!timeRegex.test(startTime)) {
-        console.log('Invalid time format:', startTime);
         return null;
       }
       
-      // Create datetime string properly - FIXED
+      // Create start datetime - this should show the exact time user selected
       const dateStr = format(bookingDate, 'yyyy-MM-dd');
       const startDateTimeStr = `${dateStr}T${startTime}:00`;
       const startDateTime = new Date(startDateTimeStr);
       
-      // Validate the start time
-      if (isNaN(startDateTime.getTime())) {
-        console.log('Invalid start time created:', startDateTimeStr);
-        return null;
-      }
+      if (isNaN(startDateTime.getTime())) return null;
       
-      const totalMinutes = (selectedPackage.base_time_minutes * packageQuantity) + additionalTime;
-      const endDateTime = new Date(startDateTime.getTime() + (totalMinutes * 60 * 1000));
+      // Calculate end time: start + base_time_minutes (+ additional time if any)
+      const totalDuration = calculateTotalDuration();
+      const endDateTime = new Date(startDateTime.getTime() + (totalDuration * 60 * 1000));
       
-      // Validate the end time
-      if (isNaN(endDateTime.getTime())) {
-        console.log('Invalid end time calculation');
-        return null;
-      }
+      if (isNaN(endDateTime.getTime())) return null;
       
-      return endDateTime;
+      return { startDateTime, endDateTime };
     } catch (error) {
-      console.log('Error calculating end time:', error);
+      console.log('Error calculating booking times:', error);
       return null;
     }
   };
@@ -384,6 +464,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       setAdditionalTime(0);
       setSelectedServices({});
       setPackageQuantity(1);
+      setTimeConflict(null);
     }
   }, [selectedStudioId, form, booking, isDataLoaded]);
 
@@ -393,6 +474,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       form.setValue('package_id', '');
       setAdditionalTime(0);
       setPackageQuantity(1);
+      setTimeConflict(null);
     }
   }, [selectedCategoryId, isRegularStudio, form, booking, isDataLoaded]);
 
@@ -408,20 +490,31 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         throw new Error('Invalid time format. Please use HH:MM format.');
       }
       
-      // Convert to UTC using WITA timezone - FIXED: Using correct function signature
+      // Convert to UTC using WITA timezone
       const startDateTimeUTC = parseWITAToUTC(data.start_time, data.booking_date);
       
-      // Validate the converted time
       if (isNaN(startDateTimeUTC.getTime())) {
         throw new Error('Invalid start time. Please check your time input.');
       }
       
-      const totalMinutes = ((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime;
+      const totalMinutes = calculateTotalDuration();
       const endDateTime = new Date(startDateTimeUTC.getTime() + (totalMinutes * 60 * 1000));
 
-      // Validate the end time
       if (isNaN(endDateTime.getTime())) {
         throw new Error('Invalid end time calculation');
+      }
+
+      // Final conflict check before saving
+      if (!booking) {
+        const hasConflict = await checkBookingConflict(
+          data.studio_id,
+          startDateTimeUTC,
+          endDateTime
+        );
+        
+        if (hasConflict) {
+          throw new Error('Waktu yang Anda pilih sudah dibooking. Silakan pilih waktu lain.');
+        }
       }
 
       console.log('🔧 Booking WITA Times:', {
@@ -436,7 +529,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       let customerId = data.user_id;
       
       if (data.customer_type === 'guest') {
-        // Check if customer already exists
         const { data: existingUsers } = await supabase
           .from('users')
           .select('id')
@@ -446,7 +538,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         if (existingUsers && existingUsers.length > 0) {
           customerId = existingUsers[0].id;
         } else {
-          // Create new customer
           const { data: newUser, error: userError } = await supabase
             .from('users')
             .insert({
@@ -483,7 +574,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
       };
 
       if (booking) {
-        // Update existing booking
         const { error } = await supabase
           .from('bookings')
           .update({
@@ -515,7 +605,6 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
 
         return { id: booking.id, ...bookingData };
       } else {
-        // Create new booking
         const { data: newBooking, error } = await supabase
           .from('bookings')
           .insert(bookingData)
@@ -552,6 +641,11 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
   });
 
   const onSubmit = async (data: BookingFormData) => {
+    if (timeConflict) {
+      toast.error('Tidak dapat membuat booking karena ada konflik waktu');
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
       await createMutation.mutateAsync(data);
@@ -560,8 +654,9 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     }
   };
 
-  const endTime = calculateEndTime();
+  const bookingTimes = calculateBookingTimes();
   const totalAmount = calculateTotalAmount();
+  const totalDuration = calculateTotalDuration();
 
   return (
     <ScrollArea className="h-[80vh] pr-4">
@@ -727,7 +822,10 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Total waktu: {(selectedPackage.base_time_minutes * packageQuantity)} menit
+                    Total waktu: {selectedPackage.base_time_minutes} menit (durasi tetap)
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Quantity hanya memengaruhi harga, bukan durasi
                   </p>
                 </div>
               )}
@@ -770,7 +868,21 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
                     placeholder="HH:MM"
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Waktu Indonesia Tengah (GMT+8) - Central Indonesia Time</p>
+                <p className="text-xs text-gray-500 mt-1">Waktu Indonesia Tengah (GMT+8)</p>
+                
+                {/* Time conflict warning */}
+                {isCheckingConflict && (
+                  <p className="text-xs text-blue-600 mt-1">Memeriksa konflik waktu...</p>
+                )}
+                
+                {timeConflict && (
+                  <Alert className="mt-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-red-600">
+                      {timeConflict}
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
 
               <div>
@@ -805,16 +917,21 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
 
           {/* Time & Services Section */}
           <div className="space-y-4">
-            {/* Booking Schedule */}
-            {endTime && (
+            {/* Booking Schedule - FIXED to show correct start/end times */}
+            {bookingTimes && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm">Jadwal Booking (WITA)</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
-                  <p>Mulai: {format(endTime, 'dd/MM/yyyy, HH:mm')}</p>
-                  <p>Selesai: {format(addMinutes(endTime, ((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime), 'dd/MM/yyyy, HH:mm')}</p>
-                  <p>Durasi: {((selectedPackage?.base_time_minutes || 0) * packageQuantity) + additionalTime} menit</p>
+                  <p>Mulai: {format(bookingTimes.startDateTime, 'dd/MM/yyyy, HH:mm')}</p>
+                  <p>Selesai: {format(bookingTimes.endDateTime, 'dd/MM/yyyy, HH:mm')}</p>
+                  <p>Durasi: {totalDuration} menit</p>
+                  {isSelfPhotoStudio && packageQuantity > 1 && (
+                    <p className="text-xs text-muted-foreground">
+                      Package quantity: {packageQuantity}x (harga akan dikali quantity)
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -931,7 +1048,10 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
           <Button type="button" variant="outline" onClick={() => onSuccess()}>
             Batal
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button 
+            type="submit" 
+            disabled={isSubmitting || !!timeConflict || isCheckingConflict}
+          >
             {isSubmitting ? 'Menyimpan...' : booking ? 'Update Booking' : 'Buat Booking'}
           </Button>
         </div>
