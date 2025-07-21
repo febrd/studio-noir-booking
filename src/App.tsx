@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { JWTAuthProvider } from "./hooks/useJWTAuth";
-import JWTAuth from "./pages/JWTAuth";
+import Auth from "./pages/Auth";
 import JWTDashboard from "./pages/JWTDashboard";
 import { JWTProtectedRoute } from "./components/auth/JWTProtectedRoute";
 import BookingSelectionPage from "./pages/customer/BookingSelectionPage";
@@ -43,9 +43,9 @@ function App() {
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<JWTAuth />} />
-              <Route path="/auth" element={<JWTAuth />} />
-              <Route path="/jwt-auth" element={<JWTAuth />} />
+              <Route path="/" element={<Auth />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/jwt-auth" element={<Auth />} />
               
               {/* Dashboard Route */}
               <Route path="/dashboard" element={
