@@ -4,7 +4,7 @@ import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { OwnerDashboard } from '@/components/Dashboard/OwnerDashboard';
 import { AdminDashboard } from '@/components/Dashboard/AdminDashboard';
 import { KeuanganDashboard } from '@/components/Dashboard/KeuanganDashboard';
-import { PelangganDashboard } from "@/components/Dashboard/PelangganDashboard
+import PelangganDashboard from '@/components/Dashboard/PelangganDashboard';
 import { Loader2 } from 'lucide-react';
 
 const JWTDashboard = () => {
