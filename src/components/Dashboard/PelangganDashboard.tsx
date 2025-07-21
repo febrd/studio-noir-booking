@@ -18,7 +18,7 @@ const PelangganDashboard = () => {
   const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<any>(null);
 
   // You can customize this QRIS image URL
-  const qrisImageUrl = "https://i.imgur.com/F3SovjY.jpeg";
+  const qrisImageUrl = "https://i.imgur.com/6U2GMax.jpeg";
 
   // Fetch user's bookings
   const { data: bookings = [], isLoading } = useQuery({

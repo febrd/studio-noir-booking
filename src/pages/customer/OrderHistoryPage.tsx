@@ -21,7 +21,7 @@ const OrderHistoryPage = () => {
   const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<any>(null);
 
   // You can customize this QRIS image URL
-  const qrisImageUrl = "https://i.imgur.com/F3SovjY.jpeg";
+  const qrisImageUrl = "https://i.imgur.com/6U2GMax.jpeg";
 
   const { data: bookings = [], isLoading, refetch } = useQuery({
     queryKey: ['customer-bookings', userProfile?.id],
@@ -95,9 +95,9 @@ const OrderHistoryPage = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'confirmed': return 'Dikonfirmasi';
-      case 'pending': return 'Menunggu';
+      case 'pending': return 'Pending';
       case 'completed': return 'Selesai';
-      case 'cancelled': return 'Dibatalkan';
+      case 'cancelled': return 'Revoked';
       case 'paid': return 'Dibayar';
       default: return status;
     }
