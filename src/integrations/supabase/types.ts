@@ -180,6 +180,7 @@ export type Database = {
           end_time: string | null
           id: string
           is_walking_session: boolean
+          notes: string | null
           package_category_id: string | null
           package_quantity: number | null
           payment_method: Database["public"]["Enums"]["payment_method"]
@@ -199,6 +200,7 @@ export type Database = {
           end_time?: string | null
           id?: string
           is_walking_session?: boolean
+          notes?: string | null
           package_category_id?: string | null
           package_quantity?: number | null
           payment_method: Database["public"]["Enums"]["payment_method"]
@@ -218,6 +220,7 @@ export type Database = {
           end_time?: string | null
           id?: string
           is_walking_session?: boolean
+          notes?: string | null
           package_category_id?: string | null
           package_quantity?: number | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
