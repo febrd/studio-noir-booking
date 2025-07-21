@@ -9,7 +9,7 @@ interface QRISPaymentDialogProps {
   isOpen: boolean;
   onClose: () => void;
   qrisImageUrl?: string;
-  booking: {
+  booking?: {
     id: string;
     studio_packages: {
       title: string;
@@ -22,19 +22,40 @@ interface QRISPaymentDialogProps {
       };
       quantity: number;
     }>;
-  };
+  } | null;
 }
 
 const QRISPaymentDialog = ({ isOpen, onClose, qrisImageUrl, booking }: QRISPaymentDialogProps) => {
   const { userProfile } = useJWTAuth();
 
+  // Early return if booking is null or undefined
+  if (!booking) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center font-peace-sans font-black text-xl">
+              Pembayaran QRIS
+            </DialogTitle>
+          </DialogHeader>
+          <div className="text-center p-4">
+            <p className="text-gray-500">Data booking tidak tersedia</p>
+            <Button onClick={onClose} className="mt-4">
+              Tutup
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const handleConfirmPayment = () => {
-    const packageName = booking.studio_packages.title;
+    const packageName = booking.studio_packages?.title || 'Paket tidak tersedia';
     const additionalServices = booking.booking_additional_services
       ?.map(service => `${service.additional_services.name} x${service.quantity}`)
       .join(', ') || '';
     
-    const dateTime = format(new Date(booking.start_time), 'dd MMMM yyyy HH:mm');
+    const dateTime = booking.start_time ? format(new Date(booking.start_time), 'dd MMMM yyyy HH:mm') : 'Waktu tidak tersedia';
     
     const services = additionalServices ? ` & ${additionalServices}` : '';
     const message = `Halo saya ${userProfile?.name} ingin konfirmasi booking ${packageName}${services} pada ${dateTime}, berikut bukti bayar terlampir. (mohon lampirkan bukti bayar)`;
@@ -79,7 +100,7 @@ const QRISPaymentDialog = ({ isOpen, onClose, qrisImageUrl, booking }: QRISPayme
           <div className="bg-gray-50 p-4 rounded-lg">
             <h3 className="font-peace-sans font-bold text-sm mb-2">Detail Booking:</h3>
             <p className="text-sm text-gray-600 mb-1">
-              <span className="font-medium">Paket:</span> {booking.studio_packages.title}
+              <span className="font-medium">Paket:</span> {booking.studio_packages?.title || 'Paket tidak tersedia'}
             </p>
             {booking.booking_additional_services && booking.booking_additional_services.length > 0 && (
               <p className="text-sm text-gray-600 mb-1">
@@ -90,7 +111,7 @@ const QRISPaymentDialog = ({ isOpen, onClose, qrisImageUrl, booking }: QRISPayme
               </p>
             )}
             <p className="text-sm text-gray-600">
-              <span className="font-medium">Waktu:</span> {format(new Date(booking.start_time), 'dd MMMM yyyy HH:mm')}
+              <span className="font-medium">Waktu:</span> {booking.start_time ? format(new Date(booking.start_time), 'dd MMMM yyyy HH:mm') : 'Waktu tidak tersedia'}
             </p>
           </div>
           
