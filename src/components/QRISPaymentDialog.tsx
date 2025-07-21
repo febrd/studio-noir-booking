@@ -39,7 +39,7 @@ const QRISPaymentDialog = ({ isOpen, onClose, booking }: QRISPaymentDialogProps)
     const message = `Halo saya ${userProfile?.name} ingin konfirmasi booking ${packageName}${services} pada ${dateTime}, berikut bukti bayar terlampir. (mohon lampirkan bukti bayar)`;
     
     const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/6281234567890?text=${encodedMessage}`;
+    const whatsappUrl = `https://wa.me/6282211409298?text=${encodedMessage}`;
     
     window.open(whatsappUrl, '_blank');
     onClose();
