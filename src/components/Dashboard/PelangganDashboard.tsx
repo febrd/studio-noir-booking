@@ -1,9 +1,10 @@
+
 import React from 'react';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, Package, Clock, MapPin, Camera, Users } from 'lucide-react';
+import { CalendarDays, Package, Clock, MapPin, Camera } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -142,7 +143,7 @@ const PelangganDashboard = () => {
         </Card>
       </div>
 
-      {/* Spending Chart - Fixed for mobile responsiveness */}
+      {/* Spending Chart - Mobile Responsive */}
       {spendingData.length > 0 && (
         <Card className="border border-gray-100 shadow-sm">
           <CardHeader className="p-4 md:p-6">
@@ -151,14 +152,14 @@ const PelangganDashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
-            <div className="w-full overflow-hidden">
-              <ResponsiveContainer width="100%" height={300} className="!w-full">
+            <div className="w-full">
+              <ResponsiveContainer width="100%" height={250} className="!w-full !h-[250px]">
                 <LineChart
                   data={spendingData}
                   margin={{
                     top: 5,
-                    right: 10,
-                    left: 10,
+                    right: 5,
+                    left: 5,
                     bottom: 5,
                   }}
                 >
@@ -166,16 +167,17 @@ const PelangganDashboard = () => {
                   <XAxis 
                     dataKey="month" 
                     stroke="#666"
-                    fontSize={12}
-                    tick={{ fontSize: 12 }}
+                    fontSize={10}
+                    tick={{ fontSize: 10 }}
                     interval="preserveStartEnd"
+                    width={60}
                   />
                   <YAxis 
                     stroke="#666"
-                    fontSize={12}
-                    tick={{ fontSize: 12 }}
+                    fontSize={10}
+                    tick={{ fontSize: 10 }}
                     tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
-                    width={50}
+                    width={40}
                   />
                   <Tooltip
                     formatter={(value: number) => [
@@ -187,15 +189,15 @@ const PelangganDashboard = () => {
                       'Pengeluaran'
                     ]}
                     labelStyle={{ fontSize: '12px' }}
-                    contentStyle={{ fontSize: '12px' }}
+                    contentStyle={{ fontSize: '12px', maxWidth: '200px' }}
                   />
                   <Legend />
                   <Line
                     type="monotone"
                     dataKey="amount"
                     stroke="#3b82f6"
-                    strokeWidth={3}
-                    dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                    strokeWidth={2}
+                    dot={{ fill: '#3b82f6', strokeWidth: 2, r: 3 }}
                     name="Pengeluaran"
                   />
                 </LineChart>

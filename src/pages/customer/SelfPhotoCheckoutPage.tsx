@@ -384,7 +384,7 @@ const SelfPhotoCheckoutPage = () => {
       <button
         className={`
           w-9 h-9 text-sm rounded-md transition-colors
-          ${isSelected ? 'bg-primary text-primary-foreground' : ''}
+          ${isSelected ? 'bg-orange-500 text-white hover:bg-orange-600' : ''}
           ${isUnavailable ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-green-500 hover:bg-green-50 cursor-pointer'}
           ${isToday && !isSelected ? 'border-2 border-blue-500' : ''}
         `}
