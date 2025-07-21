@@ -384,8 +384,9 @@ const RegularCheckoutPage = () => {
       <button
         className={`
           w-9 h-9 text-sm rounded-md transition-colors
-          ${isSelected ? 'bg-blue-500 text-white hover:bg-blue-600' : ''}
-          ${isUnavailable ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border border-green-500 hover:bg-green-50 cursor-pointer'}
+          ${isSelected ? 'bg-blue-500 text-white hover:bg-blue-600' : 
+            isUnavailable ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 
+            'bg-white border border-green-500 hover:bg-green-50 cursor-pointer'}
           ${isToday && !isSelected ? 'border-2 border-blue-500' : ''}
         `}
         onClick={() => !isUnavailable && handleDateSelect(date)}
