@@ -61,39 +61,91 @@ const parseWITAToUTC = (timeString: string, date: Date): Date => {
   return new Date(witaDateTime.getTime() - (8 * 60 * 60 * 1000)); // Convert WITA (+8) to UTC
 };
 
-// Helper function to check booking conflicts
-const checkBookingConflict = async (
+// Enhanced booking conflict checker - checks ALL booking types and durations
+const checkBookingConflictEnhanced = async (
   studioId: string, 
-  startTime: Date, 
-  endTime: Date, 
+  selectedStartTime: Date, 
+  selectedEndTime: Date, 
   excludeBookingId?: string
 ) => {
-  const { data: conflicts, error } = await supabase
+  console.log('🔍 Checking enhanced booking conflicts for:', {
+    studioId,
+    selectedStart: selectedStartTime.toISOString(),
+    selectedEnd: selectedEndTime.toISOString(),
+    excludeBookingId
+  });
+
+  // Get selected date in YYYY-MM-DD format for filtering
+  const selectedDate = format(selectedStartTime, 'yyyy-MM-dd');
+  
+  const { data: existingBookings, error } = await supabase
     .from('bookings')
-    .select('id, start_time, end_time, type')
+    .select(`
+      id, 
+      start_time, 
+      end_time, 
+      type,
+      studio_packages!inner(base_time_minutes)
+    `)
     .eq('studio_id', studioId)
     .not('status', 'in', '(cancelled,failed)')
-    .gte('start_time', format(startTime, 'yyyy-MM-dd'))
-    .lte('start_time', format(endTime, 'yyyy-MM-dd'));
+    .gte('start_time', `${selectedDate}T00:00:00`)
+    .lt('start_time', `${selectedDate}T23:59:59`);
 
   if (error) {
-    console.error('Error checking conflicts:', error);
+    console.error('❌ Error checking conflicts:', error);
     return false;
   }
 
-  if (!conflicts || conflicts.length === 0) return false;
+  if (!existingBookings || existingBookings.length === 0) {
+    console.log('✅ No existing bookings found for this date');
+    return false;
+  }
 
-  return conflicts.some(conflict => {
-    if (excludeBookingId && conflict.id === excludeBookingId) return false;
+  console.log('📋 Found existing bookings to check:', existingBookings.length);
+
+  // Check for time overlaps
+  for (const booking of existingBookings) {
+    // Skip if this is the booking being edited
+    if (excludeBookingId && booking.id === excludeBookingId) {
+      continue;
+    }
     
-    const conflictStart = new Date(conflict.start_time);
-    const conflictEnd = new Date(conflict.end_time);
+    const bookingStart = new Date(booking.start_time);
+    const bookingEnd = new Date(booking.end_time);
     
-    // Check if time ranges overlap
-    return (
-      (startTime < conflictEnd && endTime > conflictStart)
+    console.log('🕐 Checking overlap with booking:', {
+      id: booking.id,
+      type: booking.type,
+      start: bookingStart.toISOString(),
+      end: bookingEnd.toISOString(),
+      duration: booking.studio_packages?.base_time_minutes || 'unknown'
+    });
+    
+    // Enhanced overlap detection:
+    // Two time ranges overlap if: booking.start_time < selectedEnd AND booking.end_time > selectedStart
+    const hasOverlap = (
+      bookingStart < selectedEndTime && bookingEnd > selectedStartTime
     );
-  });
+    
+    if (hasOverlap) {
+      console.log('⚠️ CONFLICT DETECTED:', {
+        existingBooking: {
+          start: format(bookingStart, 'dd/MM/yyyy, HH:mm'),
+          end: format(bookingEnd, 'dd/MM/yyyy, HH:mm'),
+          type: booking.type
+        },
+        newBooking: {
+          start: format(selectedStartTime, 'dd/MM/yyyy, HH:mm'),
+          end: format(selectedEndTime, 'dd/MM/yyyy, HH:mm')
+        }
+      });
+      return true;
+    }
+  }
+  
+  console.log('✅ No conflicts found');
+  return false;
 };
 
 const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
@@ -331,7 +383,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     loadAdditionalServices();
   }, [booking, isDataLoaded, additionalServices, selectedServices]);
 
-  // Check for time conflicts when date, time, or package changes
+  // Enhanced conflict checking with comprehensive overlap detection
   useEffect(() => {
     const checkConflicts = async () => {
       const startTime = form.watch('start_time');
@@ -342,17 +394,28 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         return;
       }
 
-      // Only check conflicts for self photo studios or if explicitly requested
-      if (!isSelfPhotoStudio && !isRegularStudio) return;
-
       try {
         setIsCheckingConflict(true);
         
         // Calculate start and end times in UTC
         const startDateTimeUTC = parseWITAToUTC(startTime, bookingDate);
-        const endDateTimeUTC = new Date(startDateTimeUTC.getTime() + (selectedPackage.base_time_minutes * 60 * 1000));
         
-        const hasConflict = await checkBookingConflict(
+        // Calculate total duration (base_time_minutes + additional_time)
+        const totalMinutes = selectedPackage.base_time_minutes + additionalTime;
+        const endDateTimeUTC = new Date(startDateTimeUTC.getTime() + (totalMinutes * 60 * 1000));
+        
+        console.log('🔍 Conflict check parameters:', {
+          studioId: selectedStudioId,
+          startTime: startDateTimeUTC.toISOString(),
+          endTime: endDateTimeUTC.toISOString(),
+          baseDuration: selectedPackage.base_time_minutes,
+          additionalTime,
+          totalMinutes,
+          excludeBookingId: booking?.id
+        });
+        
+        // Use enhanced conflict checker
+        const hasConflict = await checkBookingConflictEnhanced(
           selectedStudioId, 
           startDateTimeUTC, 
           endDateTimeUTC,
@@ -360,7 +423,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         );
         
         if (hasConflict) {
-          setTimeConflict('Waktu yang Anda pilih sudah dibooking. Silakan pilih waktu lain.');
+          setTimeConflict('❌ Waktu bentrok dengan booking lain. Silakan pilih waktu lain.');
         } else {
           setTimeConflict(null);
         }
@@ -375,7 +438,7 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     // Debounce the conflict check
     const timeoutId = setTimeout(checkConflicts, 500);
     return () => clearTimeout(timeoutId);
-  }, [form.watch('start_time'), form.watch('booking_date'), selectedPackage, selectedStudioId, isSelfPhotoStudio, isRegularStudio, booking?.id]);
+  }, [form.watch('start_time'), form.watch('booking_date'), selectedPackage, selectedStudioId, additionalTime, booking?.id]);
 
   // Calculate total amount
   const calculateTotalAmount = () => {
@@ -391,15 +454,13 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
     return packagePrice + extensionCost + servicesTotal;
   };
 
-  // Calculate actual total duration (FIXED: base time only, not multiplied by quantity)
+  // Calculate actual total duration (base time + additional time, NOT multiplied by quantity)
   const calculateTotalDuration = () => {
     if (!selectedPackage) return 0;
-    // For self photo: total time is base_time_minutes only (quantity doesn't affect duration)
-    // For regular: total time includes additional time
     return selectedPackage.base_time_minutes + additionalTime;
   };
 
-  // Calculate booking schedule times (FIXED)
+  // Calculate booking schedule times - shows exact user-selected times
   const calculateBookingTimes = () => {
     const startTime = form.watch('start_time');
     const bookingDate = form.watch('booking_date');
@@ -413,14 +474,14 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         return null;
       }
       
-      // Create start datetime - this should show the exact time user selected
+      // Create start datetime - this shows the exact time user selected
       const dateStr = format(bookingDate, 'yyyy-MM-dd');
       const startDateTimeStr = `${dateStr}T${startTime}:00`;
       const startDateTime = new Date(startDateTimeStr);
       
       if (isNaN(startDateTime.getTime())) return null;
       
-      // Calculate end time: start + base_time_minutes (+ additional time if any)
+      // Calculate end time: start + total duration (base_time_minutes + additional time)
       const totalDuration = calculateTotalDuration();
       const endDateTime = new Date(startDateTime.getTime() + (totalDuration * 60 * 1000));
       
@@ -504,16 +565,16 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
         throw new Error('Invalid end time calculation');
       }
 
-      // Final conflict check before saving
+      // Final comprehensive conflict check before saving
       if (!booking) {
-        const hasConflict = await checkBookingConflict(
+        const hasConflict = await checkBookingConflictEnhanced(
           data.studio_id,
           startDateTimeUTC,
           endDateTime
         );
         
         if (hasConflict) {
-          throw new Error('Waktu yang Anda pilih sudah dibooking. Silakan pilih waktu lain.');
+          throw new Error('❌ Waktu bentrok dengan booking lain. Silakan pilih waktu lain.');
         }
       }
 
@@ -870,9 +931,9 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Waktu Indonesia Tengah (GMT+8)</p>
                 
-                {/* Time conflict warning */}
+                {/* Enhanced conflict warning */}
                 {isCheckingConflict && (
-                  <p className="text-xs text-blue-600 mt-1">Memeriksa konflik waktu...</p>
+                  <p className="text-xs text-blue-600 mt-1">🔍 Memeriksa konflik waktu dengan semua booking...</p>
                 )}
                 
                 {timeConflict && (
@@ -917,19 +978,24 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
 
           {/* Time & Services Section */}
           <div className="space-y-4">
-            {/* Booking Schedule - FIXED to show correct start/end times */}
+            {/* Booking Schedule - Shows exact user-selected start/end times */}
             {bookingTimes && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm">Jadwal Booking (WITA)</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
-                  <p>Mulai: {format(bookingTimes.startDateTime, 'dd/MM/yyyy, HH:mm')}</p>
-                  <p>Selesai: {format(bookingTimes.endDateTime, 'dd/MM/yyyy, HH:mm')}</p>
-                  <p>Durasi: {totalDuration} menit</p>
+                  <p>✅ Mulai: {format(bookingTimes.startDateTime, 'dd/MM/yyyy, HH:mm')}</p>
+                  <p>🏁 Selesai: {format(bookingTimes.endDateTime, 'dd/MM/yyyy, HH:mm')}</p>
+                  <p>⏱️ Durasi: {totalDuration} menit</p>
                   {isSelfPhotoStudio && packageQuantity > 1 && (
                     <p className="text-xs text-muted-foreground">
-                      Package quantity: {packageQuantity}x (harga akan dikali quantity)
+                      📦 Package quantity: {packageQuantity}x (harga dikali quantity, durasi tetap)
+                    </p>
+                  )}
+                  {additionalTime > 0 && (
+                    <p className="text-xs text-blue-600">
+                      ⏰ Tambahan waktu: +{additionalTime} menit
                     </p>
                   )}
                 </CardContent>
