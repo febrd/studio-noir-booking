@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,14 +17,14 @@ const WalkinSessionsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
   const queryClient = useQueryClient();
-  const { profile } = useJWTAuth();
+  const { userProfile } = useJWTAuth();
   
   const today = new Date();
   const startOfDayUtc = startOfDay(today).toISOString();
   const endOfDayUtc = endOfDay(today).toISOString();
 
   // Check if user is owner
-  const isOwner = profile?.role === 'owner';
+  const isOwner = userProfile?.role === 'owner';
 
   // Fetch today's walking sessions with UTC consistency
   const { data: sessions, isLoading, error } = useQuery({

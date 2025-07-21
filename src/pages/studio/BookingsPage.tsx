@@ -64,7 +64,7 @@ const BookingsPage = () => {
   const [deletingBooking, setDeletingBooking] = useState<any>(null);
   const [installmentBooking, setInstallmentBooking] = useState<any>(null);
   const [extendTimeBooking, setExtendTimeBooking] = useState<any>(null);
-  const { profile } = useJWTAuth();
+  const { userProfile } = useJWTAuth();
   
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -81,7 +81,7 @@ const BookingsPage = () => {
   const queryClient = useQueryClient();
 
   // Check if user is owner
-  const isOwner = profile?.role === 'owner';
+  const isOwner = userProfile?.role === 'owner';
 
   // Fetch studios for filter dropdown
   const { data: studios } = useQuery({
