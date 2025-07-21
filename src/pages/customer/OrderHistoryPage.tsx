@@ -185,6 +185,9 @@ const OrderHistoryPage = () => {
                             </h3>
                             <p className="text-gray-500 font-inter mb-2">
                               {booking.studio_packages?.title}
+                              <Badge className={getStatusColor(booking.status) + ' font-peace-sans font-bold border'}>
+                                {getStatusText(booking.status)}
+                              </Badge>
                             </p>
                             <div className="flex items-center gap-4 text-sm text-gray-400 font-inter">
                               <span className="flex items-center">
@@ -203,9 +206,7 @@ const OrderHistoryPage = () => {
                             </div>
                           </div>
                           
-                          <Badge className={getStatusColor(booking.status) + ' font-peace-sans font-bold border'}>
-                            {getStatusText(booking.status)}
-                          </Badge>
+                          
                         </div>
 
                         {/* Payment Info */}
