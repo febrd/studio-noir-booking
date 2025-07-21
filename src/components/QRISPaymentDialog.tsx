@@ -57,15 +57,15 @@ const QRISPaymentDialog = ({ isOpen, onClose, booking }: QRISPaymentDialogProps)
         <div className="space-y-6">
           {/* QRIS Code Image */}
           <div className="flex justify-center">
-            <div className="w-64 h-64 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-4xl mb-2">📱</div>
-                <p className="text-sm text-gray-500">QRIS Code</p>
-                <p className="text-xs text-gray-400 mt-1">Scan untuk pembayaran</p>
-              </div>
+            <div className="w-64 h-64 bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <img
+                src="https://i.imgur.com/F3SovjY.jpeg" // Ganti dengan URL QRIS-mu
+                alt="QRIS Payment Code"
+                className="w-full h-full object-contain"
+              />
             </div>
           </div>
-          
+
           {/* Booking Details */}
           <div className="bg-gray-50 p-4 rounded-lg">
             <h3 className="font-peace-sans font-bold text-sm mb-2">Detail Booking:</h3>
