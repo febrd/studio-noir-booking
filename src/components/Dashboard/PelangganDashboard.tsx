@@ -32,7 +32,8 @@ const PelangganDashboard = () => {
           type,
           created_at,
           studio_packages!inner(title, description),
-          studios!inner(name, type)
+          studios!inner(name, type),
+          installments(amount, paid_at)
         `)
         .eq('user_id', userProfile.id)
         .order('created_at', { ascending: false });
@@ -48,9 +49,9 @@ const PelangganDashboard = () => {
     if (!bookings.length) return [];
 
     const monthlySpending = bookings.reduce((acc, booking) => {
-      if (booking.status === 'paid' || booking.status === 'confirmed') {
+      if (booking.status === 'paid' || booking.status === 'confirmed' || booking.status === 'completed') {
         const month = format(new Date(booking.created_at), 'MMM yyyy', { locale: id });
-        acc[month] = (acc[month] || 0) + booking.total_amount;
+        acc[month] = (acc[month] || 0) + (booking.total_amount || 0);
       }
       return acc;
     }, {} as Record<string, number>);
@@ -63,14 +64,42 @@ const PelangganDashboard = () => {
   const stats = React.useMemo(() => {
     const totalBookings = bookings.length;
     const totalSpending = bookings
-      .filter(b => b.status === 'paid' || b.status === 'confirmed')
-      .reduce((sum, b) => sum + b.total_amount, 0);
+      .filter(b => b.status === 'paid' || b.status === 'confirmed' || b.status === 'completed')
+      .reduce((sum, b) => sum + (b.total_amount || 0), 0);
     const pendingBookings = bookings.filter(b => b.status === 'pending').length;
     
     return { totalBookings, totalSpending, pendingBookings };
   }, [bookings]);
 
   const recentBookings = bookings.slice(0, 5);
+
+  const getStatusBadgeStyle = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return 'bg-green-50 text-green-600 border-green-200';
+      case 'pending':
+        return 'bg-yellow-50 text-yellow-600 border-yellow-200';
+      case 'completed':
+        return 'bg-blue-50 text-blue-600 border-blue-200';
+      case 'cancelled':
+        return 'bg-red-50 text-red-600 border-red-200';
+      case 'paid':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      default:
+        return 'bg-gray-50 text-gray-600 border-gray-200';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'Dikonfirmasi';
+      case 'pending': return 'Menunggu';
+      case 'completed': return 'Selesai';
+      case 'cancelled': return 'Dibatalkan';
+      case 'paid': return 'Dibayar';
+      default: return status;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -152,32 +181,31 @@ const PelangganDashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
-            <div className="w-full">
-              <ResponsiveContainer width="100%" height={250} className="!w-full !h-[250px]">
+            <div className="w-full h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={spendingData}
                   margin={{
-                    top: 5,
-                    right: 5,
-                    left: 5,
-                    bottom: 5,
+                    top: 20,
+                    right: 30,
+                    left: 20,
+                    bottom: 20,
                   }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis 
                     dataKey="month" 
                     stroke="#666"
-                    fontSize={10}
-                    tick={{ fontSize: 10 }}
-                    interval="preserveStartEnd"
-                    width={60}
+                    fontSize={12}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
                   />
                   <YAxis 
                     stroke="#666"
-                    fontSize={10}
-                    tick={{ fontSize: 10 }}
-                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
-                    width={40}
+                    fontSize={12}
+                    tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
+                    width={60}
                   />
                   <Tooltip
                     formatter={(value: number) => [
@@ -196,8 +224,8 @@ const PelangganDashboard = () => {
                     type="monotone"
                     dataKey="amount"
                     stroke="#3b82f6"
-                    strokeWidth={2}
-                    dot={{ fill: '#3b82f6', strokeWidth: 2, r: 3 }}
+                    strokeWidth={3}
+                    dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
                     name="Pengeluaran"
                   />
                 </LineChart>
@@ -260,21 +288,25 @@ const PelangganDashboard = () => {
                       </div>
                       <div className="flex items-center gap-1">
                         <CalendarDays className="w-4 h-4" />
-                        <span>{format(new Date(booking.start_time), 'dd MMM yyyy, HH:mm', { locale: id })}</span>
+                        <span>{format(new Date(booking.start_time || booking.created_at), 'dd MMM yyyy, HH:mm', { locale: id })}</span>
                       </div>
                     </div>
+                    
+                    {/* Show installment info if available */}
+                    {booking.installments && booking.installments.length > 0 && (
+                      <div className="mt-2">
+                        <Badge className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                          Cicilan: {booking.installments.length}x pembayaran
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center justify-between md:justify-end gap-3">
-                    <Badge 
-                      variant={booking.status === 'confirmed' || booking.status === 'paid' ? 'default' : 
-                               booking.status === 'pending' ? 'secondary' : 'destructive'}
-                      className="whitespace-nowrap"
-                    >
-                      {booking.status === 'confirmed' || booking.status === 'paid' ? 'Selesai' :
-                       booking.status === 'pending' ? 'Menunggu' : 'Dibatalkan'}
+                    <Badge className={`${getStatusBadgeStyle(booking.status)} border font-peace-sans font-bold whitespace-nowrap`}>
+                      {getStatusText(booking.status)}
                     </Badge>
                     <p className="text-sm font-peace-sans font-bold text-gray-900 whitespace-nowrap">
-                      {booking.total_amount.toLocaleString('id-ID', { 
+                      {(booking.total_amount || 0).toLocaleString('id-ID', { 
                         style: 'currency', 
                         currency: 'IDR', 
                         minimumFractionDigits: 0 

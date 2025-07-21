@@ -75,7 +75,7 @@ const OrderHistoryPage = () => {
       case 'pending': return 'bg-yellow-50 text-yellow-600 border-yellow-200';
       case 'completed': return 'bg-blue-50 text-blue-600 border-blue-200';
       case 'cancelled': return 'bg-red-50 text-red-600 border-red-200';
-      case 'paid': return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+      case 'paid': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       default: return 'bg-gray-50 text-gray-600 border-gray-200';
     }
   };
@@ -207,7 +207,12 @@ const OrderHistoryPage = () => {
                           {booking.installments && booking.installments.length > 0 && (
                             <div className="mt-2 pt-2 border-t border-gray-200">
                               <div className="flex justify-between items-center">
-                                <span className="text-xs font-inter text-gray-500">Sudah Dibayar</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-inter text-gray-500">Sudah Dibayar</span>
+                                  <Badge className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                                    Cicilan {booking.installments.length}x
+                                  </Badge>
+                                </div>
                                 <span className="text-sm font-inter font-medium text-green-600">
                                   {booking.installments.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 })}
                                 </span>
@@ -244,12 +249,12 @@ const OrderHistoryPage = () => {
                           </Button>
                         )}
                         {booking.status === 'paid' && (
-                          <Button variant="outline" size="sm" className="border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-peace-sans font-bold">
+                          <Button variant="outline" size="sm" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-peace-sans font-bold">
                             Dibayar
                           </Button>
                         )}
                         {booking.status === 'cancelled' && (
-                          <Button variant="outline" size="sm" className="border-red-200 text-red-600 hover:bg-red-50 font-peace-sans font-bold">
+                          <Button variant="outline" size="sm" className="border-red-200 text-red-600 hover:bg-red-50 font-peace-sans font-bold" disabled>
                             Dibatalkan
                           </Button>
                         )}
