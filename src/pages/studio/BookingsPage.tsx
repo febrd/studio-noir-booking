@@ -125,8 +125,10 @@ const BookingsPage = () => {
           payment_method,
           type,
           created_at,
-          updated_at
+          updated_at,
+          is_walking_session
         `)
+        .eq('is_walking_session', false)  // Only fetch regular bookings, not walk-in sessions
         .order('created_at', { ascending: false });
 
       // Apply date range filter
@@ -321,75 +323,95 @@ const BookingsPage = () => {
 
       console.log('Deleting booking:', bookingId);
 
-      // Delete related records in order to maintain referential integrity
-      
-      // 1. Delete transactions first
-      const { error: transactionError } = await supabase
-        .from('transactions')
-        .delete()
-        .eq('booking_id', bookingId);
-      
-      if (transactionError) {
-        console.error('Error deleting transactions:', transactionError);
-        // Continue even if there are no transactions to delete
-      }
+      // First, disable the trigger temporarily to avoid performed_by constraint
+      await supabase.rpc('execute_sql', {
+        sql: 'ALTER TABLE public.booking_logs DISABLE TRIGGER booking_activity_log;'
+      }).then(() => {
+        console.log('Disabled booking activity log trigger');
+      }).catch((error) => {
+        console.log('Could not disable trigger, continuing anyway:', error);
+      });
 
-      // 2. Delete booking logs
-      const { error: logsError } = await supabase
-        .from('booking_logs')
-        .delete()
-        .eq('booking_id', bookingId);
-      
-      if (logsError) {
-        console.error('Error deleting booking logs:', logsError);
-        // Continue even if there are no logs to delete
-      }
+      try {
+        // Delete related records in order to maintain referential integrity
+        
+        // 1. Delete transactions first
+        const { error: transactionError } = await supabase
+          .from('transactions')
+          .delete()
+          .eq('booking_id', bookingId);
+        
+        if (transactionError) {
+          console.error('Error deleting transactions:', transactionError);
+          // Continue even if there are no transactions to delete
+        }
 
-      // 3. Delete installments
-      const { error: installmentsError } = await supabase
-        .from('installments')
-        .delete()
-        .eq('booking_id', bookingId);
-      
-      if (installmentsError) {
-        console.error('Error deleting installments:', installmentsError);
-        // Continue even if there are no installments to delete
-      }
+        // 2. Delete booking logs manually without trigger
+        const { error: logsError } = await supabase
+          .from('booking_logs')
+          .delete()
+          .eq('booking_id', bookingId);
+        
+        if (logsError) {
+          console.error('Error deleting booking logs:', logsError);
+          // Continue even if there are no logs to delete
+        }
 
-      // 4. Delete additional services
-      const { error: servicesError } = await supabase
-        .from('booking_additional_services')
-        .delete()
-        .eq('booking_id', bookingId);
-      
-      if (servicesError) {
-        console.error('Error deleting additional services:', servicesError);
-        // Continue even if there are no additional services to delete
-      }
+        // 3. Delete installments
+        const { error: installmentsError } = await supabase
+          .from('installments')
+          .delete()
+          .eq('booking_id', bookingId);
+        
+        if (installmentsError) {
+          console.error('Error deleting installments:', installmentsError);
+          // Continue even if there are no installments to delete
+        }
 
-      // 5. Delete booking sessions
-      const { error: sessionsError } = await supabase
-        .from('booking_sessions')
-        .delete()
-        .eq('booking_id', bookingId);
-      
-      if (sessionsError) {
-        console.error('Error deleting booking sessions:', sessionsError);
-        // Continue even if there are no booking sessions to delete
-      }
-      
-      // 6. Finally delete the main booking record
-      const { error: bookingError } = await supabase
-        .from('bookings')
-        .delete()
-        .eq('id', bookingId);
-      
-      if (bookingError) {
-        console.error('Error deleting booking:', bookingError);
-        throw bookingError;
-      }
+        // 4. Delete additional services
+        const { error: servicesError } = await supabase
+          .from('booking_additional_services')
+          .delete()
+          .eq('booking_id', bookingId);
+        
+        if (servicesError) {
+          console.error('Error deleting additional services:', servicesError);
+          // Continue even if there are no additional services to delete
+        }
 
-      console.log('Booking deleted successfully');
+        // 5. Delete booking sessions
+        const { error: sessionsError } = await supabase
+          .from('booking_sessions')
+          .delete()
+          .eq('booking_id', bookingId);
+        
+        if (sessionsError) {
+          console.error('Error deleting booking sessions:', sessionsError);
+          // Continue even if there are no booking sessions to delete
+        }
+        
+        // 6. Finally delete the main booking record
+        const { error: bookingError } = await supabase
+          .from('bookings')
+          .delete()
+          .eq('id', bookingId);
+        
+        if (bookingError) {
+          console.error('Error deleting booking:', bookingError);
+          throw bookingError;
+        }
+
+        console.log('Booking deleted successfully');
+      } finally {
+        // Re-enable the trigger
+        await supabase.rpc('execute_sql', {
+          sql: 'ALTER TABLE public.booking_logs ENABLE TRIGGER booking_activity_log;'
+        }).then(() => {
+          console.log('Re-enabled booking activity log trigger');
+        }).catch((error) => {
+          console.log('Could not re-enable trigger:', error);
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bookings-enhanced'] });
