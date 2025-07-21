@@ -48,7 +48,9 @@ const PelangganDashboard = () => {
   const spendingData = React.useMemo(() => {
     if (!bookings.length) return [];
 
+    // Group bookings by month and calculate spending
     const monthlySpending = bookings.reduce((acc, booking) => {
+      // Only include completed/paid bookings in spending calculation
       if (booking.status === 'paid' || booking.status === 'confirmed' || booking.status === 'completed') {
         const month = format(new Date(booking.created_at), 'MMM yyyy', { locale: id });
         acc[month] = (acc[month] || 0) + (booking.total_amount || 0);
@@ -56,9 +58,22 @@ const PelangganDashboard = () => {
       return acc;
     }, {} as Record<string, number>);
 
-    return Object.entries(monthlySpending)
-      .map(([month, amount]) => ({ month, amount }))
+    // Convert to array and sort by date
+    const sortedData = Object.entries(monthlySpending)
+      .map(([month, amount]) => ({ 
+        month, 
+        amount: Number(amount) // Ensure it's a number
+      }))
+      .sort((a, b) => {
+        // Simple date comparison - this could be improved
+        const dateA = new Date(a.month);
+        const dateB = new Date(b.month);
+        return dateA.getTime() - dateB.getTime();
+      })
       .slice(-6); // Last 6 months
+
+    console.log('Chart spending data:', sortedData);
+    return sortedData;
   }, [bookings]);
 
   const stats = React.useMemo(() => {
@@ -84,7 +99,7 @@ const PelangganDashboard = () => {
       case 'cancelled':
         return 'bg-red-50 text-red-600 border-red-200';
       case 'paid':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        return 'bg-emerald-900 text-emerald-100 border-emerald-700';
       default:
         return 'bg-gray-50 text-gray-600 border-gray-200';
     }
@@ -108,6 +123,8 @@ const PelangganDashboard = () => {
       </div>
     );
   }
+
+  console.log('Rendering dashboard - bookings:', bookings.length, 'spendingData:', spendingData);
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -172,7 +189,7 @@ const PelangganDashboard = () => {
         </Card>
       </div>
 
-      {/* Spending Chart - Mobile Responsive */}
+      {/* Spending Chart - Show if there's spending data */}
       {spendingData.length > 0 && (
         <Card className="border border-gray-100 shadow-sm">
           <CardHeader className="p-4 md:p-6">
@@ -181,31 +198,32 @@ const PelangganDashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
-            <div className="w-full h-[300px]">
+            <div className="w-full h-[250px] md:h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={spendingData}
                   margin={{
-                    top: 20,
-                    right: 30,
-                    left: 20,
-                    bottom: 20,
+                    top: 10,
+                    right: 10,
+                    left: 10,
+                    bottom: 40,
                   }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis 
                     dataKey="month" 
                     stroke="#666"
-                    fontSize={12}
+                    fontSize={10}
                     angle={-45}
                     textAnchor="end"
-                    height={80}
+                    height={60}
+                    interval={0}
                   />
                   <YAxis 
                     stroke="#666"
-                    fontSize={12}
+                    fontSize={10}
                     tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
-                    width={60}
+                    width={40}
                   />
                   <Tooltip
                     formatter={(value: number) => [
@@ -216,17 +234,24 @@ const PelangganDashboard = () => {
                       }),
                       'Pengeluaran'
                     ]}
-                    labelStyle={{ fontSize: '12px' }}
-                    contentStyle={{ fontSize: '12px', maxWidth: '200px' }}
+                    labelStyle={{ fontSize: '11px' }}
+                    contentStyle={{ 
+                      fontSize: '11px', 
+                      maxWidth: '180px',
+                      backgroundColor: 'white',
+                      border: '1px solid #ccc',
+                      borderRadius: '4px'
+                    }}
                   />
-                  <Legend />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
                   <Line
                     type="monotone"
                     dataKey="amount"
                     stroke="#3b82f6"
-                    strokeWidth={3}
-                    dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                    strokeWidth={2}
+                    dot={{ fill: '#3b82f6', strokeWidth: 1, r: 3 }}
                     name="Pengeluaran"
+                    connectNulls={false}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -295,7 +320,7 @@ const PelangganDashboard = () => {
                     {/* Show installment info if available */}
                     {booking.installments && booking.installments.length > 0 && (
                       <div className="mt-2">
-                        <Badge className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                        <Badge className="bg-purple-100 text-purple-800 border-purple-300 text-xs">
                           Cicilan: {booking.installments.length}x pembayaran
                         </Badge>
                       </div>
