@@ -513,7 +513,7 @@ const SelfPhotoCheckoutPage = () => {
     <div className="min-h-screen bg-white">
       {/* Clean Header */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-8 py-6">
+        <div className="max-w-4xl mx-auto px-4 md:px-8 py-6">
           <div className="flex items-center justify-between">
             <Button
               variant="outline"
@@ -531,34 +531,34 @@ const SelfPhotoCheckoutPage = () => {
               <ArrowLeft className="h-4 w-4 mr-2" />
               Kembali
             </Button>
-            <h1 className="text-3xl font-peace-sans font-black text-black">
+            <h1 className="text-2xl md:text-3xl font-peace-sans font-black text-black">
               {currentStep === 'package' && 'Checkout'}
               {currentStep === 'services' && 'Layanan Tambahan'}
               {currentStep === 'schedule' && 'Pilih Jadwal'}
             </h1>
-            <div className="w-20"></div>
+            <div className="w-16 md:w-20"></div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-8 py-12">
+      <div className="max-w-4xl mx-auto px-4 md:px-8 py-8 md:py-12">
         {currentStep === 'package' && (
           /* Package Selection */
-          <div className="space-y-12">
+          <div className="space-y-8 md:space-y-12">
             <div className="text-center">
-              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Paket Self Photo</h2>
-              <p className="text-lg font-inter text-gray-500">Pilih jumlah yang Anda inginkan</p>
+              <h2 className="text-3xl md:text-5xl font-peace-sans font-black mb-4 text-black">Paket Self Photo</h2>
+              <p className="text-base md:text-lg font-inter text-gray-500">Pilih jumlah yang Anda inginkan</p>
             </div>
 
             <Card className="border border-gray-100 shadow-none">
-              <CardHeader className="p-8">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-2xl font-peace-sans font-black text-black mb-2">
+              <CardHeader className="p-6 md:p-8">
+                <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+                  <div className="flex-1">
+                    <CardTitle className="text-xl md:text-2xl font-peace-sans font-black text-black mb-2">
                       {packageData.title}
                     </CardTitle>
                     <p className="text-gray-500 font-inter mb-4">{packageData.description}</p>
-                    <div className="flex items-center gap-6 text-sm font-inter text-gray-600">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 md:gap-6 text-sm font-inter text-gray-600">
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4" />
                         {packageData.base_time_minutes} menit
@@ -569,15 +569,15 @@ const SelfPhotoCheckoutPage = () => {
                       </div>
                     </div>
                   </div>
-                  <Badge className="bg-red-50 text-red-600 border-red-200 font-peace-sans font-bold">
+                  <Badge className="bg-red-50 text-red-600 border-red-200 font-peace-sans font-bold self-start">
                     Sesi Self Photo 
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="p-8 pt-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <span className="text-lg font-inter text-gray-600">Jumlah:</span>
+              <CardContent className="p-6 md:p-8 pt-0">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <span className="text-base md:text-lg font-inter text-gray-600">Jumlah:</span>
                     <div className="flex items-center gap-3">
                       <Button
                         variant="outline"
@@ -588,7 +588,7 @@ const SelfPhotoCheckoutPage = () => {
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
-                      <span className="text-2xl font-peace-sans font-black min-w-[3rem] text-center">
+                      <span className="text-xl md:text-2xl font-peace-sans font-black min-w-[3rem] text-center">
                         {packageQuantity}
                       </span>
                       <Button
@@ -601,9 +601,9 @@ const SelfPhotoCheckoutPage = () => {
                       </Button>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left md:text-right">
                     <p className="text-sm font-inter text-gray-500 mb-1">Total</p>
-                    <p className="text-3xl font-peace-sans font-black text-black">
+                    <p className="text-2xl md:text-3xl font-peace-sans font-black text-black break-words">
                       {((packageData.price * packageQuantity)).toLocaleString('id-ID', { 
                         style: 'currency', 
                         currency: 'IDR', 
@@ -618,7 +618,7 @@ const SelfPhotoCheckoutPage = () => {
             <div className="text-center">
               <Button 
                 onClick={handleContinueToServices}
-                className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-12 py-4 text-lg"
+                className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-8 md:px-12 py-3 md:py-4 text-base md:text-lg w-full sm:w-auto"
               >
                 Lanjut ke Layanan Tambahan
               </Button>
@@ -628,24 +628,24 @@ const SelfPhotoCheckoutPage = () => {
 
         {currentStep === 'services' && (
           /* Additional Services */
-          <div className="space-y-12">
+          <div className="space-y-8 md:space-y-12">
             <div className="text-center">
-              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Layanan Tambahan</h2>
-              <p className="text-lg font-inter text-gray-500">Tingkatkan pengalaman Anda (opsional)</p>
+              <h2 className="text-3xl md:text-5xl font-peace-sans font-black mb-4 text-black">Layanan Tambahan</h2>
+              <p className="text-base md:text-lg font-inter text-gray-500">Tingkatkan pengalaman Anda (opsional)</p>
             </div>
 
             <div className="space-y-6">
               {additionalServices.length > 0 ? (
                 additionalServices.map((service) => (
                   <Card key={service.id} className="border border-gray-100 shadow-none">
-                    <CardContent className="p-8">
-                      <div className="flex items-center justify-between">
+                    <CardContent className="p-6 md:p-8">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex-1">
-                          <h3 className="text-xl font-peace-sans font-black text-black mb-2">
+                          <h3 className="text-lg md:text-xl font-peace-sans font-black text-black mb-2">
                             {service.name}
                           </h3>
                           <p className="text-gray-500 font-inter mb-2">{service.description}</p>
-                          <p className="text-lg font-peace-sans font-bold text-blue-600">
+                          <p className="text-base md:text-lg font-peace-sans font-bold text-blue-600">
                             {service.price.toLocaleString('id-ID', { 
                               style: 'currency', 
                               currency: 'IDR', 
@@ -653,7 +653,7 @@ const SelfPhotoCheckoutPage = () => {
                             })}
                           </p>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-4 self-start md:self-center">
                           <Button
                             variant="outline"
                             size="icon"
@@ -663,7 +663,7 @@ const SelfPhotoCheckoutPage = () => {
                           >
                             <Minus className="h-4 w-4" />
                           </Button>
-                          <span className="text-xl font-peace-sans font-black min-w-[3rem] text-center">
+                          <span className="text-lg md:text-xl font-peace-sans font-black min-w-[3rem] text-center">
                             {selectedServices[service.id] || 0}
                           </span>
                           <Button
@@ -681,23 +681,23 @@ const SelfPhotoCheckoutPage = () => {
                 ))
               ) : (
                 <Card className="border border-gray-100 shadow-none">
-                  <CardContent className="p-8 text-center">
+                  <CardContent className="p-6 md:p-8 text-center">
                     <p className="text-gray-500 font-inter">Tidak ada layanan tambahan tersedia untuk paket ini.</p>
                   </CardContent>
                 </Card>
               )}
             </div>
 
-            {/* Order Summary */}
+            {/* Order Summary - Fixed price alignment */}
             <Card className="border border-gray-100 shadow-none bg-gray-50">
-              <CardContent className="p-8">
-                <h3 className="text-2xl font-peace-sans font-black text-black mb-6">Ringkasan Pesanan</h3>
+              <CardContent className="p-6 md:p-8">
+                <h3 className="text-xl md:text-2xl font-peace-sans font-black text-black mb-6">Ringkasan Pesanan</h3>
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="font-inter text-gray-600">
+                  <div className="flex justify-between items-start gap-4">
+                    <span className="font-inter text-gray-600 flex-1">
                       {packageData.title} × {packageQuantity}
                     </span>
-                    <span className="font-peace-sans font-bold">
+                    <span className="font-peace-sans font-bold text-right break-words">
                       {(packageData.price * packageQuantity).toLocaleString('id-ID', { 
                         style: 'currency', 
                         currency: 'IDR', 
@@ -709,11 +709,11 @@ const SelfPhotoCheckoutPage = () => {
                     const serviceQuantity = selectedServices[service.id] || 0;
                     if (serviceQuantity > 0) {
                       return (
-                        <div key={service.id} className="flex justify-between items-center">
-                          <span className="font-inter text-gray-600">
+                        <div key={service.id} className="flex justify-between items-start gap-4">
+                          <span className="font-inter text-gray-600 flex-1">
                             {service.name} × {serviceQuantity}
                           </span>
-                          <span className="font-peace-sans font-bold">
+                          <span className="font-peace-sans font-bold text-right break-words">
                             {(service.price * serviceQuantity).toLocaleString('id-ID', { 
                               style: 'currency', 
                               currency: 'IDR', 
@@ -726,9 +726,9 @@ const SelfPhotoCheckoutPage = () => {
                     return null;
                   })}
                   <div className="border-t border-gray-200 pt-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xl font-peace-sans font-black text-black">Total</span>
-                      <span className="text-2xl font-peace-sans font-black text-black">
+                    <div className="flex justify-between items-start gap-4">
+                      <span className="text-lg md:text-xl font-peace-sans font-black text-black">Total</span>
+                      <span className="text-xl md:text-2xl font-peace-sans font-black text-black text-right break-words">
                         {calculateTotal().toLocaleString('id-ID', { 
                           style: 'currency', 
                           currency: 'IDR', 
@@ -744,7 +744,7 @@ const SelfPhotoCheckoutPage = () => {
             <div className="text-center">
               <Button 
                 onClick={handleContinueToSchedule}
-                className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-12 py-4 text-lg"
+                className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold px-8 md:px-12 py-3 md:py-4 text-base md:text-lg w-full sm:w-auto"
               >
                 Lanjut ke Pilih Jadwal
               </Button>
@@ -754,43 +754,42 @@ const SelfPhotoCheckoutPage = () => {
 
         {currentStep === 'schedule' && (
           /* Schedule Selection */
-          <div className="space-y-12">
+          <div className="space-y-8 md:space-y-12">
             <div className="text-center">
-              <h2 className="text-5xl font-peace-sans font-black mb-4 text-black">Pilih Jadwal Anda</h2>
-              <p className="text-lg font-inter text-gray-500">Pilih tanggal dan waktu yang Anda inginkan</p>
+              <h2 className="text-3xl md:text-5xl font-peace-sans font-black mb-4 text-black">Pilih Jadwal Anda</h2>
+              <p className="text-base md:text-lg font-inter text-gray-500">Pilih tanggal dan waktu yang Anda inginkan</p>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 lg:grid-cols-2">
               {/* Package Summary */}
               <Card className="border border-gray-100 shadow-none">
-                <CardHeader className="p-6">
-                  <CardTitle className="flex items-center gap-2 text-xl font-peace-sans font-black">
+                <CardHeader className="p-4 md:p-6">
+                  <CardTitle className="flex items-center gap-2 text-lg md:text-xl font-peace-sans font-black">
                     <CalendarIcon className="w-5 h-5" />
                     Ringkasan Paket
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-6 pt-0 space-y-4">
+                <CardContent className="p-4 md:p-6 pt-0 space-y-4">
                   <div>
-                    <h3 className="font-peace-sans font-bold text-lg">{packageData.title}</h3>
+                    <h3 className="font-peace-sans font-bold text-base md:text-lg">{packageData.title}</h3>
                     <p className="text-gray-600 font-inter text-sm">{packageData.description}</p>
                   </div>
                   
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-gray-600">
                     <div className="flex items-center gap-1">
                       <Clock className="w-4 h-4" />
                       <span>{packageData.base_time_minutes} menit</span>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <MapPin className="w-4 h-4" />
-                    <span>{packageData.studios?.name}</span>
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      <span>{packageData.studios?.name}</span>
+                    </div>
                   </div>
                   
                   <div className="pt-2 border-t">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-start gap-4">
                       <span className="text-sm text-gray-600">Total Harga:</span>
-                      <span className="text-lg font-peace-sans font-bold text-primary">
+                      <span className="text-base md:text-lg font-peace-sans font-bold text-primary text-right break-words">
                         {calculateTotal().toLocaleString('id-ID', { 
                           style: 'currency', 
                           currency: 'IDR', 
@@ -804,8 +803,8 @@ const SelfPhotoCheckoutPage = () => {
 
               {/* Date Selection */}
               <Card className="border border-gray-100 shadow-none">
-                <CardHeader className="p-6">
-                  <CardTitle className="flex items-center justify-between">
+                <CardHeader className="p-4 md:p-6">
+                  <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <span className="font-peace-sans font-black">Pilih Tanggal</span>
                     <div className="flex items-center gap-4 text-xs font-inter">
                       <div className="flex items-center gap-1">
@@ -819,14 +818,14 @@ const SelfPhotoCheckoutPage = () => {
                     </div>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-6 pt-0">
+                <CardContent className="p-4 md:p-6 pt-0">
                   <Calendar
                     mode="single"
                     selected={selectedDate}
                     onSelect={handleDateSelect}
                     disabled={isDateUnavailable}
                     initialFocus
-                    className="rounded-md border"
+                    className="rounded-md border w-full"
                     components={{
                       Day: CustomDay
                     }}
@@ -838,19 +837,19 @@ const SelfPhotoCheckoutPage = () => {
             {/* Time Slots */}
             {selectedDate && (
               <Card className="border border-gray-100 shadow-none">
-                <CardHeader className="p-6">
+                <CardHeader className="p-4 md:p-6">
                   <CardTitle className="font-peace-sans font-black">Waktu Tersedia</CardTitle>
                   <p className="text-sm text-gray-600 font-inter">
                     {format(selectedDate, 'EEEE, dd MMMM yyyy')} (WITA) - Slot {packageData.base_time_minutes} menit dengan jeda 5 menit
                   </p>
                 </CardHeader>
-                <CardContent className="p-6 pt-0">
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                <CardContent className="p-4 md:p-6 pt-0">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                     {timeSlots.map((slot) => (
                       <Button
                         key={slot.id}
                         variant={selectedTimeSlot?.id === slot.id ? "default" : "outline"}
-                        className={`flex flex-col py-3 h-auto font-inter ${
+                        className={`flex flex-col py-3 h-auto font-inter text-xs md:text-sm ${
                           !slot.available 
                             ? 'opacity-50 cursor-not-allowed bg-gray-200 text-gray-500' 
                             : 'cursor-pointer'
@@ -873,44 +872,44 @@ const SelfPhotoCheckoutPage = () => {
               </Card>
             )}
 
-            {/* Final Booking Summary */}
+            {/* Final Booking Summary - Fixed price alignment */}
             {selectedDate && selectedTimeSlot && (
               <Card className="border border-gray-100 shadow-none bg-gray-50">
-                <CardHeader className="p-6">
+                <CardHeader className="p-4 md:p-6">
                   <CardTitle className="font-peace-sans font-black">Konfirmasi Pesanan</CardTitle>
                 </CardHeader>
-                <CardContent className="p-6 pt-0 space-y-4">
+                <CardContent className="p-4 md:p-6 pt-0 space-y-4">
                   <div className="space-y-2">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-start gap-4">
                       <span className="font-inter">Paket:</span>
-                      <span className="font-peace-sans font-bold">{packageData.title}</span>
+                      <span className="font-peace-sans font-bold text-right break-words">{packageData.title}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-start gap-4">
                       <span className="font-inter">Tanggal:</span>
-                      <span className="font-peace-sans font-bold">{format(selectedDate, 'EEEE, dd MMMM yyyy')}</span>
+                      <span className="font-peace-sans font-bold text-right break-words">{format(selectedDate, 'EEEE, dd MMMM yyyy')}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-start gap-4">
                       <span className="font-inter">Waktu:</span>
-                      <span className="font-peace-sans font-bold">{selectedTimeSlot.startTime} - {selectedTimeSlot.endTime} (WITA)</span>
+                      <span className="font-peace-sans font-bold text-right break-words">{selectedTimeSlot.startTime} - {selectedTimeSlot.endTime} (WITA)</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-start gap-4">
                       <span className="font-inter">Durasi:</span>
-                      <span className="font-peace-sans font-bold">{packageData.base_time_minutes} menit</span>
+                      <span className="font-peace-sans font-bold text-right break-words">{packageData.base_time_minutes} menit</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-start gap-4">
                       <span className="font-inter">Studio:</span>
-                      <span className="font-peace-sans font-bold">{packageData.studios?.name}</span>
+                      <span className="font-peace-sans font-bold text-right break-words">{packageData.studios?.name}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-start gap-4">
                       <span className="font-inter">Jumlah:</span>
-                      <span className="font-peace-sans font-bold">{packageQuantity}</span>
+                      <span className="font-peace-sans font-bold text-right break-words">{packageQuantity}</span>
                     </div>
                   </div>
                   
                   <div className="border-t border-gray-200 pt-4">
-                    <div className="flex justify-between items-center text-lg font-peace-sans font-black">
+                    <div className="flex justify-between items-start gap-4 text-base md:text-lg font-peace-sans font-black">
                       <span>Total Harga:</span>
-                      <span className="text-primary">
+                      <span className="text-primary text-right break-words">
                         {calculateTotal().toLocaleString('id-ID', { 
                           style: 'currency', 
                           currency: 'IDR', 

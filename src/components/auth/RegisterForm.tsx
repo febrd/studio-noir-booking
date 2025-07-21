@@ -51,7 +51,7 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
     onError(''); // Clear previous errors
 
     try {
-      console.log('Starting registration process...');
+      console.log('Starting registration process with password hashing...');
       const result = await signUp(registerForm.email, registerForm.password, registerForm.name);
       
       if (!result.success) {
@@ -60,8 +60,8 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
         // Reset captcha on failed registration
         setCaptchaReset(!captchaReset);
       } else {
-        console.log('Registration successful');
-        onSuccess('Registrasi berhasil! Silakan login dengan akun baru Anda.');
+        console.log('Registration successful with proper password hashing');
+        onSuccess('Registrasi berhasil! Password telah di-hash dengan aman. Silakan login dengan akun baru Anda.');
         setRegisterForm({ email: '', password: '', confirmPassword: '', name: '' });
         
         // Switch to login tab after successful registration
@@ -119,6 +119,9 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
           disabled={isSubmitting}
           autoComplete="new-password"
         />
+        <p className="text-xs text-gray-500">
+          Minimal 6 karakter. Password akan di-hash untuk keamanan.
+        </p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="register-confirm-password">Konfirmasi Password</Label>

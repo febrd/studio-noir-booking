@@ -1,301 +1,313 @@
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import React from 'react';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Plus, Clock, ArrowRight } from 'lucide-react';
-import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
+import { CalendarDays, Package, Clock, MapPin, Camera, Users } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-export const PelangganDashboard = () => {
+const PelangganDashboard = () => {
   const { userProfile } = useJWTAuth();
 
-  const { data: customerData, isLoading } = useQuery({
-    queryKey: ['customer-dashboard', userProfile?.id],
+  // Fetch user's bookings
+  const { data: bookings = [], isLoading } = useQuery({
+    queryKey: ['user-bookings', userProfile?.id],
     queryFn: async () => {
-      if (!userProfile?.id) return null;
+      if (!userProfile?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+          id,
+          start_time,
+          end_time,
+          status,
+          total_amount,
+          type,
+          created_at,
+          studio_packages!inner(title, description),
+          studios!inner(name, type)
+        `)
+        .eq('user_id', userProfile.id)
+        .order('created_at', { ascending: false });
 
-      const sixMonthsAgo = subMonths(new Date(), 5);
-
-      const [bookings, studios, packages, monthlySpending] = await Promise.all([
-        supabase
-          .from('bookings')
-          .select(`
-            *,
-            studios (name, type),
-            studio_packages (title, price, base_time_minutes),
-            installments (amount, paid_at, payment_method)
-          `)
-          .eq('user_id', userProfile.id)
-          .order('created_at', { ascending: false }),
-        
-        supabase.from('studios').select('*').eq('is_active', true),
-        
-        supabase.from('studio_packages').select('*, package_categories (name)'),
-
-        supabase
-          .from('bookings')
-          .select(`
-            created_at,
-            total_amount,
-            status,
-            installments (amount)
-          `)
-          .eq('user_id', userProfile.id)
-          .gte('created_at', sixMonthsAgo.toISOString())
-          .order('created_at', { ascending: true })
-      ]);
-
-      return {
-        bookings: bookings.data || [],
-        studios: studios.data || [],
-        packages: packages.data || [],
-        monthlySpending: monthlySpending.data || []
-      };
+      if (error) throw error;
+      return data;
     },
     enabled: !!userProfile?.id
   });
 
+  // Calculate spending data for chart
+  const spendingData = React.useMemo(() => {
+    if (!bookings.length) return [];
+
+    const monthlySpending = bookings.reduce((acc, booking) => {
+      if (booking.status === 'paid' || booking.status === 'confirmed') {
+        const month = format(new Date(booking.created_at), 'MMM yyyy', { locale: id });
+        acc[month] = (acc[month] || 0) + booking.total_amount;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+
+    return Object.entries(monthlySpending)
+      .map(([month, amount]) => ({ month, amount }))
+      .slice(-6); // Last 6 months
+  }, [bookings]);
+
+  const stats = React.useMemo(() => {
+    const totalBookings = bookings.length;
+    const totalSpending = bookings
+      .filter(b => b.status === 'paid' || b.status === 'confirmed')
+      .reduce((sum, b) => sum + b.total_amount, 0);
+    const pendingBookings = bookings.filter(b => b.status === 'pending').length;
+    
+    return { totalBookings, totalSpending, pendingBookings };
+  }, [bookings]);
+
+  const recentBookings = bookings.slice(0, 5);
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-white flex justify-center items-center">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin"></div>
       </div>
     );
   }
 
-  const { bookings = [], studios = [], packages = [], monthlySpending = [] } = customerData || {};
-
-  // Calculate customer statistics - exclude cancelled orders
-  const activeBookings = bookings.filter(b => b.status !== 'cancelled');
-  const totalBookings = activeBookings.length;
-  const completedBookings = activeBookings.filter(b => b.status === 'completed').length;
-  const upcomingBookings = activeBookings.filter(b => {
-    const bookingDate = new Date(b.start_time || b.created_at);
-    return bookingDate > new Date() && b.status === 'confirmed';
-  }).length;
-
-  // Calculate total spent - exclude cancelled orders
-  const totalSpent = activeBookings.reduce((sum, booking) => {
-    const bookingAmount = booking.total_amount || 0;
-    const installmentAmount = booking.installments?.reduce((instSum: number, inst: any) => instSum + (inst.amount || 0), 0) || 0;
-    return sum + Math.max(bookingAmount, installmentAmount);
-  }, 0);
-
-  // Monthly spending trend for the last 6 months - exclude cancelled orders
-  const monthlyTrend = eachMonthOfInterval({
-    start: subMonths(new Date(), 5),
-    end: new Date()
-  }).map(month => {
-    const monthStart = startOfMonth(month);
-    const monthEnd = endOfMonth(month);
-    
-    const monthBookings = monthlySpending.filter(booking => {
-      const bookingDate = new Date(booking.created_at);
-      return bookingDate >= monthStart && bookingDate <= monthEnd && booking.status !== 'cancelled';
-    });
-
-    const monthSpending = monthBookings.reduce((sum, booking) => {
-      const bookingAmount = booking.total_amount || 0;
-      const installmentAmount = booking.installments?.reduce((instSum: number, inst: any) => instSum + (inst.amount || 0), 0) || 0;
-      return sum + Math.max(bookingAmount, installmentAmount);
-    }, 0);
-
-    return {
-      month: format(month, 'MMM', { locale: id }),
-      spending: monthSpending,
-      bookings: monthBookings.length
-    };
-  });
-
-  // Recent bookings (last 3) - exclude cancelled orders
-  const recentBookings = activeBookings.slice(0, 3);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed': return 'bg-green-50 text-green-600 border-green-200';
-      case 'pending': return 'bg-yellow-50 text-yellow-600 border-yellow-200';
-      case 'completed': return 'bg-blue-50 text-blue-600 border-blue-200';
-      case 'cancelled': return 'bg-red-50 text-red-600 border-red-200';
-      default: return 'bg-gray-50 text-gray-600 border-gray-200';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'confirmed': return 'Dikonfirmasi';
-      case 'pending': return 'Menunggu';
-      case 'completed': return 'Selesai';
-      case 'cancelled': return 'Dibatalkan';
-      default: return status;
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-white">
-      {/* Hero Section - Ultra Clean */}
-      <div className="bg-white py-24 px-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-7xl font-peace-sans font-black text-black mb-6 tracking-tight leading-tight">
-            Dashboard
-          </h1>
-          <p className="text-xl font-inter text-gray-500 mb-12 max-w-xl mx-auto leading-relaxed">
-            Selamat datang kembali, {userProfile?.name}
-          </p>
-          <Link to="/customer/booking-selection">
-            <Button className="bg-black text-white hover:bg-gray-800 text-base px-8 py-3 font-peace-sans font-bold rounded-sm">
-              Buat Reservasi
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
+    <div className="space-y-6 p-4 md:p-6">
+      {/* Welcome Section */}
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 rounded-xl p-6">
+        <h1 className="text-2xl md:text-3xl font-peace-sans font-black text-gray-900 mb-2">
+          Selamat Datang, {userProfile?.name}! 👋
+        </h1>
+        <p className="text-gray-600 font-inter">
+          Kelola booking Anda dan temukan paket foto terbaik di Studio Noir.
+        </p>
       </div>
 
-      <div className="max-w-6xl mx-auto px-8 pb-24">
-        {/* Stats - Clean Numbers */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
-          <div className="text-center">
-            <div className="text-5xl font-peace-sans font-black text-black mb-3">{totalBookings}</div>
-            <h3 className="text-sm font-inter font-medium text-gray-600 uppercase tracking-wide">Total Booking</h3>
-          </div>
-
-          <div className="text-center">
-            <div className="text-5xl font-peace-sans font-black text-red-500 mb-3">{upcomingBookings}</div>
-            <h3 className="text-sm font-inter font-medium text-gray-600 uppercase tracking-wide">Mendatang</h3>
-          </div>
-
-          <div className="text-center">
-            <div className="text-3xl font-peace-sans font-black text-blue-500 mb-3">
-              {totalSpent.toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 })}
-            </div>
-            <h3 className="text-sm font-inter font-medium text-gray-600 uppercase tracking-wide">Total Pengeluaran</h3>
-          </div>
-
-          <div className="text-center">
-            <div className="text-5xl font-peace-sans font-black text-yellow-500 mb-3">{completedBookings}</div>
-            <h3 className="text-sm font-inter font-medium text-gray-600 uppercase tracking-wide">Selesai</h3>
-          </div>
-        </div>
-
-        {/* Quick Actions - Minimal */}
-        <div className="mb-20">
-          <h2 className="text-4xl font-peace-sans font-black text-center mb-12 tracking-tight">
-            Aksi Cepat
-          </h2>
-          <div className="flex justify-center gap-8">
-            <Link to="/customer/booking-selection" className="group block text-center">
-              <div className="bg-white border border-gray-100 hover:border-gray-200 p-8 transition-all duration-200 hover:shadow-sm">
-                <Plus className="h-8 w-8 mb-4 mx-auto text-red-500" />
-                <span className="font-peace-sans font-bold text-base text-gray-900 group-hover:text-red-500 transition-colors">
-                  Booking Baru
-                </span>
-              </div>
-            </Link>
-            
-            <Link to="/customer/order-history" className="group block text-center">
-              <div className="bg-white border border-gray-100 hover:border-gray-200 p-8 transition-all duration-200 hover:shadow-sm">
-                <Clock className="h-8 w-8 mb-4 mx-auto text-blue-500" />
-                <span className="font-peace-sans font-bold text-base text-gray-900 group-hover:text-blue-500 transition-colors">
-                  Riwayat Pesanan
-                </span>
-              </div>
-            </Link>
-          </div>
-        </div>
-
-        {/* Chart and Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Spending Chart */}
-          {totalBookings > 0 && (
-            <div className="bg-white border border-gray-100 p-8">
-              <h3 className="text-2xl font-peace-sans font-black mb-2">Pengeluaran Bulanan</h3>
-              <p className="text-gray-500 font-inter mb-8 text-sm">6 bulan terakhir</p>
-              <ChartContainer
-                config={{
-                  spending: { label: "Pengeluaran", color: "#dc2626" }
-                }}
-                className="h-[200px]"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={monthlyTrend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f5" />
-                    <XAxis dataKey="month" stroke="#9ca3af" className="font-inter text-xs" />
-                    <YAxis stroke="#9ca3af" className="font-inter text-xs" />
-                    <ChartTooltip 
-                      content={<ChartTooltipContent />}
-                      formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pengeluaran']}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="spending" 
-                      stroke="#dc2626" 
-                      fill="#dc2626" 
-                      fillOpacity={0.05}
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </div>
-          )}
-
-          {/* Recent Bookings */}
-          <div className="bg-white border border-gray-100 p-8">
-            <div className="flex justify-between items-center mb-8">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border border-gray-100 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-2xl font-peace-sans font-black mb-2">Aktivitas Terbaru</h3>
-                <p className="text-gray-500 font-inter text-sm">Booking terkini Anda</p>
+                <p className="text-sm font-inter text-gray-600">Total Booking</p>
+                <p className="text-2xl font-peace-sans font-black text-gray-900">{stats.totalBookings}</p>
               </div>
+              <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center">
+                <CalendarDays className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-gray-100 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-inter text-gray-600">Total Pengeluaran</p>
+                <p className="text-xl md:text-2xl font-peace-sans font-black text-gray-900">
+                  {stats.totalSpending.toLocaleString('id-ID', { 
+                    style: 'currency', 
+                    currency: 'IDR', 
+                    minimumFractionDigits: 0 
+                  })}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
+                <Package className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-gray-100 shadow-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-inter text-gray-600">Booking Pending</p>
+                <p className="text-2xl font-peace-sans font-black text-gray-900">{stats.pendingBookings}</p>
+              </div>
+              <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center">
+                <Clock className="w-6 h-6 text-orange-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Spending Chart - Fixed for mobile responsiveness */}
+      {spendingData.length > 0 && (
+        <Card className="border border-gray-100 shadow-sm">
+          <CardHeader className="p-4 md:p-6">
+            <CardTitle className="font-peace-sans font-black text-gray-900">
+              Grafik Pengeluaran (6 Bulan Terakhir)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            <div className="w-full overflow-hidden">
+              <ResponsiveContainer width="100%" height={300} className="!w-full">
+                <LineChart
+                  data={spendingData}
+                  margin={{
+                    top: 5,
+                    right: 10,
+                    left: 10,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="month" 
+                    stroke="#666"
+                    fontSize={12}
+                    tick={{ fontSize: 12 }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis 
+                    stroke="#666"
+                    fontSize={12}
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                    width={50}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [
+                      value.toLocaleString('id-ID', { 
+                        style: 'currency', 
+                        currency: 'IDR', 
+                        minimumFractionDigits: 0 
+                      }),
+                      'Pengeluaran'
+                    ]}
+                    labelStyle={{ fontSize: '12px' }}
+                    contentStyle={{ fontSize: '12px' }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="amount"
+                    stroke="#3b82f6"
+                    strokeWidth={3}
+                    dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                    name="Pengeluaran"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quick Actions */}
+      <Card className="border border-gray-100 shadow-sm">
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="font-peace-sans font-black text-gray-900">Aksi Cepat</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 pt-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Link to="/customer/booking-selection">
+              <Button className="w-full bg-black text-white hover:bg-gray-800 font-peace-sans font-bold py-6">
+                <Camera className="w-5 h-5 mr-2" />
+                Booking Baru
+              </Button>
+            </Link>
+            <Link to="/customer/order-history">
+              <Button variant="outline" className="w-full border-gray-200 text-gray-700 hover:bg-gray-50 font-peace-sans font-bold py-6">
+                <CalendarDays className="w-5 h-5 mr-2" />
+                Riwayat Pesanan
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recent Bookings */}
+      {recentBookings.length > 0 && (
+        <Card className="border border-gray-100 shadow-sm">
+          <CardHeader className="p-4 md:p-6">
+            <div className="flex items-center justify-between">
+              <CardTitle className="font-peace-sans font-black text-gray-900">
+                Booking Terbaru
+              </CardTitle>
               <Link to="/customer/order-history">
-                <Button variant="outline" size="sm" className="font-peace-sans font-bold border-gray-200 text-gray-600 hover:bg-gray-50">
+                <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 font-inter">
                   Lihat Semua
                 </Button>
               </Link>
             </div>
-            <div className="space-y-6">
-              {recentBookings.length > 0 ? (
-                recentBookings.map((booking) => (
-                  <div key={booking.id} className="pb-6 border-b border-gray-50 last:border-b-0">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h4 className="font-peace-sans font-bold text-lg mb-1">{booking.studios?.name}</h4>
-                        <p className="text-gray-500 font-inter mb-2 text-sm">
-                          {booking.studio_packages?.title}
-                        </p>
-                        <p className="text-xs text-gray-400 font-inter">
-                          {format(new Date(booking.start_time || booking.created_at), 'dd MMM yyyy, HH:mm', { locale: id })}
-                        </p>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            <div className="space-y-4">
+              {recentBookings.map((booking) => (
+                <div key={booking.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 rounded-lg gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-peace-sans font-bold text-gray-900 truncate">
+                      {booking.studio_packages?.title}
+                    </h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1 text-sm text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <MapPin className="w-4 h-4" />
+                        <span className="truncate">{booking.studios?.name}</span>
                       </div>
-                      <div className="text-right">
-                        <Badge className={getStatusColor(booking.status) + ' font-peace-sans font-bold mb-2 text-xs border'}>
-                          {getStatusText(booking.status)}
-                        </Badge>
-                        <p className="text-sm font-peace-sans font-bold">
-                          {(booking.total_amount || 0).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 })}
-                        </p>
+                      <div className="flex items-center gap-1">
+                        <CalendarDays className="w-4 h-4" />
+                        <span>{format(new Date(booking.start_time), 'dd MMM yyyy, HH:mm', { locale: id })}</span>
                       </div>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-12">
-                  <Calendar className="h-12 w-12 text-gray-200 mx-auto mb-4" />
-                  <p className="text-gray-400 font-inter mb-6">Belum ada booking</p>
-                  <Link to="/customer/booking-selection">
-                    <Button className="bg-black text-white font-peace-sans font-bold hover:bg-gray-800 text-sm px-6 py-2">
-                      Buat Booking Pertama
-                    </Button>
-                  </Link>
+                  <div className="flex items-center justify-between md:justify-end gap-3">
+                    <Badge 
+                      variant={booking.status === 'confirmed' || booking.status === 'paid' ? 'default' : 
+                               booking.status === 'pending' ? 'secondary' : 'destructive'}
+                      className="whitespace-nowrap"
+                    >
+                      {booking.status === 'confirmed' || booking.status === 'paid' ? 'Selesai' :
+                       booking.status === 'pending' ? 'Menunggu' : 'Dibatalkan'}
+                    </Badge>
+                    <p className="text-sm font-peace-sans font-bold text-gray-900 whitespace-nowrap">
+                      {booking.total_amount.toLocaleString('id-ID', { 
+                        style: 'currency', 
+                        currency: 'IDR', 
+                        minimumFractionDigits: 0 
+                      })}
+                    </p>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
-          </div>
-        </div>
-      </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Empty State */}
+      {bookings.length === 0 && (
+        <Card className="border border-gray-100 shadow-sm">
+          <CardContent className="p-8 text-center">
+            <Camera className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-peace-sans font-black text-gray-900 mb-2">
+              Belum Ada Booking
+            </h3>
+            <p className="text-gray-500 font-inter mb-6">
+              Mulai booking session foto pertama Anda di Studio Noir!
+            </p>
+            <Link to="/customer/booking-selection">
+              <Button className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold">
+                <Camera className="w-5 h-5 mr-2" />
+                Booking Sekarang
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
+
+export default PelangganDashboard;
