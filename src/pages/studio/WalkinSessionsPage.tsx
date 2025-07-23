@@ -1,21 +1,31 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, Calendar, Clock, User, MapPin } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, Clock, User, MapPin, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import WalkinBookingForm from '@/components/studio/WalkinBookingForm';
+import WalkinSessionsFilters, { WalkinFilters } from '@/components/studio/WalkinSessionsFilters';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { formatTimeWITA, formatDateTimeWITA } from '@/utils/timezoneUtils';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
+import { useWalkinSessionsFilter } from '@/hooks/useWalkinSessionsFilter';
 
 const WalkinSessionsPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
+  const [filters, setFilters] = useState<WalkinFilters>({
+    dateRange: undefined,
+    searchQuery: '',
+    status: 'all',
+    studioId: 'all'
+  });
+  
   const queryClient = useQueryClient();
   const { userProfile } = useJWTAuth();
   
@@ -25,6 +35,21 @@ const WalkinSessionsPage = () => {
 
   // Check if user is owner
   const isOwner = userProfile?.role === 'owner';
+
+  // Fetch studios for filter
+  const { data: studios } = useQuery({
+    queryKey: ['studios'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('studios')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
 
   // Fetch today's walking sessions with UTC consistency
   const { data: sessions, isLoading, error } = useQuery({
@@ -49,8 +74,8 @@ const WalkinSessionsPage = () => {
           )
         `)
         .eq('is_walking_session', true)
-        .gte('created_at', startOfDayUtc)  // Changed from start_time to created_at for better filtering
-        .lte('created_at', endOfDayUtc)    // Changed from start_time to created_at for better filtering
+        .gte('created_at', startOfDayUtc)
+        .lte('created_at', endOfDayUtc)
         .order('start_time', { ascending: true });
 
       console.log('Walk-in sessions query result:', { data, error });
@@ -63,6 +88,9 @@ const WalkinSessionsPage = () => {
       return data || [];
     }
   });
+
+  // Use custom hook for filtering
+  const { filteredSessions, totalSessions, filteredCount, isFiltered } = useWalkinSessionsFilter(sessions || [], filters);
 
   // Delete mutation with proper cleanup and owner-only access
   const deleteMutation = useMutation({
@@ -276,6 +304,13 @@ const WalkinSessionsPage = () => {
           </Dialog>
         </div>
 
+        {/* Filter Component */}
+        <WalkinSessionsFilters
+          onFilterChange={setFilters}
+          studios={studios || []}
+          isLoading={isLoading}
+        />
+
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -284,7 +319,9 @@ const WalkinSessionsPage = () => {
                 <Calendar className="h-5 w-5 text-blue-500" />
                 <div>
                   <p className="text-sm text-muted-foreground">Total Sessions</p>
-                  <p className="text-xl font-bold">{sessions?.length || 0}</p>
+                  <p className="text-xl font-bold">
+                    {isFiltered ? `${filteredCount} / ${totalSessions}` : totalSessions}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -297,7 +334,7 @@ const WalkinSessionsPage = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Confirmed</p>
                   <p className="text-xl font-bold">
-                    {sessions?.filter(s => s.status === 'confirmed').length || 0}
+                    {filteredSessions?.filter(s => s.status === 'confirmed').length || 0}
                   </p>
                 </div>
               </div>
@@ -311,7 +348,7 @@ const WalkinSessionsPage = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Completed</p>
                   <p className="text-xl font-bold">
-                    {sessions?.filter(s => s.status === 'completed').length || 0}
+                    {filteredSessions?.filter(s => s.status === 'completed').length || 0}
                   </p>
                 </div>
               </div>
@@ -325,7 +362,7 @@ const WalkinSessionsPage = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Total Revenue</p>
                   <p className="text-xl font-bold">
-                    Rp {sessions?.reduce((total, session) => total + (session.total_amount || 0), 0).toLocaleString('id-ID')}
+                    Rp {filteredSessions?.reduce((total, session) => total + (session.total_amount || 0), 0).toLocaleString('id-ID')}
                   </p>
                 </div>
               </div>
@@ -333,9 +370,23 @@ const WalkinSessionsPage = () => {
           </Card>
         </div>
 
+        {/* Filter Status Info */}
+        {isFiltered && (
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-blue-700">
+                <Filter className="h-4 w-4" />
+                <span className="text-sm">
+                  Menampilkan {filteredCount} dari {totalSessions} walk-in sessions
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Sessions List with consistent WITA time formatting */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {sessions?.map((session: any) => (
+          {filteredSessions?.map((session: any) => (
             <Card key={session.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -425,12 +476,20 @@ const WalkinSessionsPage = () => {
           ))}
         </div>
 
-        {(!sessions || sessions.length === 0) && (
+        {(!filteredSessions || filteredSessions.length === 0) && (
           <Card>
             <CardContent className="text-center py-8">
-              <p className="text-muted-foreground">Belum ada walk-in session hari ini</p>
+              <p className="text-muted-foreground">
+                {isFiltered 
+                  ? 'Tidak ada walk-in session yang sesuai dengan filter'
+                  : 'Belum ada walk-in session hari ini'
+                }
+              </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Klik "Tambah Walk-in Session" untuk menambah session baru
+                {isFiltered 
+                  ? 'Coba ubah filter atau reset untuk melihat semua data'
+                  : 'Klik "Tambah Walk-in Session" untuk menambah session baru'
+                }
               </p>
             </CardContent>
           </Card>
