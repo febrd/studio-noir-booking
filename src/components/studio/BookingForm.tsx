@@ -792,12 +792,12 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="guest_email">Email Customer *</Label>
+                    <Label htmlFor="guest_email">Email/Whatsapp Customer *</Label>
                     <Input
                       id="guest_email"
-                      type="email"
+                      type="text"
                       {...form.register('guest_email')}
-                      placeholder="Masukkan email customer"
+                      placeholder="Masukkan email/whatsapp customer"
                     />
                   </div>
                 </>
