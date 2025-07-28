@@ -170,7 +170,7 @@ export const OwnerDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue Bulan Ini</CardTitle>
+            <CardTitle className="text-sm font-medium">Turnover Bulan Ini</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -243,12 +243,12 @@ export const OwnerDashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Top 5 Studios Performance</CardTitle>
-            <CardDescription>Revenue dan jumlah booking per studio (termasuk walk-in)</CardDescription>
+            <CardDescription>Turnover dan jumlah booking per studio (termasuk walk-in)</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer
               config={{
-                revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
+                revenue: { label: "Turnover", color: "hsl(var(--chart-1))" },
                 bookings: { label: "Bookings", color: "hsl(var(--chart-2))" }
               }}
               className="h-[300px]"
@@ -275,7 +275,7 @@ export const OwnerDashboard = () => {
           <CardContent>
             <ChartContainer
               config={{
-                revenue: { label: "Revenue" }
+                revenue: { label: "Turnover" }
               }}
               className="h-[300px]"
             >
@@ -298,7 +298,7 @@ export const OwnerDashboard = () => {
                     ))}
                   </Pie>
                   <ChartTooltip
-                    formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Revenue']}
+                    formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Turnover']}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -372,7 +372,7 @@ export const OwnerDashboard = () => {
             </div>
             
             <div className="p-4 border rounded-lg">
-              <h3 className="font-semibold mb-2">Average Revenue per Studio</h3>
+              <h3 className="font-semibold mb-2">Average Turnover per Studio</h3>
               <div className="text-2xl font-bold text-primary">
                 Rp {studios?.length ? Math.round(currentRevenue / studios.length).toLocaleString('id-ID') : 0}
               </div>
