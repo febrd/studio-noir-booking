@@ -263,7 +263,7 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="offline">Offline (Cash/Transfer)</SelectItem>
+                  <SelectItem value="offline">Offline</SelectItem>
                   <SelectItem value="online">Online</SelectItem>
                 </SelectContent>
               </Select>
