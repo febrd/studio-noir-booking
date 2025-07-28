@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -113,10 +112,7 @@ const CustomOrdersPage = () => {
           quantity,
           unit_price,
           total_price,
-          additional_service_id,
-          additional_services (
-            name
-          )
+          additional_service_id
         `)
         .in('custom_order_id', orderIds);
 
@@ -124,12 +120,26 @@ const CustomOrdersPage = () => {
         console.error('Error fetching services:', servicesError);
       }
 
+      // Get additional services separately
+      const additionalServiceIds = servicesData?.map(service => service.additional_service_id) || [];
+      const { data: additionalServicesData, error: additionalServicesError } = await supabase
+        .from('additional_services')
+        .select('id, name')
+        .in('id', additionalServiceIds);
+
+      if (additionalServicesError) {
+        console.error('Error fetching additional services:', additionalServicesError);
+      }
+
       // Combine all data
       const combinedOrders: CustomOrder[] = ordersData.map(order => ({
         ...order,
         customer_profiles: customersData?.find(c => c.id === order.customer_id) || null,
         studios: studiosData?.find(s => s.id === order.studio_id) || null,
-        custom_order_services: servicesData?.filter(s => s.custom_order_id === order.id) || []
+        custom_order_services: servicesData?.filter(s => s.custom_order_id === order.id).map(service => ({
+          ...service,
+          additional_services: additionalServicesData?.find(as => as.id === service.additional_service_id) || null
+        })) || []
       }));
 
       // Filter the data based on current filters
