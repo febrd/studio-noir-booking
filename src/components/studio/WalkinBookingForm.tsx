@@ -26,7 +26,7 @@ const walkinBookingSchema = z.object({
   category_id: z.string().optional(),
   package_id: z.string().min(1, 'Package wajib dipilih'),
   start_time: z.string().min(1, 'Waktu mulai wajib diisi'),
-  payment_method: z.enum(['cash', 'debit', 'credit', 'qris', 'transfer']),
+  payment_method: z.enum(['offline', 'online']),
   notes: z.string().optional(),
   additional_services: z.array(z.string()).optional()
 });
@@ -59,7 +59,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       category_id: '',
       package_id: '',
       start_time: '',
-      payment_method: 'cash',
+      payment_method: 'offline',
       notes: '',
       additional_services: []
     }
@@ -645,11 +645,8 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
                   <SelectValue placeholder="Pilih metode pembayaran" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="debit">Debit Card</SelectItem>
-                  <SelectItem value="credit">Credit Card</SelectItem>
-                  <SelectItem value="qris">QRIS</SelectItem>
-                  <SelectItem value="transfer">Transfer Bank</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="offline">Offline</SelectItem>
                 </SelectContent>
               </Select>
               {form.formState.errors.payment_method && (
