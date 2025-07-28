@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -63,39 +64,76 @@ const CustomOrdersPage = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // First, get the custom orders
+      const { data: ordersData, error: ordersError } = await supabase
         .from('custom_orders')
-        .select(`
-          *,
-          customer_profiles (
-            full_name,
-            email,
-            phone
-          ),
-          studios (
-            name
-          ),
-          custom_order_services (
-            id,
-            quantity,
-            unit_price,
-            total_price,
-            additional_service_id,
-            additional_services (
-              name
-            )
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching orders:', error);
+      if (ordersError) {
+        console.error('Error fetching orders:', ordersError);
         toast.error('Failed to fetch orders');
         return;
       }
 
+      if (!ordersData || ordersData.length === 0) {
+        setOrders([]);
+        return;
+      }
+
+      // Get customer profiles
+      const customerIds = ordersData.map(order => order.customer_id);
+      const { data: customersData, error: customersError } = await supabase
+        .from('customer_profiles')
+        .select('id, full_name, email, phone')
+        .in('id', customerIds);
+
+      if (customersError) {
+        console.error('Error fetching customers:', customersError);
+      }
+
+      // Get studios
+      const studioIds = ordersData.map(order => order.studio_id);
+      const { data: studiosData, error: studiosError } = await supabase
+        .from('studios')
+        .select('id, name')
+        .in('id', studioIds);
+
+      if (studiosError) {
+        console.error('Error fetching studios:', studiosError);
+      }
+
+      // Get custom order services
+      const orderIds = ordersData.map(order => order.id);
+      const { data: servicesData, error: servicesError } = await supabase
+        .from('custom_order_services')
+        .select(`
+          id,
+          custom_order_id,
+          quantity,
+          unit_price,
+          total_price,
+          additional_service_id,
+          additional_services (
+            name
+          )
+        `)
+        .in('custom_order_id', orderIds);
+
+      if (servicesError) {
+        console.error('Error fetching services:', servicesError);
+      }
+
+      // Combine all data
+      const combinedOrders: CustomOrder[] = ordersData.map(order => ({
+        ...order,
+        customer_profiles: customersData?.find(c => c.id === order.customer_id) || null,
+        studios: studiosData?.find(s => s.id === order.studio_id) || null,
+        custom_order_services: servicesData?.filter(s => s.custom_order_id === order.id) || []
+      }));
+
       // Filter the data based on current filters
-      let filteredData = data || [];
+      let filteredData = combinedOrders;
 
       if (filters.customerName) {
         filteredData = filteredData.filter(order => 
