@@ -1,11 +1,11 @@
+
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Calendar, Search, Filter } from 'lucide-react';
+import { Search, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { ExportButtons } from '@/components/ExportButtons';
@@ -16,52 +16,100 @@ const OnlineBookingsReport = () => {
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { data: bookingsData, isLoading } = useQuery({
-    queryKey: ['online-bookings', startDate, endDate],
+  // Query untuk mengambil semua transaksi online (termasuk installments)
+  const { data: transactionsData, isLoading } = useQuery({
+    queryKey: ['online-transactions', startDate, endDate],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('bookings')
+      // Ambil data dari tabel transactions untuk transaksi online
+      const { data: transactions, error: transError } = await supabase
+        .from('transactions')
         .select(`
           *,
-          users (name, email),
-          studios (name, type),
-          studio_packages (title, price, category_id),
-          package_categories (name),
-          installments (amount, paid_at, payment_method)
+          bookings!inner(
+            id,
+            user_id,
+            studio_id,
+            status,
+            total_amount,
+            payment_method,
+            users!inner(name, email),
+            studios!inner(name),
+            studio_packages!inner(title)
+          )
         `)
+        .or('payment_type.eq.online,type.eq.online')
         .gte('created_at', startDate + 'T00:00:00')
         .lte('created_at', endDate + 'T23:59:59')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data;
+      if (transError) throw transError;
+
+      // Ambil data installments untuk transaksi online
+      const { data: installments, error: instError } = await supabase
+        .from('installments')
+        .select(`
+          *,
+          bookings!inner(
+            id,
+            user_id,
+            studio_id,
+            status,
+            total_amount,
+            payment_method,
+            users!inner(name, email),
+            studios!inner(name),
+            studio_packages!inner(title)
+          )
+        `)
+        .eq('payment_method', 'online')
+        .gte('created_at', startDate + 'T00:00:00')
+        .lte('created_at', endDate + 'T23:59:59')
+        .order('created_at', { ascending: false });
+
+      if (instError) throw instError;
+
+      // Gabungkan data dan normalize struktur
+      const allTransactions = [
+        ...(transactions || []).map(t => ({
+          id: t.id,
+          created_at: t.created_at,
+          amount: t.amount,
+          description: t.description,
+          type: 'transaction',
+          payment_method: t.payment_type,
+          status: t.status,
+          bookings: t.bookings
+        })),
+        ...(installments || []).map(i => ({
+          id: i.id,
+          created_at: i.created_at,
+          amount: i.amount,
+          description: `Cicilan ke-${i.installment_number || 'N/A'}`,
+          type: 'installment',
+          payment_method: i.payment_method,
+          status: 'paid',
+          bookings: i.bookings
+        }))
+      ];
+
+      return allTransactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
   });
 
-  // Filter for online bookings - assuming "online" payment method indicates online bookings
-  const onlineBookings = useMemo(() => {
-    if (!bookingsData) return [];
-    return bookingsData.filter(booking => {
-      // If payment_method is strictly "online" or "offline", filter accordingly
-      // Otherwise, we'll need to check the type field or other indicators
-      return booking.payment_method === 'online' || 
-             (booking.type && ['self_photo', 'regular'].includes(booking.type as string));
-    });
-  }, [bookingsData]);
-
   const filteredData = useMemo(() => {
-    if (!onlineBookings) return [];
+    if (!transactionsData) return [];
     
-    return onlineBookings.filter(booking => {
+    return transactionsData.filter(transaction => {
       const searchLower = searchTerm.toLowerCase();
       return (
-        booking.users?.name?.toLowerCase().includes(searchLower) ||
-        booking.users?.email?.toLowerCase().includes(searchLower) ||
-        booking.studios?.name?.toLowerCase().includes(searchLower) ||
-        booking.studio_packages?.title?.toLowerCase().includes(searchLower)
+        transaction.bookings?.users?.name?.toLowerCase().includes(searchLower) ||
+        transaction.bookings?.users?.email?.toLowerCase().includes(searchLower) ||
+        transaction.bookings?.studios?.name?.toLowerCase().includes(searchLower) ||
+        transaction.bookings?.studio_packages?.title?.toLowerCase().includes(searchLower) ||
+        transaction.description?.toLowerCase().includes(searchLower)
       );
     });
-  }, [onlineBookings, searchTerm]);
+  }, [transactionsData, searchTerm]);
 
   const exportData = useMemo(() => {
     if (!filteredData) return undefined;
@@ -72,20 +120,22 @@ const OnlineBookingsReport = () => {
       'Email',
       'Studio',
       'Paket',
+      'Tipe Transaksi',
+      'Deskripsi',
       'Status',
-      'Total Amount',
-      'Payment Method'
+      'Total Amount'
     ];
 
-    const data = filteredData.map(booking => [
-      format(new Date(booking.created_at), 'dd/MM/yyyy HH:mm', { locale: id }),
-      booking.users?.name || '-',
-      booking.users?.email || '-',
-      booking.studios?.name || '-',
-      booking.studio_packages?.title || '-',
-      booking.status,
-      `Rp ${booking.total_amount?.toLocaleString('id-ID') || '0'}`,
-      booking.payment_method || '-'
+    const data = filteredData.map(transaction => [
+      format(new Date(transaction.created_at), 'dd/MM/yyyy HH:mm', { locale: id }),
+      transaction.bookings?.users?.name || '-',
+      transaction.bookings?.users?.email || '-',
+      transaction.bookings?.studios?.name || '-',
+      transaction.bookings?.studio_packages?.title || '-',
+      transaction.type === 'installment' ? 'Cicilan' : 'Transaksi',
+      transaction.description || '-',
+      transaction.status || '-',
+      `Rp ${transaction.amount?.toLocaleString('id-ID') || '0'}`
     ]);
 
     return {
@@ -97,8 +147,11 @@ const OnlineBookingsReport = () => {
   }, [filteredData, startDate, endDate]);
 
   const totalAmount = useMemo(() => {
-    return filteredData?.reduce((sum, booking) => sum + (booking.total_amount || 0), 0) || 0;
+    return filteredData?.reduce((sum, transaction) => sum + (transaction.amount || 0), 0) || 0;
   }, [filteredData]);
+
+  const transactionCount = filteredData?.length || 0;
+  const installmentCount = filteredData?.filter(t => t.type === 'installment').length || 0;
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
@@ -111,7 +164,7 @@ const OnlineBookingsReport = () => {
           <div>
             <h1 className="text-3xl font-bold">Laporan Transaksi Online</h1>
             <p className="text-muted-foreground">
-              Laporan transaksi booking online
+              Laporan semua transaksi dengan metode pembayaran online
             </p>
           </div>
           <ExportButtons exportData={exportData} />
@@ -148,7 +201,7 @@ const OnlineBookingsReport = () => {
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Cari customer, email, studio..."
+                    placeholder="Cari customer, studio, deskripsi..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -160,11 +213,17 @@ const OnlineBookingsReport = () => {
         </Card>
 
         {/* Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold">{filteredData?.length || 0}</div>
+              <div className="text-2xl font-bold">{transactionCount}</div>
               <p className="text-muted-foreground">Total Transaksi</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-2xl font-bold text-blue-600">{installmentCount}</div>
+              <p className="text-muted-foreground">Cicilan</p>
             </CardContent>
           </Card>
           <Card>
@@ -177,10 +236,10 @@ const OnlineBookingsReport = () => {
           </Card>
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold text-blue-600">
-                {filteredData?.filter(b => b.status === 'confirmed').length || 0}
+              <div className="text-2xl font-bold text-purple-600">
+                {transactionCount - installmentCount}
               </div>
-              <p className="text-muted-foreground">Transaksi Berhasil</p>
+              <p className="text-muted-foreground">Full Payment</p>
             </CardContent>
           </Card>
         </div>
@@ -188,9 +247,9 @@ const OnlineBookingsReport = () => {
         {/* Data Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Data Transaksi</CardTitle>
+            <CardTitle>Data Transaksi Online</CardTitle>
             <CardDescription>
-              Daftar transaksi online periode {format(new Date(startDate), 'dd MMMM yyyy', { locale: id })} - {format(new Date(endDate), 'dd MMMM yyyy', { locale: id })}
+              Daftar semua transaksi online periode {format(new Date(startDate), 'dd MMMM yyyy', { locale: id })} - {format(new Date(endDate), 'dd MMMM yyyy', { locale: id })}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -201,38 +260,48 @@ const OnlineBookingsReport = () => {
                     <th className="border border-gray-200 p-3 text-left">Tanggal</th>
                     <th className="border border-gray-200 p-3 text-left">Customer</th>
                     <th className="border border-gray-200 p-3 text-left">Studio</th>
-                    <th className="border border-gray-200 p-3 text-left">Paket</th>
+                    <th className="border border-gray-200 p-3 text-left">Tipe</th>
+                    <th className="border border-gray-200 p-3 text-left">Deskripsi</th>
                     <th className="border border-gray-200 p-3 text-left">Status</th>
                     <th className="border border-gray-200 p-3 text-left">Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData?.map((booking) => (
-                    <tr key={booking.id} className="hover:bg-gray-50">
+                  {filteredData?.map((transaction) => (
+                    <tr key={`${transaction.type}-${transaction.id}`} className="hover:bg-gray-50">
                       <td className="border border-gray-200 p-3">
-                        {format(new Date(booking.created_at), 'dd/MM/yyyy HH:mm', { locale: id })}
+                        {format(new Date(transaction.created_at), 'dd/MM/yyyy HH:mm', { locale: id })}
                       </td>
                       <td className="border border-gray-200 p-3">
                         <div>
-                          <div className="font-medium">{booking.users?.name}</div>
-                          <div className="text-sm text-gray-600">{booking.users?.email}</div>
+                          <div className="font-medium">{transaction.bookings?.users?.name}</div>
+                          <div className="text-sm text-gray-600">{transaction.bookings?.users?.email}</div>
                         </div>
                       </td>
-                      <td className="border border-gray-200 p-3">{booking.studios?.name}</td>
-                      <td className="border border-gray-200 p-3">{booking.studio_packages?.title}</td>
+                      <td className="border border-gray-200 p-3">{transaction.bookings?.studios?.name}</td>
                       <td className="border border-gray-200 p-3">
                         <span className={`px-2 py-1 rounded text-xs ${
-                          booking.status === 'confirmed' 
+                          transaction.type === 'installment' 
+                            ? 'bg-blue-100 text-blue-800' 
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {transaction.type === 'installment' ? 'Cicilan' : 'Full Payment'}
+                        </span>
+                      </td>
+                      <td className="border border-gray-200 p-3">{transaction.description}</td>
+                      <td className="border border-gray-200 p-3">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          transaction.status === 'paid' 
                             ? 'bg-green-100 text-green-800' 
-                            : booking.status === 'pending'
+                            : transaction.status === 'pending'
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-red-100 text-red-800'
                         }`}>
-                          {booking.status}
+                          {transaction.status}
                         </span>
                       </td>
                       <td className="border border-gray-200 p-3 font-semibold">
-                        Rp {booking.total_amount?.toLocaleString('id-ID')}
+                        Rp {transaction.amount?.toLocaleString('id-ID')}
                       </td>
                     </tr>
                   ))}
