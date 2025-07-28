@@ -12,7 +12,8 @@ import {
   Clock,
   UserCheck,
   BookOpen,
-  Wallet
+  Wallet,
+  Receipt
 } from 'lucide-react';
 
 import {
@@ -119,14 +120,25 @@ export function AppSidebar() {
               icon: UserCheck,
             },
             {
-              title: "Online Bookings",
+              title: "Online",
               url: "/transactions/online-bookings",
               icon: Calendar,
             },
             {
-              title: "Offline Bookings",
+              title: "Offline",
               url: "/transactions/offline-bookings",
               icon: Clock,
+            },
+          ],
+        },
+        {
+          title: "Expense",
+          icon: Receipt,
+          items: [
+            {
+              title: "Manage Expenses",
+              url: "/expenses",
+              icon: Receipt,
             },
           ],
         },
@@ -191,6 +203,17 @@ export function AppSidebar() {
               title: "Offline",
               url: "/transactions/offline-bookings",
               icon: Clock,
+            },
+          ],
+        },
+        {
+          title: "Expense",
+          icon: Receipt,
+          items: [
+            {
+              title: "Manage Expenses",
+              url: "/expenses",
+              icon: Receipt,
             },
           ],
         },
