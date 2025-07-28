@@ -18,6 +18,7 @@ import PackagesPage from "./pages/studio/PackagesPage"
 import ServicesPage from "./pages/studio/ServicesPage"
 import BookingsPage from "./pages/studio/BookingsPage"
 import WalkinSessionsPage from "./pages/studio/WalkinSessionsPage"
+import CustomOrdersPage from "./pages/studio/CustomOrdersPage"
 import TransactionsPage from "./pages/transactions/TransactionsPage"
 import TransactionReports from "./pages/transactions/TransactionReports"
 import OnlineBookingsReport from "./pages/transactions/OnlineBookingsReport"
@@ -52,6 +53,7 @@ const App = () => (
             {/* Booking Routes */}
             <Route path="/bookings" element={<BookingsPage />} />
             <Route path="/walkin-sessions" element={<WalkinSessionsPage />} />
+            <Route path="/custom-orders" element={<CustomOrdersPage />} />
             <Route path="/booking-logs" element={<BookingLogsPage />} />
             
             {/* Transaction Routes */}

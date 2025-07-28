@@ -209,7 +209,33 @@ const CustomOrdersPage = () => {
 
       if (error) throw error;
 
-      toast.success('Status updated successfully');
+      // If status is changed to completed, create a transaction record
+      if (newStatus === 'completed') {
+        const order = orders.find(o => o.id === orderId);
+        if (order) {
+          const { error: transactionError } = await supabase
+            .from('transactions')
+            .insert({
+              reference_id: orderId,
+              booking_id: orderId, // Using order ID as booking ID for custom orders
+              amount: order.total_amount,
+              type: order.payment_method, // 'online' or 'offline'
+              description: `Custom order - ${order.customer_profiles?.full_name || 'Unknown Customer'}`,
+              payment_type: 'full_payment',
+              status: 'paid'
+            });
+
+          if (transactionError) {
+            console.error('Error creating transaction:', transactionError);
+            toast.error('Order updated but failed to create transaction record');
+          } else {
+            toast.success('Order completed and transaction recorded');
+          }
+        }
+      } else {
+        toast.success('Status updated successfully');
+      }
+      
       fetchOrders();
     } catch (error) {
       console.error('Error updating status:', error);

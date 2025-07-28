@@ -1,4 +1,3 @@
-
 import { 
   Calendar, 
   Camera, 
@@ -14,7 +13,8 @@ import {
   BookOpen,
   Wallet,
   Receipt,
-  HandIcon
+  HandIcon,
+  ShoppingCart
 } from 'lucide-react';
 
 import {
@@ -119,6 +119,11 @@ export function AppSidebar() {
               title: "Walk-in Sessions",
               url: "/walkin-sessions",
               icon: UserCheck,
+            },
+            {
+              title: "Custom Orders",
+              url: "/custom-orders",
+              icon: ShoppingCart,
             },
             {
               title: "Online",
