@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,13 +15,13 @@ const OfflineBookingsReport = () => {
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Query untuk mengambil semua transaksi offline (booking reguler dan walk-in sessions)
+  // Query untuk mengambil semua transaksi dengan payment method offline
   const { data: transactionsData, isLoading } = useQuery({
     queryKey: ['offline-transactions', startDate, endDate],
     queryFn: async () => {
       console.log('Fetching offline transactions...');
       
-      // Ambil semua booking yang menggunakan payment method offline (termasuk walk-in sessions)
+      // Ambil semua booking dengan payment method offline
       const { data: bookings, error: bookingError } = await supabase
         .from('bookings')
         .select(`
@@ -49,9 +48,9 @@ const OfflineBookingsReport = () => {
         throw bookingError;
       }
       
-      console.log('Fetched bookings:', bookings);
+      console.log('Fetched offline bookings:', bookings);
 
-      // Ambil semua installments yang payment method-nya offline
+      // Ambil semua installments dengan payment method offline
       const { data: installments, error: instError } = await supabase
         .from('installments')
         .select(`
@@ -63,6 +62,7 @@ const OfflineBookingsReport = () => {
             status,
             total_amount,
             payment_method,
+            type,
             is_walking_session,
             users!inner(name, email),
             studios!inner(name),
@@ -79,11 +79,11 @@ const OfflineBookingsReport = () => {
         throw instError;
       }
       
-      console.log('Fetched installments:', installments);
+      console.log('Fetched offline installments:', installments);
 
       const allTransactions = [];
 
-      // Proses semua booking (reguler dan walk-in sessions)
+      // Proses semua booking offline
       for (const booking of bookings || []) {
         const hasInstallments = installments?.some(inst => inst.booking_id === booking.id);
         
@@ -91,11 +91,12 @@ const OfflineBookingsReport = () => {
           hasInstallments,
           status: booking.status,
           isWalkingSession: booking.is_walking_session,
-          paymentMethod: booking.payment_method
+          paymentMethod: booking.payment_method,
+          type: booking.type
         });
         
-        // Hanya tampilkan sebagai full payment jika tidak ada installments dan status paid
-        if (!hasInstallments && booking.status === 'paid') {
+        // Jika tidak ada installments dan status confirmed/paid, tampilkan sebagai full payment
+        if (!hasInstallments && (booking.status === 'confirmed' || booking.status === 'paid')) {
           const sessionType = booking.is_walking_session ? 'Walk-in Session' : 'Booking Regular';
           const description = `${sessionType} - ${booking.studio_packages?.title || 'Package'}`;
           
@@ -106,8 +107,9 @@ const OfflineBookingsReport = () => {
             description: description,
             type: 'full_payment',
             payment_method: 'offline',
-            status: 'paid',
+            status: booking.status,
             is_walking_session: booking.is_walking_session,
+            booking_type: booking.type,
             bookings: {
               users: booking.users,
               studios: booking.studios,
@@ -117,7 +119,7 @@ const OfflineBookingsReport = () => {
         }
       }
 
-      // Tambahkan semua installment untuk booking offline
+      // Tambahkan semua installment offline
       for (const installment of installments || []) {
         const sessionType = installment.bookings.is_walking_session ? 'Walk-in Session' : 'Booking Regular';
         const description = `Cicilan ke-${installment.installment_number || 'N/A'} - ${sessionType} - ${installment.bookings.studio_packages?.title || 'Package'}`;
@@ -131,11 +133,12 @@ const OfflineBookingsReport = () => {
           payment_method: 'offline',
           status: 'paid',
           is_walking_session: installment.bookings.is_walking_session,
+          booking_type: installment.bookings.type,
           bookings: installment.bookings
         });
       }
 
-      console.log('All transactions processed:', allTransactions);
+      console.log('All offline transactions processed:', allTransactions);
       return allTransactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
   });
@@ -354,7 +357,7 @@ const OfflineBookingsReport = () => {
                       <td className="border border-gray-200 p-3">{transaction.description}</td>
                       <td className="border border-gray-200 p-3">
                         <span className={`px-2 py-1 rounded text-xs ${
-                          transaction.status === 'paid' 
+                          transaction.status === 'paid' || transaction.status === 'confirmed'
                             ? 'bg-green-100 text-green-800' 
                             : transaction.status === 'pending'
                             ? 'bg-yellow-100 text-yellow-800'
