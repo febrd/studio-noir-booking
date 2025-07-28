@@ -81,6 +81,29 @@ const OnlineBookingsReport = () => {
       
       console.log('Fetched online installments:', installments);
 
+      // Ambil custom orders dengan payment method online
+      const { data: customOrders, error: customOrdersError } = await supabase
+        .from('custom_orders')
+        .select(`
+          *,
+          customer_profiles!inner(
+            id,
+            full_name,
+            email
+          )
+        `)
+        .eq('payment_method', 'online')
+        .gte('created_at', startDate + 'T00:00:00')
+        .lte('created_at', endDate + 'T23:59:59')
+        .order('created_at', { ascending: false });
+
+      if (customOrdersError) {
+        console.error('Error fetching custom orders:', customOrdersError);
+        throw customOrdersError;
+      }
+
+      console.log('Fetched online custom orders:', customOrders);
+
       const allTransactions = [];
 
       // Proses semua booking online
@@ -110,6 +133,7 @@ const OnlineBookingsReport = () => {
             status: booking.status,
             is_walking_session: booking.is_walking_session,
             booking_type: booking.type,
+            jenis: booking.is_walking_session ? 'Walk-in' : 'Booking',
             bookings: {
               users: booking.users,
               studios: booking.studios,
@@ -134,7 +158,32 @@ const OnlineBookingsReport = () => {
           status: 'paid',
           is_walking_session: installment.bookings.is_walking_session,
           booking_type: installment.bookings.type,
+          jenis: installment.bookings.is_walking_session ? 'Walk-in' : 'Booking',
           bookings: installment.bookings
+        });
+      }
+
+      // Tambahkan custom orders
+      for (const order of customOrders || []) {
+        allTransactions.push({
+          id: order.id,
+          created_at: order.created_at,
+          amount: order.total_amount,
+          description: order.notes || 'Custom Order',
+          type: 'full_payment',
+          payment_method: 'online',
+          status: 'paid',
+          is_walking_session: false,
+          booking_type: 'custom',
+          jenis: 'Custom',
+          bookings: {
+            users: {
+              name: order.customer_profiles?.full_name,
+              email: order.customer_profiles?.email
+            },
+            studios: { name: 'N/A' },
+            studio_packages: { title: 'Custom Order' }
+          }
         });
       }
 
@@ -181,7 +230,7 @@ const OnlineBookingsReport = () => {
       transaction.bookings?.studios?.name || '-',
       transaction.bookings?.studio_packages?.title || '-',
       transaction.type === 'installment' ? 'Cicilan' : 'Full Payment',
-      transaction.is_walking_session ? 'Walk-in Session' : 'Booking Regular',
+      transaction.jenis,
       transaction.description || '-',
       transaction.status || '-',
       `Rp ${transaction.amount?.toLocaleString('id-ID') || '0'}`
@@ -202,6 +251,7 @@ const OnlineBookingsReport = () => {
   const transactionCount = filteredData?.length || 0;
   const installmentCount = filteredData?.filter(t => t.type === 'installment').length || 0;
   const walkinCount = filteredData?.filter(t => t.is_walking_session).length || 0;
+  const customCount = filteredData?.filter(t => t.jenis === 'Custom').length || 0;
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
@@ -263,7 +313,7 @@ const OnlineBookingsReport = () => {
         </Card>
 
         {/* Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <Card>
             <CardContent className="p-6">
               <div className="text-2xl font-bold">{transactionCount}</div>
@@ -284,6 +334,12 @@ const OnlineBookingsReport = () => {
           </Card>
           <Card>
             <CardContent className="p-6">
+              <div className="text-2xl font-bold text-purple-600">{customCount}</div>
+              <p className="text-muted-foreground">Custom Orders</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
               <div className="text-2xl font-bold text-green-600">
                 Rp {totalAmount.toLocaleString('id-ID')}
               </div>
@@ -292,7 +348,7 @@ const OnlineBookingsReport = () => {
           </Card>
           <Card>
             <CardContent className="p-6">
-              <div className="text-2xl font-bold text-purple-600">
+              <div className="text-2xl font-bold text-red-600">
                 {transactionCount - installmentCount}
               </div>
               <p className="text-muted-foreground">Full Payment</p>
@@ -338,11 +394,13 @@ const OnlineBookingsReport = () => {
                       <td className="border border-gray-200 p-3">{transaction.bookings?.studios?.name}</td>
                       <td className="border border-gray-200 p-3">
                         <span className={`px-2 py-1 rounded text-xs ${
-                          transaction.is_walking_session 
+                          transaction.jenis === 'Custom' 
+                            ? 'bg-purple-100 text-purple-800'
+                            : transaction.is_walking_session 
                             ? 'bg-orange-100 text-orange-800' 
                             : 'bg-blue-100 text-blue-800'
                         }`}>
-                          {transaction.is_walking_session ? 'Walk-in' : 'Booking'}
+                          {transaction.jenis}
                         </span>
                       </td>
                       <td className="border border-gray-200 p-3">

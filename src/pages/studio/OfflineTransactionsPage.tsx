@@ -61,18 +61,73 @@ const OfflineTransactionsPage = () => {
         query = query.gte('created_at', startDate.toISOString());
       }
 
-      const { data, error } = await query;
+      const { data: bookingTransactions, error } = await query;
       
       if (error) throw error;
-      
+
+      // Fetch custom orders with offline payment
+      const { data: customOrders, error: customOrdersError } = await supabase
+        .from('custom_orders')
+        .select(`
+          *,
+          customer_profiles!inner(
+            id,
+            full_name,
+            email
+          )
+        `)
+        .eq('payment_method', 'offline')
+        .order('created_at', { ascending: false });
+
+      if (customOrdersError) {
+        console.error('Error fetching custom orders:', customOrdersError);
+      }
+
+      // Combine both data sources
+      const allTransactions = [];
+
+      // Add booking transactions
+      if (bookingTransactions) {
+        allTransactions.push(...bookingTransactions.map(transaction => ({
+          ...transaction,
+          source: 'booking',
+          customer_name: transaction.bookings?.users?.name || 'N/A',
+          customer_email: transaction.bookings?.users?.email || 'N/A',
+          studio_name: transaction.bookings?.studios?.name || 'N/A',
+          jenis: transaction.bookings?.status === 'installment' ? 'Installment' : 'Booking',
+          tipe: 'full_payment',
+          description: transaction.description || 'Tidak ada deskripsi'
+        })));
+      }
+
+      // Add custom orders
+      if (customOrders) {
+        allTransactions.push(...customOrders.map(order => ({
+          id: order.id,
+          created_at: order.created_at,
+          amount: order.total_amount,
+          status: 'paid',
+          source: 'custom_order',
+          customer_name: order.customer_profiles?.full_name || 'N/A',
+          customer_email: order.customer_profiles?.email || 'N/A',
+          studio_name: 'N/A',
+          jenis: 'Custom',
+          tipe: 'full_payment',
+          description: order.notes || 'Tidak ada deskripsi',
+          performed_by_user: null
+        })));
+      }
+
+      // Sort by created_at
+      allTransactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
       // Filter by search query (customer name or booking ID)
-      let filteredData = data || [];
+      let filteredData = allTransactions;
       if (debouncedSearchQuery.trim()) {
         const searchLower = debouncedSearchQuery.toLowerCase();
         filteredData = filteredData.filter(transaction => 
-          transaction.bookings?.users?.name?.toLowerCase().includes(searchLower) ||
-          transaction.bookings?.users?.email?.toLowerCase().includes(searchLower) ||
-          transaction.booking_id?.toLowerCase().includes(searchLower) ||
+          transaction.customer_name?.toLowerCase().includes(searchLower) ||
+          transaction.customer_email?.toLowerCase().includes(searchLower) ||
           transaction.description?.toLowerCase().includes(searchLower)
         );
       }
@@ -98,8 +153,7 @@ const OfflineTransactionsPage = () => {
   const summary = transactions?.reduce((acc, transaction) => {
     acc.totalAmount += Number(transaction.amount);
     acc.totalTransactions += 1;
-    // Check booking status for installment, not transaction status
-    if (transaction.bookings?.status === 'installment' || transaction.status === 'unpaid') {
+    if (transaction.jenis === 'Installment' || transaction.status === 'unpaid') {
       acc.installmentCount += 1;
     }
     return acc;
@@ -276,9 +330,11 @@ const OfflineTransactionsPage = () => {
                     <TableHead>Tanggal</TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Studio</TableHead>
+                    <TableHead>Jenis</TableHead>
+                    <TableHead>Tipe</TableHead>
                     <TableHead>Deskripsi</TableHead>
-                    <TableHead>Nominal</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Total</TableHead>
                     <TableHead>Dicatat Oleh</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -290,25 +346,31 @@ const OfflineTransactionsPage = () => {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{transaction.bookings?.users?.name || 'N/A'}</div>
-                          <div className="text-sm text-gray-500">{transaction.bookings?.users?.email || 'N/A'}</div>
+                          <div className="font-medium">{transaction.customer_name}</div>
+                          <div className="text-sm text-gray-500">{transaction.customer_email}</div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        {transaction.bookings?.studios?.name || 'N/A'}
+                        {transaction.studio_name}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{transaction.jenis}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{transaction.tipe}</Badge>
                       </TableCell>
                       <TableCell className="max-w-xs">
                         <div className="truncate" title={transaction.description || ''}>
                           {transaction.description || 'Tidak ada deskripsi'}
                         </div>
                       </TableCell>
-                      <TableCell className="font-semibold">
-                        {formatPrice(Number(transaction.amount))}
-                      </TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(transaction.status)}>
                           {transaction.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="font-semibold">
+                        {formatPrice(Number(transaction.amount))}
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -273,6 +272,24 @@ const CustomOrdersPage = () => {
                     <p className="text-sm text-muted-foreground">Payment: {order.payment_method}</p>
                     <p className="font-semibold">Total: Rp {order.total_amount.toLocaleString('id-ID')}</p>
                     {order.notes && <p className="text-sm text-gray-500">Notes: {order.notes}</p>}
+                    
+                    {/* Display selected services */}
+                    {order.custom_order_services && order.custom_order_services.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Layanan:</p>
+                        <div className="space-y-1">
+                          {order.custom_order_services.map((service) => (
+                            <div key={service.id} className="text-xs bg-gray-50 p-2 rounded">
+                              <span className="font-medium">{service.additional_services?.name || 'Unknown Service'}</span>
+                              <span className="text-muted-foreground ml-2">
+                                {service.quantity}x - Rp {service.total_price.toLocaleString('id-ID')}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="flex justify-end mt-4 space-x-2">
                       <Button variant="outline" size="sm" onClick={() => handleEdit(order)}>
                         <Edit className="h-4 w-4 mr-2" />
