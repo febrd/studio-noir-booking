@@ -87,7 +87,7 @@ const OfflineBookingsReport = () => {
         .select(`
           *,
           customer_profiles!fk_custom_orders_customer_id(full_name, email),
-          studios!inner(name)
+          studios!fk_custom_orders_studio_id(name)
         `)
         .eq('payment_method', 'offline')
         .gte('created_at', startDate + 'T00:00:00')
