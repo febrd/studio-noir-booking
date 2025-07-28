@@ -216,12 +216,11 @@ const CustomOrdersPage = () => {
           const { error: transactionError } = await supabase
             .from('transactions')
             .insert({
-              reference_id: orderId,
               booking_id: orderId, // Using order ID as booking ID for custom orders
               amount: order.total_amount,
               type: order.payment_method, // 'online' or 'offline'
               description: `Custom order - ${order.customer_profiles?.full_name || 'Unknown Customer'}`,
-              payment_type: 'full_payment',
+              payment_type: order.payment_method as 'online' | 'offline',
               status: 'paid'
             });
 
