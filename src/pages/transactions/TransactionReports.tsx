@@ -894,10 +894,13 @@ const TransactionReports = () => {
                   </div>
                   <div className="space-y-2">
                     <Label>Profit (Revenue - Expenses)</Label>
-                    <div className={`text-2xl font-bold ${recapsAnalytics && recapsAnalytics.achievementPercentage >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
-                    Rp {recapsAnalytics?.totalRevenue.toLocaleString('id-ID')} - {recapsAnalytics?.totalExpenses.toLocaleString('id-ID')}
+                    <div className="text-4xl font-bold text-green-600">
+                      Rp {recapsAnalytics
+                        ? (recapsAnalytics.totalRevenue - recapsAnalytics.totalExpenses).toLocaleString('id-ID')
+                        : '0'}
                     </div>
                   </div>
+
                 </div>
               </CardContent>
             </Card>
