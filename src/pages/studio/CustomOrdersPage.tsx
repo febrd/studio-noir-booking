@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -64,16 +63,16 @@ const CustomOrdersPage = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('custom_orders')
         .select(`
           *,
-          customer_profiles!customer_id (
+          customer_profiles!inner (
             full_name,
             email,
             phone
           ),
-          studios!studio_id (
+          studios!inner (
             name
           ),
           custom_order_services (
@@ -88,8 +87,6 @@ const CustomOrdersPage = () => {
           )
         `)
         .order('created_at', { ascending: false });
-
-      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching orders:', error);
