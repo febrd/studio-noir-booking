@@ -163,7 +163,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
       form.setValue('studio_id', booking.studio_id || '');
       
       // Set payment method - map offline to cash for walkin
-      const paymentMethod = booking.payment_method === 'offline' ? 'cash' : booking.payment_method;
+      const paymentMethod = booking.payment_method === 'offline' ? 'online' : booking.payment_method;
       form.setValue('payment_method', paymentMethod as any);
       
       // Set time using WITA format
