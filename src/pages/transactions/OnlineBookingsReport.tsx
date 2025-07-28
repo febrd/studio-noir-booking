@@ -1,3 +1,4 @@
+
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,10 +16,12 @@ const OnlineBookingsReport = () => {
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Query untuk mengambil semua transaksi online (termasuk installments dan walk-in sessions)
+  // Query untuk mengambil semua transaksi online (booking reguler dan walk-in sessions)
   const { data: transactionsData, isLoading } = useQuery({
     queryKey: ['online-transactions', startDate, endDate],
     queryFn: async () => {
+      console.log('Fetching online transactions...');
+      
       // Ambil semua booking yang menggunakan payment method online (termasuk walk-in sessions)
       const { data: bookings, error: bookingError } = await supabase
         .from('bookings')
@@ -41,9 +44,14 @@ const OnlineBookingsReport = () => {
         .lte('created_at', endDate + 'T23:59:59')
         .order('created_at', { ascending: false });
 
-      if (bookingError) throw bookingError;
+      if (bookingError) {
+        console.error('Error fetching bookings:', bookingError);
+        throw bookingError;
+      }
+      
+      console.log('Fetched bookings:', bookings);
 
-      // Ambil installments untuk booking yang payment method-nya online
+      // Ambil semua installments yang payment method-nya online
       const { data: installments, error: instError } = await supabase
         .from('installments')
         .select(`
@@ -66,17 +74,29 @@ const OnlineBookingsReport = () => {
         .lte('created_at', endDate + 'T23:59:59')
         .order('created_at', { ascending: false });
 
-      if (instError) throw instError;
+      if (instError) {
+        console.error('Error fetching installments:', instError);
+        throw instError;
+      }
+      
+      console.log('Fetched installments:', installments);
 
       const allTransactions = [];
 
-      // Proses booking yang sudah paid (tidak ada installment)
+      // Proses semua booking (reguler dan walk-in sessions)
       for (const booking of bookings || []) {
         const hasInstallments = installments?.some(inst => inst.booking_id === booking.id);
         
+        console.log(`Processing booking ${booking.id}:`, {
+          hasInstallments,
+          status: booking.status,
+          isWalkingSession: booking.is_walking_session,
+          paymentMethod: booking.payment_method
+        });
+        
+        // Hanya tampilkan sebagai full payment jika tidak ada installments dan status paid
         if (!hasInstallments && booking.status === 'paid') {
-          // Tentukan deskripsi berdasarkan apakah ini walk-in session atau booking regular
-          const sessionType = booking.is_walking_session ? 'Walk-in Session' : 'Booking';
+          const sessionType = booking.is_walking_session ? 'Walk-in Session' : 'Booking Regular';
           const description = `${sessionType} - ${booking.studio_packages?.title || 'Package'}`;
           
           allTransactions.push({
@@ -99,8 +119,8 @@ const OnlineBookingsReport = () => {
 
       // Tambahkan semua installment untuk booking online
       for (const installment of installments || []) {
-        const sessionType = installment.bookings.is_walking_session ? 'Walk-in Session' : 'Booking';
-        const description = `Cicilan ke-${installment.installment_number || 'N/A'} - ${sessionType}`;
+        const sessionType = installment.bookings.is_walking_session ? 'Walk-in Session' : 'Booking Regular';
+        const description = `Cicilan ke-${installment.installment_number || 'N/A'} - ${sessionType} - ${installment.bookings.studio_packages?.title || 'Package'}`;
         
         allTransactions.push({
           id: installment.id,
@@ -115,6 +135,7 @@ const OnlineBookingsReport = () => {
         });
       }
 
+      console.log('All transactions processed:', allTransactions);
       return allTransactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
   });
