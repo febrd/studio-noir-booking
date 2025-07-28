@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import { DateRange } from 'react-day-picker';
+import { CustomOrderDateFilter } from '@/components/studio/CustomOrderDateFilter';
 import CustomOrderForm from '@/components/studio/CustomOrderForm';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
 
@@ -48,12 +51,13 @@ type FilterType = 'all' | 'pending' | 'in_progress' | 'completed' | 'cancelled';
 const CustomOrdersPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<FilterType>('all');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<CustomOrder | null>(null);
   const queryClient = useQueryClient();
 
   const { data: customOrders, isLoading, isError } = useQuery({
-    queryKey: ['custom-orders', searchQuery, statusFilter],
+    queryKey: ['custom-orders', searchQuery, statusFilter, dateRange],
     queryFn: async () => {
       console.log('Fetching custom orders...');
       
@@ -65,6 +69,16 @@ const CustomOrdersPage = () => {
 
       if (statusFilter !== 'all') {
         ordersQuery = ordersQuery.eq('status', statusFilter);
+      }
+
+      // Apply date range filter
+      if (dateRange?.from) {
+        ordersQuery = ordersQuery.gte('created_at', dateRange.from.toISOString());
+      }
+      if (dateRange?.to) {
+        const toDate = new Date(dateRange.to);
+        toDate.setHours(23, 59, 59, 999); // Set to end of day
+        ordersQuery = ordersQuery.lte('created_at', toDate.toISOString());
       }
 
       const { data: orders, error: ordersError } = await ordersQuery;
@@ -198,6 +212,12 @@ const CustomOrdersPage = () => {
     queryClient.invalidateQueries({ queryKey: ['custom-orders'] });
   };
 
+  const clearFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setDateRange(undefined);
+  };
+
   return (
     <ModernLayout>
       <div className="space-y-6">
@@ -212,40 +232,63 @@ const CustomOrdersPage = () => {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Input
-            type="text"
-            placeholder="Search customer name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="col-span-2"
-          />
+        {/* Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search customer name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as FilterType)}>
-            <SelectTrigger className="col-span-1">
+            <SelectTrigger>
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="in_progress">In Progress</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
+
+          <CustomOrderDateFilter
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+          />
+
+          <Button 
+            variant="outline" 
+            onClick={clearFilters}
+            className="flex items-center gap-2"
+          >
+            <Filter className="h-4 w-4" />
+            Clear Filters
+          </Button>
         </div>
 
         {isLoading ? (
-          <p>Loading custom orders...</p>
+          <div className="flex items-center justify-center p-8">
+            <p>Loading custom orders...</p>
+          </div>
         ) : isError ? (
-          <p>Error fetching custom orders.</p>
+          <div className="flex items-center justify-center p-8">
+            <p className="text-red-500">Error fetching custom orders.</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {customOrders && customOrders.length > 0 ? (
               customOrders.map((order) => (
-                <Card key={order.id}>
+                <Card key={order.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <CardTitle className="flex justify-between items-start">
-                      {order.customer_profiles?.full_name || 'Unknown Customer'}
+                      <span className="truncate">{order.customer_profiles?.full_name || 'Unknown Customer'}</span>
                       <Badge
                         variant="secondary"
                         className={
@@ -258,20 +301,24 @@ const CustomOrdersPage = () => {
                                 : 'bg-red-500 text-white'
                         }
                       >
-                        {order.status}
+                        {order.status.replace('_', ' ')}
                       </Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Order Date: {format(new Date(order.created_at), 'dd MMMM yyyy', { locale: id })}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Email: {order.customer_profiles?.email || 'No email'}
-                    </p>
-                    <p className="text-sm text-muted-foreground">Payment: {order.payment_method}</p>
-                    <p className="font-semibold">Total: Rp {order.total_amount.toLocaleString('id-ID')}</p>
-                    {order.notes && <p className="text-sm text-gray-500">Notes: {order.notes}</p>}
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Order Date: {format(new Date(order.created_at), 'dd MMMM yyyy', { locale: id })}
+                      </p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        Email: {order.customer_profiles?.email || 'No email'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Payment: {order.payment_method}</p>
+                      <p className="font-semibold">Total: Rp {order.total_amount.toLocaleString('id-ID')}</p>
+                      {order.notes && (
+                        <p className="text-sm text-gray-500 truncate">Notes: {order.notes}</p>
+                      )}
+                    </div>
                     
                     {/* Display selected services */}
                     {order.custom_order_services && order.custom_order_services.length > 0 && (
@@ -304,7 +351,9 @@ const CustomOrdersPage = () => {
                 </Card>
               ))
             ) : (
-              <p className="col-span-3 text-center text-muted-foreground">No custom orders found.</p>
+              <div className="col-span-3 text-center py-8">
+                <p className="text-muted-foreground">No custom orders found.</p>
+              </div>
             )}
           </div>
         )}
