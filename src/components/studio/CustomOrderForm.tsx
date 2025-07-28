@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -91,7 +90,7 @@ const CustomOrderForm: React.FC<CustomOrderFormProps> = ({
       setValue('payment_method', editingOrder.payment_method);
       setValue('notes', editingOrder.notes || '');
       
-      // Load selected services for editing
+      // Auto-fill selected services when editing
       if (editingOrder.custom_order_services) {
         const services = editingOrder.custom_order_services.map((service: any) => ({
           id: service.additional_service_id,
@@ -101,8 +100,12 @@ const CustomOrderForm: React.FC<CustomOrderFormProps> = ({
         }));
         setSelectedServices(services);
       }
+    } else {
+      // Reset form when not editing
+      reset();
+      setSelectedServices([]);
     }
-  }, [editingOrder, setValue]);
+  }, [editingOrder, setValue, reset]);
 
   const fetchCustomers = async () => {
     const { data } = await supabase

@@ -25,9 +25,23 @@ interface CustomOrder {
   notes: string | null;
   payment_method: string;
   customer_profiles: {
+    id: string;
     full_name: string;
     email: string;
   } | null;
+  custom_order_services?: Array<{
+    id: string;
+    additional_service_id: string;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
+    additional_services?: {
+      id: string;
+      name: string;
+      price: number;
+      description?: string;
+    };
+  }>;
 }
 
 type FilterType = 'all' | 'pending' | 'in_progress' | 'completed' | 'cancelled';
@@ -44,10 +58,25 @@ const CustomOrdersPage = () => {
     queryFn: async () => {
       console.log('Fetching custom orders...');
       
-      // First, get the custom orders
+      // First, get the custom orders with their services
       let ordersQuery = supabase
         .from('custom_orders')
-        .select('*')
+        .select(`
+          *,
+          custom_order_services (
+            id,
+            additional_service_id,
+            quantity,
+            unit_price,
+            total_price,
+            additional_services (
+              id,
+              name,
+              price,
+              description
+            )
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (statusFilter !== 'all') {
@@ -84,9 +113,10 @@ const CustomOrdersPage = () => {
         customerProfiles?.map(profile => [profile.id, profile]) || []
       );
 
-      // Combine orders with customer profiles
+      // Combine orders with customer profiles and ensure proper typing
       const ordersWithProfiles = orders.map(order => ({
         ...order,
+        status: order.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
         customer_profiles: profilesMap.get(order.customer_id) || null
       }));
 
@@ -133,6 +163,17 @@ const CustomOrdersPage = () => {
     }
   };
 
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setEditingOrder(null);
+  };
+
+  const handleSuccess = () => {
+    setIsDialogOpen(false);
+    setEditingOrder(null);
+    queryClient.invalidateQueries({ queryKey: ['custom-orders'] });
+  };
+
   return (
     <ModernLayout>
       <div className="space-y-6">
@@ -141,34 +182,10 @@ const CustomOrdersPage = () => {
             <h1 className="text-2xl font-bold">Custom Orders</h1>
             <p className="text-muted-foreground">Manage custom photography orders</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New Custom Order
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingOrder ? 'Edit Custom Order' : 'Create New Custom Order'}
-                </DialogTitle>
-              </DialogHeader>
-              <CustomOrderForm
-                isOpen={isDialogOpen}
-                onClose={() => {
-                  setIsDialogOpen(false);
-                  setEditingOrder(null);
-                }}
-                onSuccess={() => {
-                  setIsDialogOpen(false);
-                  setEditingOrder(null);
-                  queryClient.invalidateQueries({ queryKey: ['custom-orders'] });
-                }}
-                editingOrder={editingOrder}
-              />
-            </DialogContent>
-          </Dialog>
+          <Button onClick={() => setIsDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Custom Order
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -249,6 +266,22 @@ const CustomOrdersPage = () => {
             )}
           </div>
         )}
+
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingOrder ? 'Edit Custom Order' : 'Create New Custom Order'}
+              </DialogTitle>
+            </DialogHeader>
+            <CustomOrderForm
+              isOpen={isDialogOpen}
+              onClose={handleCloseDialog}
+              onSuccess={handleSuccess}
+              editingOrder={editingOrder}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </ModernLayout>
   );
