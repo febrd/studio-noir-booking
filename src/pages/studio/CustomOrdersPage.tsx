@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,19 +12,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { CustomOrderForm } from '@/components/studio/CustomOrderForm';
+import CustomOrderForm from '@/components/studio/CustomOrderForm';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
 
 interface CustomOrder {
   id: string;
   created_at: string;
-  customer_name: string;
-  customer_email: string;
-  description: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  total_price: number;
+  customer_id: string;
   studio_id: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  total_amount: number;
   notes: string | null;
+  payment_method: string;
+  customer_profiles?: {
+    full_name: string;
+    email: string;
+  };
 }
 
 type FilterType = 'all' | 'pending' | 'in_progress' | 'completed' | 'cancelled';
@@ -35,16 +39,22 @@ const CustomOrdersPage = () => {
   const [editingOrder, setEditingOrder] = useState<CustomOrder | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: customOrders, isLoading, isError } = useQuery<CustomOrder[]>(
-    ['custom-orders', searchQuery, statusFilter],
-    async () => {
+  const { data: customOrders, isLoading, isError } = useQuery({
+    queryKey: ['custom-orders', searchQuery, statusFilter],
+    queryFn: async () => {
       let query = supabase
-        .from<CustomOrder>('custom_orders')
-        .select('*')
+        .from('custom_orders')
+        .select(`
+          *,
+          customer_profiles!inner (
+            full_name,
+            email
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (searchQuery) {
-        query = query.ilike('customer_name', `%${searchQuery}%`);
+        query = query.ilike('customer_profiles.full_name', `%${searchQuery}%`);
       }
 
       if (statusFilter !== 'all') {
@@ -59,10 +69,10 @@ const CustomOrdersPage = () => {
 
       return data || [];
     }
-  );
+  });
 
-  const { mutate: deleteOrder } = useMutation(
-    async (id: string) => {
+  const { mutate: deleteOrder } = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('custom_orders')
         .delete()
@@ -72,16 +82,14 @@ const CustomOrdersPage = () => {
         throw new Error(error.message);
       }
     },
-    {
-      onSuccess: () => {
-        toast.success('Order deleted successfully!');
-        queryClient.invalidateQueries({ queryKey: ['custom-orders'] });
-      },
-      onError: (error: any) => {
-        toast.error(`Failed to delete order: ${error.message}`);
-      },
-    }
-  );
+    onSuccess: () => {
+      toast.success('Order deleted successfully!');
+      queryClient.invalidateQueries({ queryKey: ['custom-orders'] });
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to delete order: ${error.message}`);
+    },
+  });
 
   const handleEdit = (order: CustomOrder) => {
     setEditingOrder(order);
@@ -96,7 +104,7 @@ const CustomOrdersPage = () => {
 
   const filteredOrders = customOrders?.filter(order => {
     const searchTerm = searchQuery.toLowerCase();
-    const customerName = order.customer_name.toLowerCase();
+    const customerName = order.customer_profiles?.full_name?.toLowerCase() || '';
     return customerName.includes(searchTerm);
   }) || [];
 
@@ -122,16 +130,17 @@ const CustomOrdersPage = () => {
                 </DialogTitle>
               </DialogHeader>
               <CustomOrderForm
-                order={editingOrder}
+                isOpen={isDialogOpen}
+                onClose={() => {
+                  setIsDialogOpen(false);
+                  setEditingOrder(null);
+                }}
                 onSuccess={() => {
                   setIsDialogOpen(false);
                   setEditingOrder(null);
                   queryClient.invalidateQueries({ queryKey: ['custom-orders'] });
                 }}
-                onCancel={() => {
-                  setIsDialogOpen(false);
-                  setEditingOrder(null);
-                }}
+                editingOrder={editingOrder}
               />
             </DialogContent>
           </Dialog>
@@ -169,7 +178,7 @@ const CustomOrdersPage = () => {
               <Card key={order.id}>
                 <CardHeader>
                   <CardTitle className="flex justify-between items-start">
-                    {order.customer_name}
+                    {order.customer_profiles?.full_name || 'Unknown Customer'}
                     <Badge
                       variant="secondary"
                       className={
@@ -190,9 +199,9 @@ const CustomOrdersPage = () => {
                   <p className="text-sm text-muted-foreground">
                     Order Date: {format(new Date(order.created_at), 'dd MMMM yyyy', { locale: id })}
                   </p>
-                  <p className="text-sm text-muted-foreground">Email: {order.customer_email}</p>
-                  <p className="text-sm text-muted-foreground">Description: {order.description}</p>
-                  <p className="font-semibold">Total: Rp {order.total_price.toLocaleString('id-ID')}</p>
+                  <p className="text-sm text-muted-foreground">Email: {order.customer_profiles?.email || 'No email'}</p>
+                  <p className="text-sm text-muted-foreground">Payment: {order.payment_method}</p>
+                  <p className="font-semibold">Total: Rp {order.total_amount.toLocaleString('id-ID')}</p>
                   {order.notes && <p className="text-sm text-gray-500">Notes: {order.notes}</p>}
                   <div className="flex justify-end mt-4 space-x-2">
                     <Button variant="outline" size="sm" onClick={() => handleEdit(order)}>
