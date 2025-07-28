@@ -183,12 +183,12 @@ export function AppSidebar() {
               icon: FileText,
             },
             {
-              title: "Online Bookings",
+              title: "Online",
               url: "/transactions/online-bookings",
               icon: Calendar,
             },
             {
-              title: "Offline Bookings",
+              title: "Offline",
               url: "/transactions/offline-bookings",
               icon: Clock,
             },
