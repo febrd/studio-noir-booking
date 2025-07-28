@@ -67,12 +67,12 @@ const CustomOrdersPage = () => {
         .from('custom_orders')
         .select(`
           *,
-          customer_profiles!inner (
+          customer_profiles (
             full_name,
             email,
             phone
           ),
-          studios!inner (
+          studios (
             name
           ),
           custom_order_services (

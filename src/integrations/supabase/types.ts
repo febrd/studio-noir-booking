@@ -308,6 +308,20 @@ export type Database = {
             referencedRelation: "custom_orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_custom_order_services_additional_service_id"
+            columns: ["additional_service_id"]
+            isOneToOne: false
+            referencedRelation: "additional_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_custom_order_services_custom_order_id"
+            columns: ["custom_order_id"]
+            isOneToOne: false
+            referencedRelation: "custom_orders"
+            referencedColumns: ["id"]
+          },
         ]
       }
       custom_orders: {
@@ -366,7 +380,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fk_custom_orders_customer_id"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fk_custom_orders_studio"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_custom_orders_studio_id"
             columns: ["studio_id"]
             isOneToOne: false
             referencedRelation: "studios"
