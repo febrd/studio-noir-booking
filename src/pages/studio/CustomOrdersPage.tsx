@@ -1,487 +1,216 @@
-
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DataTable } from '@/components/ui/data-table';
-import { ColumnDef } from '@tanstack/react-table';
-import { Plus, Edit, Trash2, Filter, Calendar } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Search, Filter, Eye, Edit, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import CustomOrderForm from '@/components/studio/CustomOrderForm';
-import { DatePicker } from '@/components/ui/date-picker';
+import { id } from 'date-fns/locale';
+import { CustomOrderForm } from '@/components/studio/CustomOrderForm';
+import { ModernLayout } from '@/components/Layout/ModernLayout';
 
 interface CustomOrder {
   id: string;
-  customer_id: string;
-  studio_id: string;
-  total_amount: number;
-  payment_method: string;
-  status: string;
-  order_date: string;
-  notes?: string;
   created_at: string;
-  customer_profiles: {
-    full_name: string;
-    email: string;
-    phone?: string;
-  } | null;
-  studios: {
-    name: string;
-  } | null;
-  custom_order_services: Array<{
-    id: string;
-    quantity: number;
-    unit_price: number;
-    total_price: number;
-    additional_service_id: string;
-    additional_services: {
-      name: string;
-    } | null;
-  }>;
+  customer_name: string;
+  customer_email: string;
+  description: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  total_price: number;
+  studio_id: string;
+  notes: string | null;
 }
 
+type FilterType = 'all' | 'pending' | 'in_progress' | 'completed' | 'cancelled';
+
 const CustomOrdersPage = () => {
-  const [orders, setOrders] = useState<CustomOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<FilterType>('all');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<CustomOrder | null>(null);
-  const [filters, setFilters] = useState({
-    customerName: '',
-    status: 'all',
-    paymentMethod: 'all',
-    dateFrom: undefined as Date | undefined,
-    dateTo: undefined as Date | undefined
-  });
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  const fetchOrders = async () => {
-    setLoading(true);
-    try {
-      // First, get the custom orders
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('custom_orders')
+  const { data: customOrders, isLoading, isError } = useQuery<CustomOrder[]>(
+    ['custom-orders', searchQuery, statusFilter],
+    async () => {
+      let query = supabase
+        .from<CustomOrder>('custom_orders')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (ordersError) {
-        console.error('Error fetching orders:', ordersError);
-        toast.error('Failed to fetch orders');
-        return;
+      if (searchQuery) {
+        query = query.ilike('customer_name', `%${searchQuery}%`);
       }
 
-      if (!ordersData || ordersData.length === 0) {
-        setOrders([]);
-        return;
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
       }
 
-      // Get customer profiles
-      const customerIds = ordersData.map(order => order.customer_id);
-      const { data: customersData, error: customersError } = await supabase
-        .from('customer_profiles')
-        .select('id, full_name, email, phone')
-        .in('id', customerIds);
+      const { data, error } = await query;
 
-      if (customersError) {
-        console.error('Error fetching customers:', customersError);
+      if (error) {
+        throw new Error(error.message);
       }
 
-      // Get studios
-      const studioIds = ordersData.map(order => order.studio_id);
-      const { data: studiosData, error: studiosError } = await supabase
-        .from('studios')
-        .select('id, name')
-        .in('id', studioIds);
-
-      if (studiosError) {
-        console.error('Error fetching studios:', studiosError);
-      }
-
-      // Get custom order services
-      const orderIds = ordersData.map(order => order.id);
-      const { data: servicesData, error: servicesError } = await supabase
-        .from('custom_order_services')
-        .select(`
-          id,
-          custom_order_id,
-          quantity,
-          unit_price,
-          total_price,
-          additional_service_id
-        `)
-        .in('custom_order_id', orderIds);
-
-      if (servicesError) {
-        console.error('Error fetching services:', servicesError);
-      }
-
-      // Get additional services separately
-      const additionalServiceIds = servicesData?.map(service => service.additional_service_id) || [];
-      const { data: additionalServicesData, error: additionalServicesError } = await supabase
-        .from('additional_services')
-        .select('id, name')
-        .in('id', additionalServiceIds);
-
-      if (additionalServicesError) {
-        console.error('Error fetching additional services:', additionalServicesError);
-      }
-
-      // Combine all data
-      const combinedOrders: CustomOrder[] = ordersData.map(order => ({
-        ...order,
-        customer_profiles: customersData?.find(c => c.id === order.customer_id) || null,
-        studios: studiosData?.find(s => s.id === order.studio_id) || null,
-        custom_order_services: servicesData?.filter(s => s.custom_order_id === order.id).map(service => ({
-          ...service,
-          additional_services: additionalServicesData?.find(as => as.id === service.additional_service_id) || null
-        })) || []
-      }));
-
-      // Filter the data based on current filters
-      let filteredData = combinedOrders;
-
-      if (filters.customerName) {
-        filteredData = filteredData.filter(order => 
-          order.customer_profiles?.full_name?.toLowerCase().includes(filters.customerName.toLowerCase())
-        );
-      }
-      if (filters.status !== 'all') {
-        filteredData = filteredData.filter(order => order.status === filters.status);
-      }
-      if (filters.paymentMethod !== 'all') {
-        filteredData = filteredData.filter(order => order.payment_method === filters.paymentMethod);
-      }
-      if (filters.dateFrom) {
-        filteredData = filteredData.filter(order => 
-          new Date(order.order_date) >= filters.dateFrom!
-        );
-      }
-      if (filters.dateTo) {
-        filteredData = filteredData.filter(order => 
-          new Date(order.order_date) <= filters.dateTo!
-        );
-      }
-
-      setOrders(filteredData);
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Failed to fetch orders');
-    } finally {
-      setLoading(false);
+      return data || [];
     }
-  };
+  );
 
-  const handleEdit = (order: CustomOrder) => {
-    setEditingOrder(order);
-    setIsFormOpen(true);
-  };
-
-  const handleDelete = async (orderId: string) => {
-    if (!confirm('Are you sure you want to delete this order?')) return;
-
-    try {
+  const { mutate: deleteOrder } = useMutation(
+    async (id: string) => {
       const { error } = await supabase
         .from('custom_orders')
         .delete()
-        .eq('id', orderId);
+        .eq('id', id);
 
-      if (error) throw error;
-
-      toast.success('Order deleted successfully');
-      fetchOrders();
-    } catch (error) {
-      console.error('Error deleting order:', error);
-      toast.error('Failed to delete order');
-    }
-  };
-
-  const handleStatusChange = async (orderId: string, newStatus: string) => {
-    try {
-      const { error } = await supabase
-        .from('custom_orders')
-        .update({ status: newStatus })
-        .eq('id', orderId);
-
-      if (error) throw error;
-
-      // If status is changed to completed, create a transaction record
-      if (newStatus === 'completed') {
-        const order = orders.find(o => o.id === orderId);
-        if (order) {
-          const { error: transactionError } = await supabase
-            .from('transactions')
-            .insert({
-              booking_id: orderId, // Using order ID as booking ID for custom orders
-              amount: order.total_amount,
-              type: order.payment_method, // 'online' or 'offline'
-              description: `Custom order - ${order.customer_profiles?.full_name || 'Unknown Customer'}`,
-              payment_type: order.payment_method as 'online' | 'offline',
-              status: 'paid'
-            });
-
-          if (transactionError) {
-            console.error('Error creating transaction:', transactionError);
-            toast.error('Order updated but failed to create transaction record');
-          } else {
-            toast.success('Order completed and transaction recorded');
-          }
-        }
-      } else {
-        toast.success('Status updated successfully');
+      if (error) {
+        throw new Error(error.message);
       }
-      
-      fetchOrders();
-    } catch (error) {
-      console.error('Error updating status:', error);
-      toast.error('Failed to update status');
+    },
+    {
+      onSuccess: () => {
+        toast.success('Order deleted successfully!');
+        queryClient.invalidateQueries({ queryKey: ['custom-orders'] });
+      },
+      onError: (error: any) => {
+        toast.error(`Failed to delete order: ${error.message}`);
+      },
+    }
+  );
+
+  const handleEdit = (order: CustomOrder) => {
+    setEditingOrder(order);
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this order?')) {
+      deleteOrder(id);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'confirmed': return 'bg-blue-100 text-blue-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPaymentMethodColor = (method: string) => {
-    return method === 'online' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
-  };
-
-  const columns: ColumnDef<CustomOrder>[] = [
-    {
-      accessorKey: 'order_date',
-      header: 'Date',
-      cell: ({ row }) => format(new Date(row.original.order_date), 'dd/MM/yyyy HH:mm')
-    },
-    {
-      accessorKey: 'customer_profiles.full_name',
-      header: 'Customer',
-      cell: ({ row }) => (
-        <div>
-          <div className="font-medium">{row.original.customer_profiles?.full_name || 'N/A'}</div>
-          <div className="text-sm text-gray-500">{row.original.customer_profiles?.email || 'N/A'}</div>
-        </div>
-      )
-    },
-    {
-      accessorKey: 'studios.name',
-      header: 'Studio',
-      cell: ({ row }) => row.original.studios?.name || 'N/A'
-    },
-    {
-      accessorKey: 'payment_method',
-      header: 'Payment',
-      cell: ({ row }) => (
-        <Badge className={getPaymentMethodColor(row.original.payment_method)}>
-          {row.original.payment_method}
-        </Badge>
-      )
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => (
-        <Select
-          value={row.original.status}
-          onValueChange={(value) => handleStatusChange(row.original.id, value)}
-        >
-          <SelectTrigger className="w-32">
-            <Badge className={getStatusColor(row.original.status)}>
-              {row.original.status}
-            </Badge>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="confirmed">Confirmed</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
-      )
-    },
-    {
-      accessorKey: 'custom_order_services',
-      header: 'Services',
-      cell: ({ row }) => (
-        <div className="space-y-1">
-          {row.original.custom_order_services.map((service) => (
-            <div key={service.id} className="text-sm">
-              {service.additional_services?.name || 'N/A'} ({service.quantity}x)
-            </div>
-          ))}
-        </div>
-      )
-    },
-    {
-      accessorKey: 'total_amount',
-      header: 'Total',
-      cell: ({ row }) => `Rp ${row.original.total_amount.toLocaleString()}`
-    },
-    {
-      id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => (
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleEdit(row.original)}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleDelete(row.original.id)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      )
-    }
-  ];
-
-  const handleFormClose = () => {
-    setIsFormOpen(false);
-    setEditingOrder(null);
-  };
-
-  const handleFormSuccess = () => {
-    fetchOrders();
-  };
-
-  const clearFilters = () => {
-    setFilters({
-      customerName: '',
-      status: 'all',
-      paymentMethod: 'all',
-      dateFrom: undefined,
-      dateTo: undefined
-    });
-  };
-
-  // Apply filters when they change
-  useEffect(() => {
-    fetchOrders();
-  }, [filters]);
+  const filteredOrders = customOrders?.filter(order => {
+    const searchTerm = searchQuery.toLowerCase();
+    const customerName = order.customer_name.toLowerCase();
+    return customerName.includes(searchTerm);
+  }) || [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Custom Orders</h1>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Order
-        </Button>
+    <ModernLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Custom Orders</h1>
+            <p className="text-muted-foreground">Manage custom photography orders</p>
+          </div>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                New Custom Order
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingOrder ? 'Edit Custom Order' : 'Create New Custom Order'}
+                </DialogTitle>
+              </DialogHeader>
+              <CustomOrderForm
+                order={editingOrder}
+                onSuccess={() => {
+                  setIsDialogOpen(false);
+                  setEditingOrder(null);
+                  queryClient.invalidateQueries({ queryKey: ['custom-orders'] });
+                }}
+                onCancel={() => {
+                  setIsDialogOpen(false);
+                  setEditingOrder(null);
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Input
+            type="text"
+            placeholder="Search customer name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="col-span-2"
+          />
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as FilterType)}>
+            <SelectTrigger className="col-span-1">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {isLoading ? (
+          <p>Loading custom orders...</p>
+        ) : isError ? (
+          <p>Error fetching custom orders.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredOrders.map((order) => (
+              <Card key={order.id}>
+                <CardHeader>
+                  <CardTitle className="flex justify-between items-start">
+                    {order.customer_name}
+                    <Badge
+                      variant="secondary"
+                      className={
+                        order.status === 'pending'
+                          ? 'bg-yellow-500 text-white'
+                          : order.status === 'in_progress'
+                            ? 'bg-blue-500 text-white'
+                            : order.status === 'completed'
+                              ? 'bg-green-500 text-white'
+                              : 'bg-red-500 text-white'
+                      }
+                    >
+                      {order.status}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Order Date: {format(new Date(order.created_at), 'dd MMMM yyyy', { locale: id })}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Email: {order.customer_email}</p>
+                  <p className="text-sm text-muted-foreground">Description: {order.description}</p>
+                  <p className="font-semibold">Total: Rp {order.total_price.toLocaleString('id-ID')}</p>
+                  {order.notes && <p className="text-sm text-gray-500">Notes: {order.notes}</p>}
+                  <div className="flex justify-end mt-4 space-x-2">
+                    <Button variant="outline" size="sm" onClick={() => handleEdit(order)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => handleDelete(order.id)}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-4 w-4" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Customer Name</label>
-              <Input
-                placeholder="Search by name..."
-                value={filters.customerName}
-                onChange={(e) => setFilters({...filters, customerName: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Status</label>
-              <Select
-                value={filters.status}
-                onValueChange={(value) => setFilters({...filters, status: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Payment Method</label>
-              <Select
-                value={filters.paymentMethod}
-                onValueChange={(value) => setFilters({...filters, paymentMethod: value})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All methods" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All methods</SelectItem>
-                  <SelectItem value="online">Online</SelectItem>
-                  <SelectItem value="offline">Offline</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Date From</label>
-              <DatePicker
-                selected={filters.dateFrom}
-                onSelect={(date) => setFilters({...filters, dateFrom: date})}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">Date To</label>
-              <DatePicker
-                selected={filters.dateTo}
-                onSelect={(date) => setFilters({...filters, dateTo: date})}
-              />
-            </div>
-          </div>
-          <div className="mt-4">
-            <Button variant="outline" onClick={clearFilters}>
-              Clear Filters
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Orders Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Orders ({orders.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">Loading...</div>
-          ) : (
-            <DataTable columns={columns} data={orders} />
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Form Dialog */}
-      <CustomOrderForm
-        isOpen={isFormOpen}
-        onClose={handleFormClose}
-        onSuccess={handleFormSuccess}
-        editingOrder={editingOrder}
-      />
-    </div>
+    </ModernLayout>
   );
 };
 
