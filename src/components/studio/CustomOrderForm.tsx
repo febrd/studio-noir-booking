@@ -18,6 +18,7 @@ const customOrderSchema = z.object({
   customer_id: z.string().min(1, 'Customer is required'),
   studio_id: z.string().min(1, 'Studio is required'),
   payment_method: z.enum(['online', 'offline']),
+  status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']),
   notes: z.string().optional(),
 });
 
@@ -64,6 +65,7 @@ const CustomOrderForm: React.FC<CustomOrderFormProps> = ({
       customer_id: '',
       studio_id: '',
       payment_method: 'offline',
+      status: 'pending',
       notes: ''
     }
   });
@@ -88,6 +90,7 @@ const CustomOrderForm: React.FC<CustomOrderFormProps> = ({
       setValue('customer_id', editingOrder.customer_id);
       setValue('studio_id', editingOrder.studio_id);
       setValue('payment_method', editingOrder.payment_method);
+      setValue('status', editingOrder.status);
       setValue('notes', editingOrder.notes || '');
       
       // Auto-fill selected services when editing
@@ -208,6 +211,7 @@ const CustomOrderForm: React.FC<CustomOrderFormProps> = ({
             customer_id: data.customer_id,
             studio_id: data.studio_id,
             payment_method: data.payment_method,
+            status: data.status,
             total_amount: totalAmount,
             notes: data.notes,
             updated_at: new Date().toISOString()
@@ -229,6 +233,7 @@ const CustomOrderForm: React.FC<CustomOrderFormProps> = ({
             customer_id: data.customer_id,
             studio_id: data.studio_id,
             payment_method: data.payment_method,
+            status: data.status,
             total_amount: totalAmount,
             notes: data.notes
           }])
@@ -438,6 +443,31 @@ const CustomOrderForm: React.FC<CustomOrderFormProps> = ({
               </div>
             </div>
           )}
+
+          {/* Status */}
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Controller
+              name="status"
+              control={control}
+              render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.status && (
+              <p className="text-sm text-red-500">{errors.status.message}</p>
+            )}
+          </div>
 
           {/* Payment Method */}
           <div className="space-y-2">
