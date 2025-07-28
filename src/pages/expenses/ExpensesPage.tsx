@@ -110,27 +110,27 @@ const ExpensesPage = () => {
   return (
     <JWTProtectedRoute allowedRoles={['admin', 'owner', 'keuangan']}>
       <ModernLayout>
-        <div className="p-6 space-y-6">
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">Expense Management</h1>
-              <p className="text-muted-foreground">Track and manage company expenses</p>
+              <h1 className="text-3xl font-bold">Daftar Pengeluaran</h1>
+              <p className="text-muted-foreground">Kelola dan pantau pengeluaran perusahaan</p>
             </div>
             <Button onClick={() => setShowForm(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Expense
+              Tambah Pengeluaran
             </Button>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Expense Filters</CardTitle>
+              <CardTitle>Filter Pengeluaran</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-4 items-center">
                 <div className="flex-1 min-w-[200px]">
                   <Input
-                    placeholder="Search expenses..."
+                    placeholder="Cari pengeluaran..."
                     value={filters.search}
                     onChange={(e) => updateFilters({ search: e.target.value })}
                     className="w-full"
@@ -141,7 +141,7 @@ const ExpensesPage = () => {
                   onClick={() => setShowFilters(!showFilters)}
                 >
                   <Filter className="h-4 w-4 mr-2" />
-                  Filters
+                  Filter
                 </Button>
                 <Button
                   variant="outline"
