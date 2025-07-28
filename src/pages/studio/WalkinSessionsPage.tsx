@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -205,11 +204,11 @@ const WalkinSessionsPage = () => {
         const transactionData = {
           booking_id: bookingData.id,
           amount: bookingData.total_amount,
-          type: bookingData.payment_method, // Use the actual payment method
-          status: 'paid',
-          payment_type: bookingData.payment_method, // Ensure consistency
+          type: bookingData.payment_method,
+          status: 'paid' as const,
+          payment_type: bookingData.payment_method === 'online' ? 'online' as const : 'offline' as const,
           description: `Walk-in session ${bookingData.payment_method} - ${bookingData.studio_packages?.title || 'Package'}`,
-          performed_by: null // Will be handled by database function
+          performed_by: null
         };
 
         const { error: transactionError } = await supabase
