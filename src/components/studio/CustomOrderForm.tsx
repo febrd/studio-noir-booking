@@ -56,7 +56,7 @@ const CustomOrderForm: React.FC<CustomOrderFormProps> = ({
   const [additionalServices, setAdditionalServices] = useState<AdditionalService[]>([]);
   const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '' });
+  const [newCustomer, setNewCustomer] = useState({ name: '', email: '' });
   const [loading, setLoading] = useState(false);
 
   const { control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<CustomOrderFormData>({
@@ -141,8 +141,7 @@ const CustomOrderForm: React.FC<CustomOrderFormProps> = ({
       .from('customer_profiles')
       .insert([{
         full_name: newCustomer.name,
-        email: newCustomer.email,
-        phone: newCustomer.phone || null
+        email: newCustomer.email
       }])
       .select()
       .single();
@@ -155,7 +154,7 @@ const CustomOrderForm: React.FC<CustomOrderFormProps> = ({
     setCustomers([...customers, data]);
     setValue('customer_id', data.id);
     setShowNewCustomerForm(false);
-    setNewCustomer({ name: '', email: '', phone: '' });
+    setNewCustomer({ name: '', email: '' });
     toast.success('Customer created successfully');
   };
 
@@ -267,7 +266,7 @@ const CustomOrderForm: React.FC<CustomOrderFormProps> = ({
     reset();
     setSelectedServices([]);
     setShowNewCustomerForm(false);
-    setNewCustomer({ name: '', email: '', phone: '' });
+    setNewCustomer({ name: '', email: '' });
     onClose();
   };
 
@@ -327,20 +326,12 @@ const CustomOrderForm: React.FC<CustomOrderFormProps> = ({
                     />
                   </div>
                   <div>
-                    <Label>Email *</Label>
+                    <Label>Email/WhatsApp *</Label>
                     <Input
-                      type="email"
+                      type="text"
                       value={newCustomer.email}
                       onChange={(e) => setNewCustomer({...newCustomer, email: e.target.value})}
-                      placeholder="customer@email.com"
-                    />
-                  </div>
-                  <div>
-                    <Label>Phone</Label>
-                    <Input
-                      value={newCustomer.phone}
-                      onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
-                      placeholder="Phone number"
+                      placeholder="customer@email.com or WhatsApp number"
                     />
                   </div>
                   <div className="flex gap-2">

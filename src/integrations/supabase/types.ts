@@ -309,10 +309,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fk_custom_order_services_additional_service"
+            columns: ["additional_service_id"]
+            isOneToOne: false
+            referencedRelation: "additional_services"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fk_custom_order_services_additional_service_id"
             columns: ["additional_service_id"]
             isOneToOne: false
             referencedRelation: "additional_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_custom_order_services_custom_order"
+            columns: ["custom_order_id"]
+            isOneToOne: false
+            referencedRelation: "custom_orders"
             referencedColumns: ["id"]
           },
           {
@@ -376,7 +390,7 @@ export type Database = {
             foreignKeyName: "fk_custom_orders_customer"
             columns: ["customer_id"]
             isOneToOne: false
-            referencedRelation: "users"
+            referencedRelation: "customer_profiles"
             referencedColumns: ["id"]
           },
           {
