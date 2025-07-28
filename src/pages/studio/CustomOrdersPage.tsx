@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -50,8 +51,8 @@ const CustomOrdersPage = () => {
   const [editingOrder, setEditingOrder] = useState<CustomOrder | null>(null);
   const [filters, setFilters] = useState({
     customerName: '',
-    status: '',
-    paymentMethod: '',
+    status: 'all',
+    paymentMethod: 'all',
     dateFrom: undefined as Date | undefined,
     dateTo: undefined as Date | undefined
   });
@@ -150,10 +151,10 @@ const CustomOrdersPage = () => {
           order.customer_profiles?.full_name?.toLowerCase().includes(filters.customerName.toLowerCase())
         );
       }
-      if (filters.status) {
+      if (filters.status !== 'all') {
         filteredData = filteredData.filter(order => order.status === filters.status);
       }
-      if (filters.paymentMethod) {
+      if (filters.paymentMethod !== 'all') {
         filteredData = filteredData.filter(order => order.payment_method === filters.paymentMethod);
       }
       if (filters.dateFrom) {
@@ -362,8 +363,8 @@ const CustomOrdersPage = () => {
   const clearFilters = () => {
     setFilters({
       customerName: '',
-      status: '',
-      paymentMethod: '',
+      status: 'all',
+      paymentMethod: 'all',
       dateFrom: undefined,
       dateTo: undefined
     });
@@ -412,7 +413,7 @@ const CustomOrdersPage = () => {
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
+                  <SelectItem value="all">All statuses</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="confirmed">Confirmed</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
@@ -430,7 +431,7 @@ const CustomOrdersPage = () => {
                   <SelectValue placeholder="All methods" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All methods</SelectItem>
+                  <SelectItem value="all">All methods</SelectItem>
                   <SelectItem value="online">Online</SelectItem>
                   <SelectItem value="offline">Offline</SelectItem>
                 </SelectContent>
