@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,31 +19,30 @@ const OfflineBookingsReport = () => {
   const { data: transactionsData, isLoading } = useQuery({
     queryKey: ['offline-transactions', startDate, endDate],
     queryFn: async () => {
-      // Ambil data dari tabel transactions untuk transaksi offline
-      const { data: transactions, error: transError } = await supabase
-        .from('transactions')
+      // Ambil semua booking yang menggunakan payment method offline
+      const { data: bookings, error: bookingError } = await supabase
+        .from('bookings')
         .select(`
-          *,
-          bookings!inner(
-            id,
-            user_id,
-            studio_id,
-            status,
-            total_amount,
-            payment_method,
-            users!inner(name, email),
-            studios!inner(name),
-            studio_packages!inner(title)
-          )
+          id,
+          created_at,
+          payment_method,
+          total_amount,
+          status,
+          type,
+          user_id,
+          studio_id,
+          users!inner(name, email),
+          studios!inner(name),
+          studio_packages!inner(title)
         `)
-        .or('payment_type.eq.offline,type.eq.offline')
+        .eq('payment_method', 'offline')
         .gte('created_at', startDate + 'T00:00:00')
         .lte('created_at', endDate + 'T23:59:59')
         .order('created_at', { ascending: false });
 
-      if (transError) throw transError;
+      if (bookingError) throw bookingError;
 
-      // Ambil data installments untuk transaksi offline
+      // Ambil installments untuk booking yang payment method-nya offline
       const { data: installments, error: instError } = await supabase
         .from('installments')
         .select(`
@@ -68,29 +66,44 @@ const OfflineBookingsReport = () => {
 
       if (instError) throw instError;
 
-      // Gabungkan data dan normalize struktur
-      const allTransactions = [
-        ...(transactions || []).map(t => ({
-          id: t.id,
-          created_at: t.created_at,
-          amount: t.amount,
-          description: t.description,
-          type: 'transaction',
-          payment_method: t.payment_type,
-          status: t.status,
-          bookings: t.bookings
-        })),
-        ...(installments || []).map(i => ({
-          id: i.id,
-          created_at: i.created_at,
-          amount: i.amount,
-          description: `Cicilan ke-${i.installment_number || 'N/A'}`,
+      const allTransactions = [];
+
+      // Proses booking yang sudah paid (tidak ada installment)
+      for (const booking of bookings || []) {
+        const hasInstallments = installments?.some(inst => inst.booking_id === booking.id);
+        
+        if (!hasInstallments && booking.status === 'paid') {
+          // Hanya tampilkan full payment jika tidak ada installment
+          allTransactions.push({
+            id: booking.id,
+            created_at: booking.created_at,
+            amount: booking.total_amount,
+            description: `Full Payment - ${booking.studio_packages?.title || 'Package'}`,
+            type: 'full_payment',
+            payment_method: 'offline',
+            status: 'paid',
+            bookings: {
+              users: booking.users,
+              studios: booking.studios,
+              studio_packages: booking.studio_packages
+            }
+          });
+        }
+      }
+
+      // Tambahkan semua installment untuk booking offline
+      for (const installment of installments || []) {
+        allTransactions.push({
+          id: installment.id,
+          created_at: installment.created_at,
+          amount: installment.amount,
+          description: `Cicilan ke-${installment.installment_number || 'N/A'}`,
           type: 'installment',
-          payment_method: i.payment_method,
+          payment_method: 'offline',
           status: 'paid',
-          bookings: i.bookings
-        }))
-      ];
+          bookings: installment.bookings
+        });
+      }
 
       return allTransactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
@@ -132,7 +145,7 @@ const OfflineBookingsReport = () => {
       transaction.bookings?.users?.email || '-',
       transaction.bookings?.studios?.name || '-',
       transaction.bookings?.studio_packages?.title || '-',
-      transaction.type === 'installment' ? 'Cicilan' : 'Transaksi',
+      transaction.type === 'installment' ? 'Cicilan' : 'Full Payment',
       transaction.description || '-',
       transaction.status || '-',
       `Rp ${transaction.amount?.toLocaleString('id-ID') || '0'}`
