@@ -265,6 +265,115 @@ export type Database = {
           },
         ]
       }
+      custom_order_services: {
+        Row: {
+          additional_service_id: string
+          created_at: string
+          custom_order_id: string
+          id: string
+          quantity: number
+          total_price: number
+          unit_price: number
+        }
+        Insert: {
+          additional_service_id: string
+          created_at?: string
+          custom_order_id: string
+          id?: string
+          quantity?: number
+          total_price: number
+          unit_price: number
+        }
+        Update: {
+          additional_service_id?: string
+          created_at?: string
+          custom_order_id?: string
+          id?: string
+          quantity?: number
+          total_price?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_order_services_additional_service_id_fkey"
+            columns: ["additional_service_id"]
+            isOneToOne: false
+            referencedRelation: "additional_services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_order_services_custom_order_id_fkey"
+            columns: ["custom_order_id"]
+            isOneToOne: false
+            referencedRelation: "custom_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_orders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          id: string
+          notes: string | null
+          order_date: string
+          payment_method: string
+          status: string
+          studio_id: string
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          id?: string
+          notes?: string | null
+          order_date?: string
+          payment_method: string
+          status?: string
+          studio_id: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          id?: string
+          notes?: string | null
+          order_date?: string
+          payment_method?: string
+          status?: string
+          studio_id?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_custom_orders_customer"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_custom_orders_studio"
+            columns: ["studio_id"]
+            isOneToOne: false
+            referencedRelation: "studios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_profiles: {
         Row: {
           address: string | null

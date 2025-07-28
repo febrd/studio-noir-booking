@@ -9,6 +9,7 @@ import BookingsPage from './BookingsPage';
 import StudioDashboard from './StudioDashboard';
 import OfflineTransactionsPage from './OfflineTransactionsPage';
 import BookingLogsPage from './BookingLogsPage';
+import CustomOrdersPage from './CustomOrdersPage';
 import ExpensesPage from '../expenses/ExpensesPage';
 
 const StudioManagement = () => {
@@ -23,6 +24,7 @@ const StudioManagement = () => {
         <Route path="bookings" element={<BookingsPage />} />
         <Route path="transactions" element={<OfflineTransactionsPage />} />
         <Route path="logs" element={<BookingLogsPage />} />
+        <Route path="custom-orders" element={<CustomOrdersPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
       </Routes>
     </ModernLayout>
