@@ -15,11 +15,11 @@ const OfflineBookingsReport = () => {
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Query untuk mengambil semua transaksi offline (termasuk installments)
+  // Query untuk mengambil semua transaksi offline (termasuk installments dan walk-in sessions)
   const { data: transactionsData, isLoading } = useQuery({
     queryKey: ['offline-transactions', startDate, endDate],
     queryFn: async () => {
-      // Ambil semua booking yang menggunakan payment method offline
+      // Ambil semua booking yang menggunakan payment method offline (termasuk walk-in sessions)
       const { data: bookings, error: bookingError } = await supabase
         .from('bookings')
         .select(`
@@ -29,6 +29,7 @@ const OfflineBookingsReport = () => {
           total_amount,
           status,
           type,
+          is_walking_session,
           user_id,
           studio_id,
           users!inner(name, email),
@@ -54,6 +55,7 @@ const OfflineBookingsReport = () => {
             status,
             total_amount,
             payment_method,
+            is_walking_session,
             users!inner(name, email),
             studios!inner(name),
             studio_packages!inner(title)
@@ -73,15 +75,19 @@ const OfflineBookingsReport = () => {
         const hasInstallments = installments?.some(inst => inst.booking_id === booking.id);
         
         if (!hasInstallments && booking.status === 'paid') {
-          // Hanya tampilkan full payment jika tidak ada installment
+          // Tentukan deskripsi berdasarkan apakah ini walk-in session atau booking regular
+          const sessionType = booking.is_walking_session ? 'Walk-in Session' : 'Booking';
+          const description = `${sessionType} - ${booking.studio_packages?.title || 'Package'}`;
+          
           allTransactions.push({
             id: booking.id,
             created_at: booking.created_at,
             amount: booking.total_amount,
-            description: `Full Payment - ${booking.studio_packages?.title || 'Package'}`,
+            description: description,
             type: 'full_payment',
             payment_method: 'offline',
             status: 'paid',
+            is_walking_session: booking.is_walking_session,
             bookings: {
               users: booking.users,
               studios: booking.studios,
@@ -93,14 +99,18 @@ const OfflineBookingsReport = () => {
 
       // Tambahkan semua installment untuk booking offline
       for (const installment of installments || []) {
+        const sessionType = installment.bookings.is_walking_session ? 'Walk-in Session' : 'Booking';
+        const description = `Cicilan ke-${installment.installment_number || 'N/A'} - ${sessionType}`;
+        
         allTransactions.push({
           id: installment.id,
           created_at: installment.created_at,
           amount: installment.amount,
-          description: `Cicilan ke-${installment.installment_number || 'N/A'}`,
+          description: description,
           type: 'installment',
           payment_method: 'offline',
           status: 'paid',
+          is_walking_session: installment.bookings.is_walking_session,
           bookings: installment.bookings
         });
       }
@@ -134,6 +144,7 @@ const OfflineBookingsReport = () => {
       'Studio',
       'Paket',
       'Tipe Transaksi',
+      'Jenis',
       'Deskripsi',
       'Status',
       'Total Amount'
@@ -146,6 +157,7 @@ const OfflineBookingsReport = () => {
       transaction.bookings?.studios?.name || '-',
       transaction.bookings?.studio_packages?.title || '-',
       transaction.type === 'installment' ? 'Cicilan' : 'Full Payment',
+      transaction.is_walking_session ? 'Walk-in Session' : 'Booking Regular',
       transaction.description || '-',
       transaction.status || '-',
       `Rp ${transaction.amount?.toLocaleString('id-ID') || '0'}`
@@ -165,6 +177,7 @@ const OfflineBookingsReport = () => {
 
   const transactionCount = filteredData?.length || 0;
   const installmentCount = filteredData?.filter(t => t.type === 'installment').length || 0;
+  const walkinCount = filteredData?.filter(t => t.is_walking_session).length || 0;
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
@@ -226,7 +239,7 @@ const OfflineBookingsReport = () => {
         </Card>
 
         {/* Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <Card>
             <CardContent className="p-6">
               <div className="text-2xl font-bold">{transactionCount}</div>
@@ -237,6 +250,12 @@ const OfflineBookingsReport = () => {
             <CardContent className="p-6">
               <div className="text-2xl font-bold text-blue-600">{installmentCount}</div>
               <p className="text-muted-foreground">Cicilan</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-2xl font-bold text-orange-600">{walkinCount}</div>
+              <p className="text-muted-foreground">Walk-in Sessions</p>
             </CardContent>
           </Card>
           <Card>
@@ -273,6 +292,7 @@ const OfflineBookingsReport = () => {
                     <th className="border border-gray-200 p-3 text-left">Tanggal</th>
                     <th className="border border-gray-200 p-3 text-left">Customer</th>
                     <th className="border border-gray-200 p-3 text-left">Studio</th>
+                    <th className="border border-gray-200 p-3 text-left">Jenis</th>
                     <th className="border border-gray-200 p-3 text-left">Tipe</th>
                     <th className="border border-gray-200 p-3 text-left">Deskripsi</th>
                     <th className="border border-gray-200 p-3 text-left">Status</th>
@@ -292,6 +312,15 @@ const OfflineBookingsReport = () => {
                         </div>
                       </td>
                       <td className="border border-gray-200 p-3">{transaction.bookings?.studios?.name}</td>
+                      <td className="border border-gray-200 p-3">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          transaction.is_walking_session 
+                            ? 'bg-orange-100 text-orange-800' 
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {transaction.is_walking_session ? 'Walk-in' : 'Booking'}
+                        </span>
+                      </td>
                       <td className="border border-gray-200 p-3">
                         <span className={`px-2 py-1 rounded text-xs ${
                           transaction.type === 'installment' 
