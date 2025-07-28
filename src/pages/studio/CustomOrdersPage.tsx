@@ -28,10 +28,10 @@ interface CustomOrder {
     full_name: string;
     email: string;
     phone?: string;
-  };
+  } | null;
   studios: {
     name: string;
-  };
+  } | null;
   custom_order_services: Array<{
     id: string;
     quantity: number;
@@ -40,7 +40,7 @@ interface CustomOrder {
     additional_service_id: string;
     additional_services: {
       name: string;
-    };
+    } | null;
   }>;
 }
 
@@ -68,12 +68,12 @@ const CustomOrdersPage = () => {
         .from('custom_orders')
         .select(`
           *,
-          customer_profiles (
+          customer_profiles:customer_id (
             full_name,
             email,
             phone
           ),
-          studios (
+          studios:studio_id (
             name
           ),
           custom_order_services (
@@ -89,23 +89,6 @@ const CustomOrdersPage = () => {
         `)
         .order('created_at', { ascending: false });
 
-      // Apply filters
-      if (filters.customerName) {
-        query = query.ilike('customer_profiles.full_name', `%${filters.customerName}%`);
-      }
-      if (filters.status) {
-        query = query.eq('status', filters.status);
-      }
-      if (filters.paymentMethod) {
-        query = query.eq('payment_method', filters.paymentMethod);
-      }
-      if (filters.dateFrom) {
-        query = query.gte('order_date', filters.dateFrom.toISOString());
-      }
-      if (filters.dateTo) {
-        query = query.lte('order_date', filters.dateTo.toISOString());
-      }
-
       const { data, error } = await query;
 
       if (error) {
@@ -114,7 +97,32 @@ const CustomOrdersPage = () => {
         return;
       }
 
-      setOrders(data || []);
+      // Filter the data based on current filters
+      let filteredData = data || [];
+
+      if (filters.customerName) {
+        filteredData = filteredData.filter(order => 
+          order.customer_profiles?.full_name?.toLowerCase().includes(filters.customerName.toLowerCase())
+        );
+      }
+      if (filters.status) {
+        filteredData = filteredData.filter(order => order.status === filters.status);
+      }
+      if (filters.paymentMethod) {
+        filteredData = filteredData.filter(order => order.payment_method === filters.paymentMethod);
+      }
+      if (filters.dateFrom) {
+        filteredData = filteredData.filter(order => 
+          new Date(order.order_date) >= filters.dateFrom!
+        );
+      }
+      if (filters.dateTo) {
+        filteredData = filteredData.filter(order => 
+          new Date(order.order_date) <= filters.dateTo!
+        );
+      }
+
+      setOrders(filteredData);
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to fetch orders');
@@ -189,14 +197,15 @@ const CustomOrdersPage = () => {
       header: 'Customer',
       cell: ({ row }) => (
         <div>
-          <div className="font-medium">{row.original.customer_profiles.full_name}</div>
-          <div className="text-sm text-gray-500">{row.original.customer_profiles.email}</div>
+          <div className="font-medium">{row.original.customer_profiles?.full_name || 'N/A'}</div>
+          <div className="text-sm text-gray-500">{row.original.customer_profiles?.email || 'N/A'}</div>
         </div>
       )
     },
     {
       accessorKey: 'studios.name',
-      header: 'Studio'
+      header: 'Studio',
+      cell: ({ row }) => row.original.studios?.name || 'N/A'
     },
     {
       accessorKey: 'payment_method',
@@ -236,7 +245,7 @@ const CustomOrdersPage = () => {
         <div className="space-y-1">
           {row.original.custom_order_services.map((service) => (
             <div key={service.id} className="text-sm">
-              {service.additional_services.name} ({service.quantity}x)
+              {service.additional_services?.name || 'N/A'} ({service.quantity}x)
             </div>
           ))}
         </div>
