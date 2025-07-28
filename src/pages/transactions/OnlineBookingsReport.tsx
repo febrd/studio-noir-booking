@@ -86,7 +86,7 @@ const OnlineBookingsReport = () => {
         .from('custom_orders')
         .select(`
           *,
-          customer_profiles!custom_orders_customer_id_fkey(full_name, email),
+          customer_profiles!fk_custom_orders_customer_id(full_name, email),
           studios!inner(name)
         `)
         .eq('payment_method', 'online')
