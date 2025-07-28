@@ -155,7 +155,7 @@ export const KeuanganDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Turnover Bulan Ini</CardTitle>
+            <CardTitle className="text-sm font-medium">Revenue Bulan Ini</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -210,16 +210,16 @@ export const KeuanganDashboard = () => {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Daily Turnover Trend - Composed Chart */}
+        {/* Daily Revenue Trend - Composed Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>Tren Turnover Harian</CardTitle>
+            <CardTitle>Tren Revenue Harian</CardTitle>
             <CardDescription>Perkembangan pendapatan per hari bulan ini</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer
               config={{
-                revenue: { label: "Turnover", color: "hsl(var(--chart-1))" },
+                revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
                 bookings: { label: "Bookings", color: "hsl(var(--chart-2))" }
               }}
               className="h-[300px]"
@@ -249,12 +249,12 @@ export const KeuanganDashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle>Distribusi Metode Pembayaran</CardTitle>
-            <CardDescription>Turnover berdasarkan metode pembayaran</CardDescription>
+            <CardDescription>Revenue berdasarkan metode pembayaran</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer
               config={{
-                revenue: { label: "Turnover" }
+                revenue: { label: "Revenue" }
               }}
               className="h-[300px]"
             >
@@ -277,7 +277,7 @@ export const KeuanganDashboard = () => {
                     ))}
                   </Pie>
                   <ChartTooltip
-                    formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Turnover']}
+                    formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Revenue']}
                   />
                 </PieChart>
               </ResponsiveContainer>
