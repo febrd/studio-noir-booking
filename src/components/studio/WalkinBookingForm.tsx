@@ -374,7 +374,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),
         additional_time_minutes: additionalTime > 0 ? additionalTime : null,
-        payment_method: 'offline' as const,
+        payment_method: data.payment_method || null,
         total_amount: totalAmount,
         is_walking_session: true,
         package_quantity: isSelfPhotoStudio ? packageQuantity : null,
