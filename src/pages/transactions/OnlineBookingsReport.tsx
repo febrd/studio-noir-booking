@@ -81,12 +81,12 @@ const OnlineBookingsReport = () => {
       
       console.log('Fetched online installments:', installments);
 
-      // Ambil custom orders dengan payment method online
+      // Ambil custom orders dengan payment method online - fix the relationship hint
       const { data: customOrders, error: customOrdersError } = await supabase
         .from('custom_orders')
         .select(`
           *,
-          customer_profiles!inner(
+          customer_profiles!custom_orders_customer_id_fkey(
             id,
             full_name,
             email
