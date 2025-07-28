@@ -12,6 +12,7 @@ import { ExpenseTable } from '@/components/expenses/ExpenseTable';
 import { ExpenseFilters } from '@/components/expenses/ExpenseFilters';
 import { useExpenseFilters } from '@/hooks/useExpenseFilters';
 import { JWTProtectedRoute } from '@/components/auth/JWTProtectedRoute';
+import { ModernLayout } from '@/components/Layout/ModernLayout';
 
 export interface Expense {
   id: string;
@@ -108,74 +109,76 @@ const ExpensesPage = () => {
 
   return (
     <JWTProtectedRoute allowedRoles={['admin', 'owner', 'keuangan']}>
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Expense Management</h1>
-            <p className="text-muted-foreground">Track and manage company expenses</p>
-          </div>
-          <Button onClick={() => setShowForm(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Expense
-          </Button>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Expense Filters</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-4 items-center">
-              <div className="flex-1 min-w-[200px]">
-                <Input
-                  placeholder="Search expenses..."
-                  value={filters.search}
-                  onChange={(e) => updateFilters({ search: e.target.value })}
-                  className="w-full"
-                />
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-              </Button>
-              <Button
-                variant="outline"
-                onClick={resetFilters}
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Reset
-              </Button>
+      <ModernLayout>
+        <div className="p-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">Expense Management</h1>
+              <p className="text-muted-foreground">Track and manage company expenses</p>
             </div>
-            
-            {showFilters && (
-              <div className="mt-4">
-                <ExpenseFilters
-                  filters={filters}
-                  onFiltersChange={updateFilters}
-                />
+            <Button onClick={() => setShowForm(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Expense
+            </Button>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Expense Filters</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-4 items-center">
+                <div className="flex-1 min-w-[200px]">
+                  <Input
+                    placeholder="Search expenses..."
+                    value={filters.search}
+                    onChange={(e) => updateFilters({ search: e.target.value })}
+                    className="w-full"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filters
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={resetFilters}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reset
+                </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              
+              {showFilters && (
+                <div className="mt-4">
+                  <ExpenseFilters
+                    filters={filters}
+                    onFiltersChange={updateFilters}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        <ExpenseTable
-          expenses={expenses}
-          isLoading={isLoading}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-        />
-
-        {showForm && (
-          <ExpenseForm
-            expense={editingExpense}
-            onClose={handleFormClose}
-            onSuccess={handleFormSuccess}
+          <ExpenseTable
+            expenses={expenses}
+            isLoading={isLoading}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
           />
-        )}
-      </div>
+
+          {showForm && (
+            <ExpenseForm
+              expense={editingExpense}
+              onClose={handleFormClose}
+              onSuccess={handleFormSuccess}
+            />
+          )}
+        </div>
+      </ModernLayout>
     </JWTProtectedRoute>
   );
 };
