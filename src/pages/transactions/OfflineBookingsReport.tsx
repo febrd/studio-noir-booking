@@ -81,6 +81,26 @@ const OfflineBookingsReport = () => {
       
       console.log('Fetched offline installments:', installments);
 
+      // Ambil semua custom orders dengan payment method offline
+      const { data: customOrders, error: customError } = await supabase
+        .from('custom_orders')
+        .select(`
+          *,
+          customer_profiles!inner(full_name, email),
+          studios!inner(name)
+        `)
+        .eq('payment_method', 'offline')
+        .gte('created_at', startDate + 'T00:00:00')
+        .lte('created_at', endDate + 'T23:59:59')
+        .order('created_at', { ascending: false });
+
+      if (customError) {
+        console.error('Error fetching custom orders:', customError);
+        throw customError;
+      }
+      
+      console.log('Fetched offline custom orders:', customOrders);
+
       const allTransactions = [];
 
       // Proses semua booking offline
@@ -110,6 +130,7 @@ const OfflineBookingsReport = () => {
             status: booking.status,
             is_walking_session: booking.is_walking_session,
             booking_type: booking.type,
+            source: 'booking',
             bookings: {
               users: booking.users,
               studios: booking.studios,
@@ -134,7 +155,34 @@ const OfflineBookingsReport = () => {
           status: 'paid',
           is_walking_session: installment.bookings.is_walking_session,
           booking_type: installment.bookings.type,
+          source: 'installment',
           bookings: installment.bookings
+        });
+      }
+
+      // Tambahkan semua custom orders offline
+      for (const order of customOrders || []) {
+        const description = `Custom Order - ${order.notes || 'No description'}`;
+        
+        allTransactions.push({
+          id: order.id,
+          created_at: order.created_at,
+          amount: order.total_amount,
+          description: description,
+          type: 'custom_order',
+          payment_method: 'offline',
+          status: order.status,
+          is_walking_session: false,
+          booking_type: 'custom',
+          source: 'custom_order',
+          bookings: {
+            users: { 
+              name: order.customer_profiles?.full_name || 'N/A',
+              email: order.customer_profiles?.email || 'N/A'
+            },
+            studios: order.studios,
+            studio_packages: { title: 'Custom Order' }
+          }
         });
       }
 
@@ -180,8 +228,8 @@ const OfflineBookingsReport = () => {
       transaction.bookings?.users?.email || '-',
       transaction.bookings?.studios?.name || '-',
       transaction.bookings?.studio_packages?.title || '-',
-      transaction.type === 'installment' ? 'Cicilan' : 'Full Payment',
-      transaction.is_walking_session ? 'Walk-in Session' : 'Booking Regular',
+      transaction.type === 'installment' ? 'Cicilan' : transaction.type === 'custom_order' ? 'Custom Order' : 'Full Payment',
+      transaction.is_walking_session ? 'Walk-in Session' : transaction.type === 'custom_order' ? 'Custom Order' : 'Booking Regular',
       transaction.description || '-',
       transaction.status || '-',
       `Rp ${transaction.amount?.toLocaleString('id-ID') || '0'}`
@@ -202,6 +250,7 @@ const OfflineBookingsReport = () => {
   const transactionCount = filteredData?.length || 0;
   const installmentCount = filteredData?.filter(t => t.type === 'installment').length || 0;
   const walkinCount = filteredData?.filter(t => t.is_walking_session).length || 0;
+  const customOrderCount = filteredData?.filter(t => t.type === 'custom_order').length || 0;
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
@@ -263,7 +312,7 @@ const OfflineBookingsReport = () => {
         </Card>
 
         {/* Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <Card>
             <CardContent className="p-6">
               <div className="text-2xl font-bold">{transactionCount}</div>
@@ -284,6 +333,12 @@ const OfflineBookingsReport = () => {
           </Card>
           <Card>
             <CardContent className="p-6">
+              <div className="text-2xl font-bold text-red-600">{customOrderCount}</div>
+              <p className="text-muted-foreground">Custom Orders</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
               <div className="text-2xl font-bold text-green-600">
                 Rp {totalAmount.toLocaleString('id-ID')}
               </div>
@@ -293,7 +348,7 @@ const OfflineBookingsReport = () => {
           <Card>
             <CardContent className="p-6">
               <div className="text-2xl font-bold text-purple-600">
-                {transactionCount - installmentCount}
+                {transactionCount - installmentCount - customOrderCount}
               </div>
               <p className="text-muted-foreground">Full Payment</p>
             </CardContent>
@@ -325,7 +380,7 @@ const OfflineBookingsReport = () => {
                 </thead>
                 <tbody>
                   {filteredData?.map((transaction) => (
-                    <tr key={`${transaction.type}-${transaction.id}`} className="hover:bg-gray-50">
+                    <tr key={`${transaction.source}-${transaction.id}`} className="hover:bg-gray-50">
                       <td className="border border-gray-200 p-3">
                         {format(new Date(transaction.created_at), 'dd/MM/yyyy HH:mm', { locale: id })}
                       </td>
@@ -338,28 +393,32 @@ const OfflineBookingsReport = () => {
                       <td className="border border-gray-200 p-3">{transaction.bookings?.studios?.name}</td>
                       <td className="border border-gray-200 p-3">
                         <span className={`px-2 py-1 rounded text-xs ${
-                          transaction.is_walking_session 
+                          transaction.type === 'custom_order'
+                            ? 'bg-red-100 text-red-800'
+                            : transaction.is_walking_session 
                             ? 'bg-orange-100 text-orange-800' 
                             : 'bg-blue-100 text-blue-800'
                         }`}>
-                          {transaction.is_walking_session ? 'Walk-in' : 'Booking'}
+                          {transaction.type === 'custom_order' ? 'Custom Order' : transaction.is_walking_session ? 'Walk-in' : 'Booking'}
                         </span>
                       </td>
                       <td className="border border-gray-200 p-3">
                         <span className={`px-2 py-1 rounded text-xs ${
                           transaction.type === 'installment' 
                             ? 'bg-blue-100 text-blue-800' 
+                            : transaction.type === 'custom_order'
+                            ? 'bg-red-100 text-red-800'
                             : 'bg-green-100 text-green-800'
                         }`}>
-                          {transaction.type === 'installment' ? 'Cicilan' : 'Full Payment'}
+                          {transaction.type === 'installment' ? 'Cicilan' : transaction.type === 'custom_order' ? 'Custom Order' : 'Full Payment'}
                         </span>
                       </td>
                       <td className="border border-gray-200 p-3">{transaction.description}</td>
                       <td className="border border-gray-200 p-3">
                         <span className={`px-2 py-1 rounded text-xs ${
-                          transaction.status === 'paid' || transaction.status === 'confirmed'
+                          transaction.status === 'paid' || transaction.status === 'confirmed' || transaction.status === 'completed'
                             ? 'bg-green-100 text-green-800' 
-                            : transaction.status === 'pending'
+                            : transaction.status === 'pending' || transaction.status === 'in_progress'
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-red-100 text-red-800'
                         }`}>
