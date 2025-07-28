@@ -65,7 +65,7 @@ const OfflineTransactionsPage = () => {
       
       if (error) throw error;
 
-      // Fetch custom orders with offline payment - fix the relationship hint
+      // Fetch custom orders with offline payment
       const { data: customOrders, error: customOrdersError } = await supabase
         .from('custom_orders')
         .select(`

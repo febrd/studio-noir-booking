@@ -387,6 +387,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "custom_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fk_custom_orders_customer"
             columns: ["customer_id"]
             isOneToOne: false
