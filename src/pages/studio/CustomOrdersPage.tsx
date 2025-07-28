@@ -24,10 +24,10 @@ interface CustomOrder {
   total_amount: number;
   notes: string | null;
   payment_method: string;
-  customer_profiles?: {
+  customer_profiles: {
     full_name: string;
     email: string;
-  };
+  } | null;
 }
 
 type FilterType = 'all' | 'pending' | 'in_progress' | 'completed' | 'cancelled';
@@ -46,7 +46,7 @@ const CustomOrdersPage = () => {
         .from('custom_orders')
         .select(`
           *,
-          customer_profiles!inner (
+          customer_profiles!custom_orders_customer_id_fkey (
             full_name,
             email
           )
@@ -64,6 +64,7 @@ const CustomOrdersPage = () => {
       const { data, error } = await query;
 
       if (error) {
+        console.error('Error fetching custom orders:', error);
         throw new Error(error.message);
       }
 
