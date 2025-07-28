@@ -199,26 +199,30 @@ const WalkinSessionsPage = () => {
   };
 
   const handleSuccess = async (bookingData?: any) => {
-    // Create offline transaction for walk-in sessions
-    if (bookingData && bookingData.payment_method === 'offline') {
+    // Create transaction for walk-in sessions based on payment method
+    if (bookingData && bookingData.payment_method) {
       try {
+        const transactionData = {
+          booking_id: bookingData.id,
+          amount: bookingData.total_amount,
+          type: bookingData.payment_method, // Use the actual payment method
+          status: 'paid',
+          payment_type: bookingData.payment_method, // Ensure consistency
+          description: `Walk-in session ${bookingData.payment_method} - ${bookingData.studio_packages?.title || 'Package'}`,
+          performed_by: null // Will be handled by database function
+        };
+
         const { error: transactionError } = await supabase
           .from('transactions')
-          .insert({
-            booking_id: bookingData.id,
-            amount: bookingData.total_amount,
-            type: 'offline',
-            status: 'paid',
-            payment_type: 'offline',
-            description: `Walk-in session offline - ${bookingData.studio_packages?.title || 'Package'}`,
-            performed_by: null // Will be handled by database function
-          });
+          .insert(transactionData);
 
         if (transactionError) {
-          console.error('Error creating offline transaction for walk-in:', transactionError);
+          console.error('Error creating transaction for walk-in:', transactionError);
+        } else {
+          console.log('Transaction created successfully:', transactionData);
         }
       } catch (error) {
-        console.error('Error creating offline transaction for walk-in:', error);
+        console.error('Error creating transaction for walk-in:', error);
       }
     }
 

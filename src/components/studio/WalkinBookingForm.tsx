@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -374,7 +373,7 @@ const WalkinBookingForm = ({ booking, onSuccess }: WalkinBookingFormProps) => {
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),
         additional_time_minutes: additionalTime > 0 ? additionalTime : null,
-        payment_method: data.payment_method || null,
+        payment_method: data.payment_method, // Use the selected payment method
         total_amount: totalAmount,
         is_walking_session: true,
         package_quantity: isSelfPhotoStudio ? packageQuantity : null,
