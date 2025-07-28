@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, Users, DollarSign, Activity, Target, Calendar, Building2 } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, Activity, Target, Calendar, Building2, TrendingDown } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, addDays, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
@@ -22,6 +22,12 @@ import { ModernLayout } from '@/components/Layout/ModernLayout';
 interface WeeklyRevenue {
   week: string;
   revenue: number;
+  period: string;
+}
+
+interface WeeklyExpense {
+  week: string;
+  expense: number;
   period: string;
 }
 
@@ -183,6 +189,25 @@ const TransactionReports = () => {
     }
   });
 
+  // Fetch expenses data for the custom period
+  const { data: expensesData, isLoading: isExpensesLoading } = useQuery({
+    queryKey: ['recaps-expenses', startDate, endDate],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('expenses')
+        .select(`
+          *,
+          users:performed_by (name, email)
+        `)
+        .gte('date', startDate.toISOString())
+        .lte('date', endDate.toISOString())
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    }
+  });
+
   const analytics = useMemo(() => {
     if (!combinedData) return null;
 
@@ -287,7 +312,7 @@ const TransactionReports = () => {
   }, [combinedData]);
 
   const recapsAnalytics = useMemo(() => {
-    if (!recapsData) return null;
+    if (!recapsData || !expensesData) return null;
 
     const calculateRevenue = (bookings: any[]) => {
       return bookings.reduce((sum, booking) => {
@@ -311,7 +336,24 @@ const TransactionReports = () => {
       };
     });
 
+    // Weekly expenses calculation
+    const weeklyExpenses: WeeklyExpense[] = weeklyPeriods.map(week => {
+      const weekExpenses = expensesData.filter(expense => {
+        const expenseDate = new Date(expense.date);
+        return expenseDate >= week.startDate && expenseDate <= week.endDate;
+      });
+
+      const totalExpense = weekExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+
+      return {
+        week: week.label,
+        expense: totalExpense,
+        period: week.period
+      };
+    });
+
     const totalRevenue = weeklyRevenue.reduce((sum, week) => sum + week.revenue, 0);
+    const totalExpenses = weeklyExpenses.reduce((sum, week) => sum + week.expense, 0);
 
     // Monthly details by category and package
     const categoryStats = recapsData.reduce((acc, booking) => {
@@ -395,13 +437,15 @@ const TransactionReports = () => {
 
     return {
       weeklyRevenue,
+      weeklyExpenses,
       totalRevenue,
+      totalExpenses,
       monthlyDetails,
       topStudios,
       currentTarget,
       achievementPercentage
     };
-  }, [recapsData, weeklyPeriods, monthlyTarget, targetAmount, startDate, endDate]);
+  }, [recapsData, expensesData, weeklyPeriods, monthlyTarget, targetAmount, startDate, endDate]);
 
   // Add export data for Transaction Reports
   const exportData = useMemo(() => {
@@ -477,7 +521,7 @@ const TransactionReports = () => {
   // Color palette for pie chart
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C', '#8DD1E1', '#D084D0'];
 
-  if (isLoading || isRecapsLoading) {
+  if (isLoading || isRecapsLoading || isExpensesLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
   }
 
@@ -889,6 +933,46 @@ const TransactionReports = () => {
               </CardContent>
             </Card>
 
+            {/* Weekly Expenses Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingDown className="h-5 w-5" />
+                  Pengeluaran Mingguan
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-200">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-200 p-3 text-left">Minggu 1</th>
+                        <th className="border border-gray-200 p-3 text-left">Minggu 2</th>
+                        <th className="border border-gray-200 p-3 text-left">Minggu 3</th>
+                        <th className="border border-gray-200 p-3 text-left">Minggu 4</th>
+                        <th className="border border-gray-200 p-3 text-left font-bold">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        {recapsAnalytics?.weeklyExpenses.map((week, index) => (
+                          <td key={index} className="border border-gray-200 p-3">
+                            <div className="text-sm text-gray-600">{week.period}</div>
+                            <div className="font-semibold text-red-600">Rp {week.expense.toLocaleString('id-ID')}</div>
+                          </td>
+                        ))}
+                        <td className="border border-gray-200 p-3 bg-red-50">
+                          <div className="font-bold text-red-600">
+                            Rp {recapsAnalytics?.totalExpenses.toLocaleString('id-ID')}
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Weekly Revenue Chart */}
             <Card>
               <CardHeader>
@@ -914,6 +998,37 @@ const TransactionReports = () => {
                         formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pendapatan']}
                       />
                       <Bar dataKey="revenue" fill="var(--color-revenue)" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            {/* Weekly Expenses Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Grafik Pengeluaran Mingguan</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{
+                    expense: {
+                      label: "Pengeluaran",
+                      color: "hsl(var(--destructive))",
+                    },
+                  }}
+                  className="h-[300px]"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={[...(recapsAnalytics?.weeklyExpenses || []), { week: 'Total', expense: recapsAnalytics?.totalExpenses || 0, period: 'Keseluruhan' }]}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="week" />
+                      <YAxis />
+                      <ChartTooltip
+                        content={<ChartTooltipContent />}
+                        formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Pengeluaran']}
+                      />
+                      <Bar dataKey="expense" fill="var(--color-expense)" />
                     </BarChart>
                   </ResponsiveContainer>
                 </ChartContainer>
