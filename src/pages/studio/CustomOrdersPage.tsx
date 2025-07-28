@@ -58,25 +58,10 @@ const CustomOrdersPage = () => {
     queryFn: async () => {
       console.log('Fetching custom orders...');
       
-      // First, get the custom orders with their services
+      // First, get the custom orders
       let ordersQuery = supabase
         .from('custom_orders')
-        .select(`
-          *,
-          custom_order_services (
-            id,
-            additional_service_id,
-            quantity,
-            unit_price,
-            total_price,
-            additional_services (
-              id,
-              name,
-              price,
-              description
-            )
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (statusFilter !== 'all') {
@@ -108,16 +93,56 @@ const CustomOrdersPage = () => {
         throw new Error(profilesError.message);
       }
 
+      // Get order IDs for fetching services
+      const orderIds = orders.map(order => order.id);
+
+      // Fetch custom order services with explicit foreign key hinting
+      const { data: orderServices, error: servicesError } = await supabase
+        .from('custom_order_services')
+        .select(`
+          id,
+          custom_order_id,
+          additional_service_id,
+          quantity,
+          unit_price,
+          total_price,
+          additional_services!custom_order_services_additional_service_id_fkey (
+            id,
+            name,
+            price,
+            description
+          )
+        `)
+        .in('custom_order_id', orderIds);
+
+      if (servicesError) {
+        console.error('Error fetching order services:', servicesError);
+        // Don't throw error, just continue without services
+      }
+
       // Create a map of customer profiles for quick lookup
       const profilesMap = new Map(
         customerProfiles?.map(profile => [profile.id, profile]) || []
       );
 
-      // Combine orders with customer profiles and ensure proper typing
+      // Create a map of services grouped by order ID
+      const servicesMap = new Map<string, any[]>();
+      if (orderServices) {
+        orderServices.forEach(service => {
+          const orderId = service.custom_order_id;
+          if (!servicesMap.has(orderId)) {
+            servicesMap.set(orderId, []);
+          }
+          servicesMap.get(orderId)?.push(service);
+        });
+      }
+
+      // Combine orders with customer profiles and services
       const ordersWithProfiles = orders.map(order => ({
         ...order,
         status: order.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
-        customer_profiles: profilesMap.get(order.customer_id) || null
+        customer_profiles: profilesMap.get(order.customer_id) || null,
+        custom_order_services: servicesMap.get(order.id) || []
       }));
 
       // Filter by search query if provided
