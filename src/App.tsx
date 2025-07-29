@@ -28,6 +28,10 @@ import Users from "./pages/admin/Users"
 import Customers from "./pages/admin/Customers"
 import PaymentProviders from "./pages/admin/PaymentProviders"
 import RecapsPage from "./pages/recaps/RecapsPage"
+import BookingSelectionPage from "./pages/customer/BookingSelectionPage"
+import SelfPhotoPackagesPage from "./pages/customer/SelfPhotoPackagesPage"
+import RegularPackagesPage from "./pages/customer/RegularPackagesPage"
+import OrderHistoryPage from "./pages/customer/OrderHistoryPage"
 
 const queryClient = new QueryClient()
 
@@ -43,6 +47,12 @@ const App = () => (
             <Route path="/auth" element={<JWTAuth />} />
             <Route path="/dashboard/*" element={<JWTDashboard />} />
             <Route path="/dashboard" element={<JWTDashboard />} />
+            
+            {/* Customer Routes */}
+            <Route path="/customer/booking-selection" element={<BookingSelectionPage />} />
+            <Route path="/customer/self-photo-packages" element={<SelfPhotoPackagesPage />} />
+            <Route path="/customer/regular-packages" element={<RegularPackagesPage />} />
+            <Route path="/customer/order-history" element={<OrderHistoryPage />} />
             
             {/* Studio Management Routes */}
             <Route path="/studios" element={<StudiosPage />} />
