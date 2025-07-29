@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { ArrowLeft, Search, Camera, Clock, MapPin, Star, Users } from 'lucide-re
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 
 interface Package {
   id: string;
@@ -31,6 +32,22 @@ const SelfPhotoPackagesPage = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('popular');
+  const { userProfile, isAuthenticated } = useJWTAuth();
+
+  // Redirect if not authenticated or not a customer
+  useEffect(() => {
+    if (!isAuthenticated) {
+      console.log('SelfPhotoPackagesPage - Not authenticated, redirecting to auth');
+      navigate('/auth');
+      return;
+    }
+    
+    if (userProfile && userProfile.role !== 'pelanggan') {
+      console.log('SelfPhotoPackagesPage - Not a customer, redirecting to dashboard');
+      navigate('/dashboard');
+      return;
+    }
+  }, [isAuthenticated, userProfile, navigate]);
 
   // Fetch self photo packages from database
   const { data: packages = [], isLoading, error } = useQuery({
@@ -60,6 +77,7 @@ const SelfPhotoPackagesPage = () => {
       console.log('Fetched self photo packages:', data);
       return data as Package[];
     },
+    enabled: isAuthenticated && userProfile?.role === 'pelanggan'
   });
 
   // Filter and sort packages
@@ -86,6 +104,19 @@ const SelfPhotoPackagesPage = () => {
     toast.success('Navigating to checkout...');
     navigate(`/customer/self-photo-checkout?package=${packageId}`);
   };
+
+  // Show loading while checking authentication
+  if (!isAuthenticated || !userProfile) {
+    return (
+      <div className="min-h-screen bg-white p-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center py-12">
+            <div className="w-8 h-8 border-2 border-gray-200 border-t-black rounded-full animate-spin mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (
