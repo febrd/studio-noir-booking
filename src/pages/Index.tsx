@@ -1,10 +1,8 @@
-
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import HeroSection from "@/components/landing/HeroSection";
 import StudiosSection from "@/components/landing/StudiosSection";
-import MainServicesSection from "@/components/landing/MainServicesSection";
 import AdditionalServicesSection from "@/components/landing/AdditionalServicesSection";
 import PackagesSection from "@/components/landing/PackagesSection";
 import ShortcutsSection from "@/components/landing/ShortcutsSection";
