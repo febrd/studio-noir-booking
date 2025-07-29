@@ -5,19 +5,18 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { Toaster } from "@/components/ui/sonner"
 import Index from "./pages/Index"
 import StudiosPage from "./pages/studio/StudiosPage"
-import StudioPackagesPage from "./pages/studio/StudioPackagesPage"
+import PackagesPage from "./pages/studio/PackagesPage"
 import BookingsPage from "./pages/studio/BookingsPage"
 import CustomOrdersPage from "./pages/studio/CustomOrdersPage"
-import AdditionalServicesPage from "./pages/studio/AdditionalServicesPage"
-import JWTAuth from "./pages/auth/JWTAuth"
-import JWTDashboard from "./pages/dashboard/JWTDashboard"
-import UsersPage from "./pages/admin/UsersPage"
-import Expenses from "./pages/admin/Expenses"
-import WalkinBookings from "./pages/studio/WalkinBookings"
-import MonthlyTargets from "./pages/admin/MonthlyTargets"
+import ServicesPage from "./pages/studio/ServicesPage"
+import JWTAuth from "./pages/JWTAuth"
+import JWTDashboard from "./pages/JWTDashboard"
+import UsersPage from "./pages/admin/Users"
+import ExpensesPage from "./pages/expenses/ExpensesPage"
+import WalkinSessionsPage from "./pages/studio/WalkinSessionsPage"
 import "./App.css"
 import { JWTAuthProvider } from "./hooks/useJWTAuth"
-import PackageCategories from "./pages/studio/PackageCategories"
+import PackageCategoriesPage from "./pages/studio/PackageCategoriesPage"
 import Customers from "./pages/admin/Customers"
 import PaymentProviders from "./pages/admin/PaymentProviders"
 import RecapsPage from "./pages/recaps/RecapsPage"
@@ -52,18 +51,17 @@ function App() {
             
             {/* Studio Management Routes */}
             <Route path="/studios" element={<StudiosPage />} />
-            <Route path="/studio-packages" element={<StudioPackagesPage />} />
+            <Route path="/studio-packages" element={<PackagesPage />} />
             <Route path="/bookings" element={<BookingsPage />} />
-            <Route path="/walkin-bookings" element={<WalkinBookings />} />
+            <Route path="/walkin-sessions" element={<WalkinSessionsPage />} />
             <Route path="/custom-orders" element={<CustomOrdersPage />} />
-            <Route path="/additional-services" element={<AdditionalServicesPage />} />
-            <Route path="/package-categories" element={<PackageCategories />} />
+            <Route path="/additional-services" element={<ServicesPage />} />
+            <Route path="/package-categories" element={<PackageCategoriesPage />} />
             
             {/* Admin Routes */}
             <Route path="/users" element={<UsersPage />} />
             <Route path="/customers" element={<Customers />} />
-            <Route path="/expenses" element={<Expenses />} />
-            <Route path="/monthly-targets" element={<MonthlyTargets />} />
+            <Route path="/expenses" element={<ExpensesPage />} />
             <Route path="/payment-providers" element={<PaymentProviders />} />
             <Route path="/recaps" element={<RecapsPage />} />
             </Routes>
