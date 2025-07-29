@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,7 +56,7 @@ const Index = () => {
   if (studiosLoading || servicesLoading || packagesLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-yellow-50">
-        <div className="max-w-7xl mx-auto px-4 py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="space-y-8">
             <Skeleton className="h-96 w-full" />
             <Skeleton className="h-64 w-full" />

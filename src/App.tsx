@@ -26,6 +26,7 @@ import RegularPackagesPage from "./pages/customer/RegularPackagesPage"
 import OrderHistoryPage from "./pages/customer/OrderHistoryPage"
 import SelfPhotoCheckoutPage from "./pages/customer/SelfPhotoCheckoutPage"
 import RegularCheckoutPage from "./pages/customer/RegularCheckoutPage"
+import { JWTProtectedRoute } from "./components/auth/JWTProtectedRoute"
 
 const queryClient = new QueryClient()
 
@@ -41,13 +42,37 @@ function App() {
             <Route path="/dashboard/*" element={<JWTDashboard />} />
             <Route path="/dashboard" element={<JWTDashboard />} />
             
-            {/* Customer Routes */}
-            <Route path="/customer/booking-selection" element={<BookingSelectionPage />} />
-            <Route path="/customer/self-photo-packages" element={<SelfPhotoPackagesPage />} />
-            <Route path="/customer/regular-packages" element={<RegularPackagesPage />} />
-            <Route path="/customer/order-history" element={<OrderHistoryPage />} />
-            <Route path="/customer/self-photo-checkout" element={<SelfPhotoCheckoutPage />} />
-            <Route path="/customer/regular-checkout" element={<RegularCheckoutPage />} />
+            {/* Customer Routes - Protected for pelanggan only */}
+            <Route path="/customer/booking-selection" element={
+              <JWTProtectedRoute allowedRoles={['pelanggan']}>
+                <BookingSelectionPage />
+              </JWTProtectedRoute>
+            } />
+            <Route path="/customer/self-photo-packages" element={
+              <JWTProtectedRoute allowedRoles={['pelanggan']}>
+                <SelfPhotoPackagesPage />
+              </JWTProtectedRoute>
+            } />
+            <Route path="/customer/regular-packages" element={
+              <JWTProtectedRoute allowedRoles={['pelanggan']}>
+                <RegularPackagesPage />
+              </JWTProtectedRoute>
+            } />
+            <Route path="/customer/order-history" element={
+              <JWTProtectedRoute allowedRoles={['pelanggan']}>
+                <OrderHistoryPage />
+              </JWTProtectedRoute>
+            } />
+            <Route path="/customer/self-photo-checkout" element={
+              <JWTProtectedRoute allowedRoles={['pelanggan']}>
+                <SelfPhotoCheckoutPage />
+              </JWTProtectedRoute>
+            } />
+            <Route path="/customer/regular-checkout" element={
+              <JWTProtectedRoute allowedRoles={['pelanggan']}>
+                <RegularCheckoutPage />
+              </JWTProtectedRoute>
+            } />
             
             {/* Studio Management Routes */}
             <Route path="/studios" element={<StudiosPage />} />
