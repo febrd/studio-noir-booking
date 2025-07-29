@@ -24,7 +24,7 @@ import SelfPhotoSchedulePage from './pages/customer/SelfPhotoSchedulePage';
 import RegularCheckoutPage from './pages/customer/RegularCheckoutPage';
 import SelfPhotoCheckoutPage from './pages/customer/SelfPhotoCheckoutPage';
 import OrderHistoryPage from './pages/customer/OrderHistoryPage';
-import JWTProtectedRoute from './components/auth/JWTProtectedRoute';
+import { JWTProtectedRoute } from './components/auth/JWTProtectedRoute';
 import NotFound from './pages/NotFound';
 import Unauthorized from './pages/Unauthorized';
 import RecapsPage from './pages/recaps/RecapsPage';
