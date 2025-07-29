@@ -20,7 +20,7 @@ const ShortcutsSection = () => {
       title: "Tracking Transaksi",
       description: "Cek status pembayaran dan booking kamu",
       action: "Cek Status",
-      href: "/transactions",
+      href: "/customer/order-history",
       gradient: "from-blue-500 to-cyan-500",
       bgGradient: "from-blue-50 to-cyan-50"
     },
