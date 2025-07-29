@@ -1,6 +1,6 @@
 
 import { useAuth } from '@/hooks/useAuth';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -10,11 +10,6 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute = ({ children, allowedRoles = ['owner', 'admin', 'keuangan'] }: ProtectedRouteProps) => {
   const { userProfile, loading } = useAuth();
-  const location = useLocation();
-
-  console.log('ProtectedRoute - User Profile:', userProfile);
-  console.log('ProtectedRoute - Current Path:', location.pathname);
-  console.log('ProtectedRoute - Allowed Roles:', allowedRoles);
 
   if (loading) {
     return (
@@ -25,21 +20,12 @@ export const ProtectedRoute = ({ children, allowedRoles = ['owner', 'admin', 'ke
   }
 
   if (!userProfile) {
-    console.log('ProtectedRoute - No user profile, redirecting to auth');
-    return <Navigate to="/auth" replace state={{ from: location }} />;
+    return <Navigate to="/auth" replace />;
   }
 
   if (!allowedRoles.includes(userProfile.role as any)) {
-    console.log('ProtectedRoute - Role not allowed:', userProfile.role, 'Allowed:', allowedRoles);
-    
-    // If user is pelanggan but route doesn't allow pelanggan, redirect to customer dashboard
-    if (userProfile.role === 'pelanggan') {
-      return <Navigate to="/dashboard" replace />;
-    }
-    
     return <Navigate to="/unauthorized" replace />;
   }
 
-  console.log('ProtectedRoute - Access granted for role:', userProfile.role);
   return <>{children}</>;
 };
