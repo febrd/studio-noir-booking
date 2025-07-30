@@ -1,21 +1,27 @@
-
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Index from './pages/Index';
-import StudiosPage from './pages/studio/StudiosPage';
-import PackagesPage from './pages/studio/PackagesPage';
-import ServicesPage from './pages/studio/ServicesPage';
-import Auth from './pages/Auth'; // Using Auth.tsx with captcha
+import Auth from './pages/Auth';
 import JWTDashboard from './pages/JWTDashboard';
 import Users from './pages/admin/Users';
 import ExpensesPage from './pages/expenses/ExpensesPage';
-import WalkinSessionsPage from './pages/studio/WalkinSessionsPage';
 import TransactionsPage from './pages/transactions/TransactionsPage';
-import BookingsPage from './pages/studio/BookingsPage';
-import PackageCategoriesPage from './pages/studio/PackageCategoriesPage';
-import CustomOrdersPage from './pages/studio/CustomOrdersPage';
+import RecapsPage from './pages/recaps/RecapsPage';
+import TransactionReports from './pages/transactions/TransactionReports';
+import OnlineBookingsReport from './pages/transactions/OnlineBookingsReport';
+import OfflineBookingsReport from './pages/transactions/OfflineBookingsReport';
+import Customers from './pages/admin/Customers';
+import StudioManagement from './pages/studio/StudioManagement';
+import PaymentGateway from './pages/PaymentGateway';
+import PaymentProviders from './pages/admin/PaymentProviders';
+import { JWTProtectedRoute } from './components/auth/JWTProtectedRoute';
+import NotFound from './pages/NotFound';
+import Unauthorized from './pages/Unauthorized';
+import { JWTAuthProvider } from './hooks/useJWTAuth';
+
+// Customer pages
 import BookingSelectionPage from './pages/customer/BookingSelectionPage';
 import RegularPackagesPage from './pages/customer/RegularPackagesPage';
 import SelfPhotoPackagesPage from './pages/customer/SelfPhotoPackagesPage';
@@ -24,21 +30,6 @@ import SelfPhotoSchedulePage from './pages/customer/SelfPhotoSchedulePage';
 import RegularCheckoutPage from './pages/customer/RegularCheckoutPage';
 import SelfPhotoCheckoutPage from './pages/customer/SelfPhotoCheckoutPage';
 import OrderHistoryPage from './pages/customer/OrderHistoryPage';
-import { JWTProtectedRoute } from './components/auth/JWTProtectedRoute';
-import NotFound from './pages/NotFound';
-import Unauthorized from './pages/Unauthorized';
-import RecapsPage from './pages/recaps/RecapsPage';
-import BookingLogsPage from './pages/studio/BookingLogsPage';
-import TransactionReports from './pages/transactions/TransactionReports';
-import OnlineBookingsReport from './pages/transactions/OnlineBookingsReport';
-import OfflineBookingsReport from './pages/transactions/OfflineBookingsReport';
-import OfflineTransactionsPage from './pages/studio/OfflineTransactionsPage';
-import Customers from './pages/admin/Customers';
-import StudioManagement from './pages/studio/StudioManagement';
-import StudioDashboard from './pages/studio/StudioDashboard';
-import PaymentGateway from './pages/PaymentGateway';
-import PaymentProviders from './pages/admin/PaymentProviders';
-import { JWTAuthProvider } from './hooks/useJWTAuth';
 
 const queryClient = new QueryClient();
 
@@ -51,61 +42,112 @@ function App() {
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
+              
+              {/* Dashboard */}
               <Route path="/dashboard" element={
                 <JWTProtectedRoute>
                   <JWTDashboard />
                 </JWTProtectedRoute>
               } />
+
+              {/* Studio Management Routes */}
+              <Route path="/studio/*" element={
+                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
+                  <StudioManagement />
+                </JWTProtectedRoute>
+              } />
+
+              {/* Direct studio routes for backward compatibility */}
               <Route path="/studios" element={
                 <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <StudiosPage />
+                  <StudioManagement />
                 </JWTProtectedRoute>
               } />
               <Route path="/packages" element={
                 <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <PackagesPage />
+                  <StudioManagement />
                 </JWTProtectedRoute>
               } />
               <Route path="/services" element={
                 <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <ServicesPage />
+                  <StudioManagement />
                 </JWTProtectedRoute>
               } />
-              <Route path="/users" element={
+              <Route path="/bookings" element={
                 <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <Users />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/expenses" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
-                  <ExpensesPage />
+                  <StudioManagement />
                 </JWTProtectedRoute>
               } />
               <Route path="/walkin-sessions" element={
                 <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <WalkinSessionsPage />
+                  <StudioManagement />
                 </JWTProtectedRoute>
               } />
+              <Route path="/custom-orders" element={
+                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
+                  <StudioManagement />
+                </JWTProtectedRoute>
+              } />
+              <Route path="/booking-logs" element={
+                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
+                  <StudioManagement />
+                </JWTProtectedRoute>
+              } />
+
+              {/* Admin Routes */}
+              <Route path="/admin/users" element={
+                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
+                  <Users />
+                </JWTProtectedRoute>
+              } />
+              <Route path="/admin/customers" element={
+                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
+                  <Customers />
+                </JWTProtectedRoute>
+              } />
+              <Route path="/admin/payment-providers" element={
+                <JWTProtectedRoute allowedRoles={['owner']}>
+                  <PaymentProviders />
+                </JWTProtectedRoute>
+              } />
+
+              {/* Transaction Routes */}
               <Route path="/transactions" element={
                 <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
                   <TransactionsPage />
                 </JWTProtectedRoute>
               } />
-              <Route path="/bookings" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <BookingsPage />
+              <Route path="/transactions/reports" element={
+                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
+                  <TransactionReports />
                 </JWTProtectedRoute>
               } />
-              <Route path="/package-categories" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <PackageCategoriesPage />
+              <Route path="/transactions/online-bookings" element={
+                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
+                  <OnlineBookingsReport />
                 </JWTProtectedRoute>
               } />
-              <Route path="/custom-orders" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <CustomOrdersPage />
+              <Route path="/transactions/offline-bookings" element={
+                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
+                  <OfflineBookingsReport />
                 </JWTProtectedRoute>
               } />
+
+              {/* Expenses */}
+              <Route path="/expenses" element={
+                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
+                  <ExpensesPage />
+                </JWTProtectedRoute>
+              } />
+
+              {/* Reports & Recaps */}
+              <Route path="/recaps" element={
+                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
+                  <RecapsPage />
+                </JWTProtectedRoute>
+              } />
+
+              {/* Customer Routes */}
               <Route path="/customer/booking-selection" element={
                 <JWTProtectedRoute allowedRoles={['pelanggan']}>
                   <BookingSelectionPage />
@@ -146,61 +188,14 @@ function App() {
                   <OrderHistoryPage />
                 </JWTProtectedRoute>
               } />
-              <Route path="/recaps" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
-                  <RecapsPage />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/booking-logs" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <BookingLogsPage />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/transaction-reports" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
-                  <TransactionReports />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/online-bookings-report" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
-                  <OnlineBookingsReport />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/offline-bookings-report" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan']}>
-                  <OfflineBookingsReport />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/offline-transactions" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <OfflineTransactionsPage />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/customers" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <Customers />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/studio-management" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <StudioManagement />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/studio-dashboard" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <StudioDashboard />
-                </JWTProtectedRoute>
-              } />
+
+              {/* Other Routes */}
               <Route path="/payment-gateway" element={
                 <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
                   <PaymentGateway />
                 </JWTProtectedRoute>
               } />
-              <Route path="/payment-providers" element={
-                <JWTProtectedRoute allowedRoles={['owner', 'admin']}>
-                  <PaymentProviders />
-                </JWTProtectedRoute>
-              } />
+
               <Route path="/unauthorized" element={<Unauthorized />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

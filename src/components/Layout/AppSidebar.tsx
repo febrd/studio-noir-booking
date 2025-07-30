@@ -1,4 +1,3 @@
-
 import { 
   Calendar, 
   Camera, 
@@ -86,22 +85,22 @@ export function AppSidebar() {
           items: [
             {
               title: "Studios",
-              url: "/studios",
+              url: "/studio/studios",
               icon: Camera,
             },
             {
               title: "Package Categories",
-              url: "/categories",
+              url: "/studio/categories",
               icon: Package,
             },
             {
               title: "Packages",
-              url: "/packages",
+              url: "/studio/packages",
               icon: Package,
             },
             {
               title: "Additional Services",
-              url: "/services",
+              url: "/studio/services",
               icon: Settings,
             },
            
@@ -113,17 +112,17 @@ export function AppSidebar() {
           items: [
             {
               title: "Bookings",
-              url: "/bookings",
+              url: "/studio/bookings",
               icon: Calendar,
             },
             {
               title: "Walk-in Sessions",
-              url: "/walkin-sessions",
+              url: "/studio/walkin-sessions",
               icon: UserCheck,
             },
             {
               title: "Custom Orders",
-              url: "/custom-orders",
+              url: "/studio/custom-orders",
               icon: ShoppingCart,
             },
             {
@@ -160,7 +159,7 @@ export function AppSidebar() {
             },
             {
               title: "Booking Logs",
-              url: "/booking-logs",
+              url: "/studio/logs",
               icon: BookOpen,
             },
           ],
