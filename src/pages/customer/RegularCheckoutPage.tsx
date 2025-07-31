@@ -54,6 +54,39 @@ interface BookedSlot {
   id: string;
 }
 
+interface Transaction {
+  id: string;
+  amount: number;
+  status: string;
+  payment_type: string;
+  created_at: string;
+}
+
+interface Installment {
+  id: string;
+  amount: number;
+  installment_number: number;
+}
+
+interface PendingBooking {
+  id: string;
+  start_time: string;
+  end_time: string;
+  total_amount: number;
+  status: string;
+  studio_packages: {
+    title: string;
+  } | null;
+  booking_additional_services: Array<{
+    quantity: number;
+    additional_services: {
+      name: string;
+    } | null;
+  }>;
+  transactions: Transaction[];
+  installments: Installment[];
+}
+
 const RegularCheckoutPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -113,7 +146,7 @@ const RegularCheckoutPage = () => {
         return [];
       }
 
-      return data || [];
+      return (data || []) as PendingBooking[];
     },
     enabled: !!userProfile?.id
   });
@@ -409,8 +442,8 @@ const RegularCheckoutPage = () => {
     }
   };
 
-  const handlePayment = async (booking: any) => {
-    const installmentTransactions = booking.transactions?.filter((t: any) => t.payment_type === 'installment') || [];
+  const handlePayment = async (booking: PendingBooking) => {
+    const installmentTransactions = booking.transactions?.filter((t) => t.payment_type === 'installment') || [];
     const installmentRecords = booking.installments || [];
 
     if (installmentTransactions.length > 0) {
@@ -432,7 +465,7 @@ const RegularCheckoutPage = () => {
               .eq('id', firstInstallmentTx.id);
 
             const totalAmount = booking.total_amount || 0;
-            const paidAmount = installmentRecords.reduce((sum: number, inst: any) => sum + inst.amount, 0);
+            const paidAmount = installmentRecords.reduce((sum, inst) => sum + inst.amount, 0);
             const remainingAmount = totalAmount - paidAmount;
 
             if (remainingAmount > 0) {
@@ -459,7 +492,7 @@ const RegularCheckoutPage = () => {
     }
   };
 
-  const handleInstallmentPayment = async (booking: any, amount: number, installmentNumber: number) => {
+  const handleInstallmentPayment = async (booking: PendingBooking, amount: number, installmentNumber: number) => {
     try {
       const invoiceData = {
         performed_by: userProfile?.id || '',
@@ -501,11 +534,8 @@ const RegularCheckoutPage = () => {
             status: 'pending'
           });
 
-        // Keep booking status as 'pending' instead of 'installment'
-        if (installmentNumber === 1) {
-          // Don't change status to 'installment', keep it as 'pending'
-          console.log('Installment created, keeping booking status as pending');
-        }
+        // Keep booking status as 'pending' - don't change to 'installment'
+        console.log('Installment created, keeping booking status as pending');
 
         if (invoice.invoice_url) {
           window.open(invoice.invoice_url, '_blank');
@@ -550,12 +580,12 @@ const RegularCheckoutPage = () => {
     return type === 'self_photo' ? 'Self Photo' : 'Studio Reguler';
   };
 
-  const getPaymentStatusText = (booking: any) => {
-    const installmentTransactions = booking.transactions?.filter((t: any) => t.payment_type === 'installment') || [];
+  const getPaymentStatusText = (booking: PendingBooking) => {
+    const installmentTransactions = booking.transactions?.filter((t) => t.payment_type === 'installment') || [];
     const installmentRecords = booking.installments || [];
 
     if (installmentTransactions.length > 0) {
-      const paidInstallments = installmentTransactions.filter((t: any) => t.status === 'paid').length;
+      const paidInstallments = installmentTransactions.filter((t) => t.status === 'paid').length;
       const totalInstallments = 2; // Assuming max 2 installments
 
       if (paidInstallments === 0) {
