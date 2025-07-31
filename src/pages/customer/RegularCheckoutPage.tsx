@@ -694,7 +694,7 @@ const RegularCheckoutPage = () => {
                           variant="outline"
                           size="icon"
                           onClick={() => handleQuantityChange(false)}
-                          disabled={packageQuantity <= 1}
+                          disabled
                           className="border-gray-200 text-gray-600 hover:bg-gray-50"
                         >
                           <Minus className="h-4 w-4" />
@@ -706,7 +706,7 @@ const RegularCheckoutPage = () => {
                           variant="outline"
                           size="icon"
                           onClick={() => handleQuantityChange(true)}
-                          disabled={packageQuantity >= 1}
+                          disabled
                           className="border-gray-200 text-gray-600 hover:bg-gray-50"
                         >
                           <Plus className="h-4 w-4" />
