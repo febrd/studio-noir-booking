@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,10 +19,14 @@ const RegularCheckoutPage = () => {
   const { createInvoice, getInvoice } = useInvoiceAPI();
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  const { data: booking, isLoading, isError } = useQuery({
+  const { data: booking, isLoading, error } = useQuery({
     queryKey: ['booking', bookingId],
     queryFn: async () => {
-      if (!bookingId) throw new Error("Booking ID is required");
+      if (!bookingId) {
+        throw new Error("Booking ID is required");
+      }
+
+      console.log('🔍 Fetching booking data for ID:', bookingId);
 
       const { data, error } = await supabase
         .from('bookings')
@@ -36,13 +39,24 @@ const RegularCheckoutPage = () => {
           )
         `)
         .eq('id', bookingId)
-        .single();
+        .maybeSingle();
 
       if (error) {
+        console.error('❌ Error fetching booking:', error);
         throw new Error(error.message);
       }
+      
+      if (!data) {
+        console.error('❌ No booking found with ID:', bookingId);
+        throw new Error("Booking tidak ditemukan");
+      }
+
+      console.log('✅ Booking data fetched successfully:', data);
       return data;
     },
+    enabled: !!bookingId,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
@@ -54,9 +68,6 @@ const RegularCheckoutPage = () => {
       navigate('/customer/order-history');
     }
   }, [booking, navigate, toast]);
-
-  if (isLoading) return <div>Loading...</div>;
-  if (isError) return <div>Error fetching booking.</div>;
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -435,7 +446,62 @@ const RegularCheckoutPage = () => {
     }
   };
 
-  const bookingCode = booking ? `BK-${booking.id.slice(0, 8)}` : '';
+  if (isLoading) {
+    return (
+      <ModernLayout>
+        <div className="container mx-auto p-6 max-w-4xl">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Memuat data booking...</p>
+            </div>
+          </div>
+        </div>
+      </ModernLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <ModernLayout>
+        <div className="container mx-auto p-6 max-w-4xl">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <h2 className="text-2xl font-semibold mb-2">Error</h2>
+              <p className="text-muted-foreground mb-4">
+                {error.message || "Terjadi kesalahan saat memuat data booking"}
+              </p>
+              <Button onClick={() => navigate('/customer/order-history')}>
+                Kembali ke Riwayat Pesanan
+              </Button>
+            </div>
+          </div>
+        </div>
+      </ModernLayout>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <ModernLayout>
+        <div className="container mx-auto p-6 max-w-4xl">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <h2 className="text-2xl font-semibold mb-2">Booking Tidak Ditemukan</h2>
+              <p className="text-muted-foreground mb-4">
+                Booking dengan ID tersebut tidak ditemukan
+              </p>
+              <Button onClick={() => navigate('/customer/order-history')}>
+                Kembali ke Riwayat Pesanan
+              </Button>
+            </div>
+          </div>
+        </div>
+      </ModernLayout>
+    );
+  }
+
+  const bookingCode = `BK-${booking.id.slice(0, 8)}`;
   const packageType = 'Regular Package';
 
   return (
@@ -446,114 +512,120 @@ const RegularCheckoutPage = () => {
           <p className="text-muted-foreground">Review and complete your booking</p>
         </div>
 
-        {booking && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Detail Booking</CardTitle>
-                <CardDescription>Informasi lengkap tentang booking Anda</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <Badge variant="secondary">{bookingCode}</Badge>
-                  <Badge>{packageType}</Badge>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Detail Booking</CardTitle>
+              <CardDescription>Informasi lengkap tentang booking Anda</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4">
+                <Badge variant="secondary">{bookingCode}</Badge>
+                <Badge>{packageType}</Badge>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span>{new Date(booking.start_time).toLocaleDateString('id-ID')}</span>
                 </div>
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>{formatDate(booking.start_time)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span>{formatTime(booking.start_time)} - {formatTime(booking.end_time)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span>Studio Location</span>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Informasi Tambahan:</p>
-                  <p className="text-muted-foreground">{booking.notes || 'Tidak ada catatan'}</p>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Pembayaran
-                </CardTitle>
-                <CardDescription>
-                  Pilih metode pembayaran untuk booking Anda
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                  <span className="font-medium">Total Pembayaran:</span>
-                  <span className="text-2xl font-bold">
-                    Rp {booking.total_amount?.toLocaleString('id-ID')}
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span>
+                    {new Date(booking.start_time).toLocaleTimeString('id-ID', { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })} - {new Date(booking.end_time).toLocaleTimeString('id-ID', { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
                   </span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span>Studio Location</span>
+                </div>
+              </div>
 
-                <div className="space-y-3">
-                  {(booking.status === 'pending' || booking.status === 'installment') && (
-                    <>
-                      <Button
-                        onClick={handlePayment}
-                        disabled={isProcessingPayment}
-                        className="w-full"
-                        size="lg"
-                      >
-                        {isProcessingPayment ? 'Memproses...' : 'Bayar Sekarang'}
-                      </Button>
-                      
-                      <div className="grid grid-cols-2 gap-3">
-                        <Button
-                          onClick={handleFullPayment}
-                          disabled={isProcessingPayment}
-                          variant="outline"
-                        >
-                          Bayar Penuh
-                        </Button>
-                        <Button
-                          onClick={handleInstallmentPayment}
-                          disabled={isProcessingPayment}
-                          variant="outline"
-                        >
-                          Cicilan 50%
-                        </Button>
-                      </div>
-                    </>
-                  )}
+              <Separator />
 
-                  {booking.status === 'pending' && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Informasi Tambahan:</p>
+                <p className="text-muted-foreground">{booking.notes || 'Tidak ada catatan'}</p>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Pembayaran
+              </CardTitle>
+              <CardDescription>
+                Pilih metode pembayaran untuk booking Anda
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                <span className="font-medium">Total Pembayaran:</span>
+                <span className="text-2xl font-bold">
+                  Rp {booking.total_amount?.toLocaleString('id-ID')}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {(booking.status === 'pending' || booking.status === 'installment') && (
+                  <>
                     <Button
-                      onClick={cancelBooking}
-                      variant="destructive"
+                      onClick={handlePayment}
+                      disabled={isProcessingPayment}
                       className="w-full"
+                      size="lg"
                     >
-                      Batalkan Pesanan
+                      {isProcessingPayment ? 'Memproses...' : 'Bayar Sekarang'}
                     </Button>
-                  )}
-                </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        onClick={handleFullPayment}
+                        disabled={isProcessingPayment}
+                        variant="outline"
+                      >
+                        Bayar Penuh
+                      </Button>
+                      <Button
+                        onClick={handleInstallmentPayment}
+                        disabled={isProcessingPayment}
+                        variant="outline"
+                      >
+                        Cicilan 50%
+                      </Button>
+                    </div>
+                  </>
+                )}
 
-                <div className="text-sm text-muted-foreground">
-                  <p>• Pembayaran aman melalui Xendit</p>
-                  <p>• Cicilan tersedia dengan pembayaran 50% di awal</p>
-                  <p>• Link pembayaran berlaku selama 24 jam</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                {booking.status === 'pending' && (
+                  <Button
+                    onClick={cancelBooking}
+                    variant="destructive"
+                    className="w-full"
+                  >
+                    Batalkan Pesanan
+                  </Button>
+                )}
+              </div>
+
+              <div className="text-sm text-muted-foreground">
+                <p>• Pembayaran aman melalui Xendit</p>
+                <p>• Cicilan tersedia dengan pembayaran 50% di awal</p>
+                <p>• Link pembayaran berlaku selama 24 jam</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </ModernLayout>
   );
