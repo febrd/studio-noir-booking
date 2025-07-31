@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Edit, Trash2, TestTube, Loader2 } from 'lucide-react';
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface PaymentProvider {
@@ -27,6 +26,65 @@ interface PaymentProviderCardProps {
   provider: PaymentProvider;
   onEdit: (provider: PaymentProvider) => void;
   onDelete: (id: string) => void;
+}
+
+// Xendit Authentication Helper
+class XenditAuthHelper {
+  private secretKey: string;
+  private apiUrl: string;
+
+  constructor(secretKey: string, apiUrl: string = 'https://api.xendit.co') {
+    this.secretKey = secretKey;
+    this.apiUrl = apiUrl;
+  }
+
+  getAuthHeader(): string {
+    const credentials = `${this.secretKey}:`;
+    const base64Credentials = btoa(credentials);
+    return `Basic ${base64Credentials}`;
+  }
+
+  async testConnection(): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      console.log('Testing Xendit connection to:', this.apiUrl);
+      
+      const response = await fetch(`${this.apiUrl}/v2/invoices?limit=1`, {
+        method: 'GET',
+        headers: {
+          'Authorization': this.getAuthHeader(),
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const responseData = await response.json();
+
+      console.log('Xendit API Response Status:', response.status);
+      console.log('Xendit API Response:', responseData);
+
+      if (response.ok) {
+        return {
+          success: true,
+          data: {
+            status: response.status,
+            message: 'Koneksi berhasil ke Xendit API',
+            invoices: responseData,
+            timestamp: new Date().toISOString()
+          }
+        };
+      } else {
+        return {
+          success: false,
+          error: responseData.message || `HTTP ${response.status}: ${response.statusText}`
+        };
+      }
+    } catch (error) {
+      console.error('Xendit connection test failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
 }
 
 export const PaymentProviderCard = ({ provider, onEdit, onDelete }: PaymentProviderCardProps) => {
@@ -58,23 +116,20 @@ export const PaymentProviderCard = ({ provider, onEdit, onDelete }: PaymentProvi
     console.log('Testing connection for provider:', provider.id);
 
     try {
-      const { data, error } = await supabase.functions.invoke('xendit-test-provider', {
-        body: { providerId: provider.id }
-      });
+      const xenditAuth = new XenditAuthHelper(
+        provider.secret_key,
+        provider.api_url || 'https://api.xendit.co'
+      );
 
-      console.log('Test connection response:', data);
+      const testResult = await xenditAuth.testConnection();
 
-      if (error) {
-        console.error('Test connection error:', error);
-        toast.error('Gagal melakukan test koneksi: ' + error.message);
-        return;
-      }
+      console.log('Test connection result:', testResult);
 
-      if (data?.test?.success) {
+      if (testResult.success) {
         toast.success(`✅ Koneksi berhasil ke Xendit API (${provider.environment})`);
-        console.log('Test result data:', data.test.data);
+        console.log('Test result data:', testResult.data);
       } else {
-        toast.error(`❌ Test koneksi gagal: ${data?.test?.error || 'Unknown error'}`);
+        toast.error(`❌ Test koneksi gagal: ${testResult.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Unexpected test error:', error);

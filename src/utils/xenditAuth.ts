@@ -1,6 +1,4 @@
 
-import { supabase } from '@/integrations/supabase/client';
-
 export interface XenditTestResult {
   success: boolean;
   data?: any;
@@ -15,84 +13,126 @@ export interface XenditProvider {
 }
 
 export class XenditAuthClient {
-  // Test connection to Xendit using active production provider
-  static async testConnection(): Promise<{
-    provider?: XenditProvider;
-    test: XenditTestResult;
-  }> {
-    try {
-      const { data, error } = await supabase.functions.invoke('xendit-auth-test');
+  private secretKey: string;
+  private apiUrl: string;
 
-      if (error) {
+  constructor(secretKey: string, apiUrl: string = 'https://api.xendit.co') {
+    this.secretKey = secretKey;
+    this.apiUrl = apiUrl;
+  }
+
+  // Create Basic Auth header
+  getAuthHeader(): string {
+    const credentials = `${this.secretKey}:`;
+    const base64Credentials = btoa(credentials);
+    return `Basic ${base64Credentials}`;
+  }
+
+  // Generic method to make authenticated requests to Xendit
+  async makeRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    const url = `${this.apiUrl}${endpoint}`;
+    
+    const defaultHeaders = {
+      'Authorization': this.getAuthHeader(),
+      'Content-Type': 'application/json',
+    };
+
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+    });
+  }
+
+  // Test authentication by getting invoices list
+  async testConnection(): Promise<XenditTestResult> {
+    try {
+      console.log('Testing Xendit connection...');
+      
+      const response = await this.makeRequest('/v2/invoices?limit=1');
+      const responseData = await response.json();
+
+      console.log('Xendit API Response Status:', response.status);
+      console.log('Xendit API Response:', responseData);
+
+      if (response.ok) {
         return {
-          test: {
-            success: false,
-            error: error.message || 'Failed to test connection'
+          success: true,
+          data: {
+            status: response.status,
+            message: 'Koneksi berhasil ke Xendit API',
+            invoices: responseData,
+            timestamp: new Date().toISOString()
           }
         };
-      }
-
-      return data;
-    } catch (error) {
-      return {
-        test: {
+      } else {
+        return {
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error occurred'
-        }
+          error: responseData.message || `HTTP ${response.status}: ${response.statusText}`
+        };
+      }
+    } catch (error) {
+      console.error('Xendit connection test failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }
 
-  // Test connection for specific provider
-  static async testProviderConnection(providerId: string): Promise<{
-    provider?: XenditProvider;
-    test: XenditTestResult;
-  }> {
+  // Get balance (alternative test endpoint)
+  async getBalance(): Promise<XenditTestResult> {
     try {
-      const { data, error } = await supabase.functions.invoke('xendit-test-provider', {
-        body: { providerId }
+      const response = await this.makeRequest('/balance');
+      const responseData = await response.json();
+
+      if (response.ok) {
+        return {
+          success: true,
+          data: responseData
+        };
+      } else {
+        return {
+          success: false,
+          error: responseData.message || `HTTP ${response.status}`
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  // Create invoice
+  async createInvoice(invoiceData: any): Promise<XenditTestResult> {
+    try {
+      const response = await this.makeRequest('/v2/invoices', {
+        method: 'POST',
+        body: JSON.stringify(invoiceData)
       });
 
-      if (error) {
+      const responseData = await response.json();
+
+      if (response.ok) {
         return {
-          test: {
-            success: false,
-            error: error.message || 'Failed to test connection'
-          }
+          success: true,
+          data: responseData
+        };
+      } else {
+        return {
+          success: false,
+          error: responseData.message || `HTTP ${response.status}`
         };
       }
-
-      return data;
     } catch (error) {
       return {
-        test: {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error occurred'
-        }
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
-    }
-  }
-
-  // Get active production provider for general use
-  static async getActiveProvider(): Promise<XenditProvider | null> {
-    try {
-      const { data: provider, error } = await supabase
-        .from('payment_providers')
-        .select('id, name, environment, api_url')
-        .eq('environment', 'production')
-        .eq('status', 'active')
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error || !provider) {
-        return null;
-      }
-
-      return provider as XenditProvider;
-    } catch (error) {
-      console.error('Error getting active provider:', error);
-      return null;
     }
   }
 }
