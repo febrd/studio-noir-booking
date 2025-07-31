@@ -354,8 +354,8 @@ const SelfPhotoCheckoutPage = () => {
               }
             }
           } else {
-            // Still pending, redirect to existing URL (we'll need to get this from somewhere)
-            console.log('⏳ Invoice still pending, redirecting...');
+            // Still pending, show message
+            console.log('⏳ Invoice still pending...');
             toast({
               title: "Invoice Masih Aktif",
               description: "Silakan lanjutkan pembayaran di tab yang sudah terbuka atau pilih metode pembayaran baru",
