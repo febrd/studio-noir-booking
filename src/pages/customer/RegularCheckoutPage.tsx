@@ -14,6 +14,7 @@ import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { formatDateTimeWITA, parseWITAToUTC } from '@/utils/timezoneUtils';
 import QRISPaymentDialog from '@/components/QRISPaymentDialog';
 import PaymentMethodSelection from '@/components/PaymentMethodSelection';
+import { useInvoiceAPI } from '@/hooks/useInvoiceAPI';
 
 interface PackageCategory {
   id: string;
@@ -58,6 +59,7 @@ const RegularCheckoutPage = () => {
   const [searchParams] = useSearchParams();
   const packageId = searchParams.get('package');
   const { userProfile } = useJWTAuth();
+  const { createInvoice, getInvoice, loading: invoiceLoading } = useInvoiceAPI();
 
   const [selectedCategory, setSelectedCategory] = useState<PackageCategory | null>(null);
   const [selectedServices, setSelectedServices] = useState<{ [key: string]: number }>({});
@@ -415,15 +417,13 @@ const RegularCheckoutPage = () => {
       const firstInstallmentTx = installmentTransactions[0];
 
       try {
-        const response = await supabase.functions.invoke('xendit-get-invoice', {
-          body: {
-            performed_by: userProfile?.id,
-            transaction_id: firstInstallmentTx.id
-          }
+        const response = await getInvoice({
+          performed_by: userProfile?.id || '',
+          external_id: `installment-${booking.id}-1-${Date.now()}`
         });
 
-        if (response.data?.success && response.data?.data?.invoice) {
-          const invoiceStatus = response.data.data.invoice.status;
+        if (response.success && response.data?.invoice) {
+          const invoiceStatus = response.data.invoice.status;
 
           if (invoiceStatus === 'SETTLED') {
             await supabase
@@ -438,19 +438,15 @@ const RegularCheckoutPage = () => {
             if (remainingAmount > 0) {
               await handleInstallmentPayment(booking, remainingAmount, 2);
             } else {
-              await supabase
-                .from('bookings')
-                .update({ status: 'paid' })
-                .eq('id', booking.id);
-
-              toast.success('Semua cicilan sudah lunas!');
+              // Keep status as 'pending' instead of changing to 'paid'
+              toast.success('Semua cicilan sudah lunas! Status booking tetap pending.');
               refetchPendingBookings();
             }
           } else if (invoiceStatus === 'EXPIRED') {
             await handleInstallmentPayment(booking, firstInstallmentTx.amount, 1);
           } else {
-            if (response.data.data.invoice.invoice_url) {
-              window.open(response.data.data.invoice.invoice_url, '_blank');
+            if (response.data.invoice.invoice_url) {
+              window.open(response.data.invoice.invoice_url, '_blank');
             }
           }
         }
@@ -460,14 +456,13 @@ const RegularCheckoutPage = () => {
       }
     } else {
       setSelectedPendingBooking(booking);
-      setShowPaymentDialog(true);
     }
   };
 
   const handleInstallmentPayment = async (booking: any, amount: number, installmentNumber: number) => {
     try {
       const invoiceData = {
-        performed_by: userProfile?.id,
+        performed_by: userProfile?.id || '',
         external_id: `installment-${booking.id}-${installmentNumber}-${Date.now()}`,
         amount: amount,
         description: `Cicilan ${installmentNumber} - ${booking.studio_packages?.title}`,
@@ -479,11 +474,9 @@ const RegularCheckoutPage = () => {
         }
       };
 
-      const response = await supabase.functions.invoke('xendit-create-invoice', {
-        body: invoiceData
-      });
+      const response = await createInvoice(invoiceData);
 
-      if (response.data?.success && response.data?.data?.invoice) {
+      if (response.success && response.data?.invoice) {
         const invoice = response.data.data.invoice;
 
         await supabase
@@ -508,11 +501,10 @@ const RegularCheckoutPage = () => {
             status: 'pending'
           });
 
+        // Keep booking status as 'pending' instead of 'installment'
         if (installmentNumber === 1) {
-          await supabase
-            .from('bookings')
-            .update({ status: 'installment' })
-            .eq('id', booking.id);
+          // Don't change status to 'installment', keep it as 'pending'
+          console.log('Installment created, keeping booking status as pending');
         }
 
         if (invoice.invoice_url) {
@@ -522,7 +514,7 @@ const RegularCheckoutPage = () => {
 
         refetchPendingBookings();
       } else {
-        throw new Error(response.data?.error || 'Gagal membuat invoice cicilan');
+        throw new Error(response.error || 'Gagal membuat invoice cicilan');
       }
     } catch (error) {
       console.error('Error creating installment payment:', error);
