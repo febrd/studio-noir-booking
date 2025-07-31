@@ -29,6 +29,7 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
     bookingStatus: booking.status,
     xenditStatus,
     invoice_url,
+    bookingPaymentLink: booking.payment_link,
     shouldCheckXendit
   });
 
@@ -73,13 +74,15 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
         return;
       }
       
-      // Jika ada invoice_url, buka di tab baru
-      if (invoice_url) {
-        console.log('🔗 Opening Xendit checkout URL:', invoice_url);
-        window.open(invoice_url, '_blank');
+      // Prioritas: gunakan invoice_url dari Xendit API, jika tidak ada gunakan dari booking.payment_link
+      const paymentUrl = invoice_url || booking.payment_link;
+      
+      if (paymentUrl) {
+        console.log('🔗 Opening payment URL:', paymentUrl);
+        window.open(paymentUrl, '_blank');
         return;
       } else {
-        console.log('❌ No invoice_url available');
+        console.log('❌ No payment URL available');
         toast.error('Link pembayaran tidak tersedia. Silakan hubungi admin.');
         return;
       }
@@ -115,7 +118,7 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
             Link Expired - Hubungi Admin
           </>
         );
-      } else if (invoice_url) {
+      } else if (invoice_url || booking.payment_link) {
         return (
           <>
             <ExternalLink className="w-4 h-4 mr-2" />

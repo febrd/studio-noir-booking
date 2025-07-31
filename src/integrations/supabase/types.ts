@@ -183,6 +183,7 @@ export type Database = {
           notes: string | null
           package_category_id: string | null
           package_quantity: number | null
+          payment_link: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           performed_by: string | null
           start_time: string | null
@@ -203,6 +204,7 @@ export type Database = {
           notes?: string | null
           package_category_id?: string | null
           package_quantity?: number | null
+          payment_link?: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
           performed_by?: string | null
           start_time?: string | null
@@ -223,6 +225,7 @@ export type Database = {
           notes?: string | null
           package_category_id?: string | null
           package_quantity?: number | null
+          payment_link?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
           performed_by?: string | null
           start_time?: string | null
@@ -637,45 +640,36 @@ export type Database = {
         Row: {
           api_key: string | null
           api_url: string | null
-          client_id: string | null
-          client_secret: string | null
           created_at: string
           environment: Database["public"]["Enums"]["payment_environment"]
           id: string
           name: string
           public_key: string | null
           secret_key: string | null
-          server_key: string | null
           status: Database["public"]["Enums"]["provider_status"]
           updated_at: string
         }
         Insert: {
           api_key?: string | null
           api_url?: string | null
-          client_id?: string | null
-          client_secret?: string | null
           created_at?: string
           environment?: Database["public"]["Enums"]["payment_environment"]
           id?: string
           name: string
           public_key?: string | null
           secret_key?: string | null
-          server_key?: string | null
           status?: Database["public"]["Enums"]["provider_status"]
           updated_at?: string
         }
         Update: {
           api_key?: string | null
           api_url?: string | null
-          client_id?: string | null
-          client_secret?: string | null
           created_at?: string
           environment?: Database["public"]["Enums"]["payment_environment"]
           id?: string
           name?: string
           public_key?: string | null
           secret_key?: string | null
-          server_key?: string | null
           status?: Database["public"]["Enums"]["provider_status"]
           updated_at?: string
         }

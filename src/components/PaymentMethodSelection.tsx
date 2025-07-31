@@ -110,13 +110,14 @@ const PaymentMethodSelection = ({
       });
 
       if (invoiceResult.success && invoiceResult.data?.invoice?.invoice_url) {
-        // Update booking status and payment method
+        // Update booking status, payment method, and save payment link
         const newStatus = isInstallment ? 'installment' : 'pending';
         
         await supabase
           .from('bookings')
           .update({ 
-            payment_method: 'online'
+            payment_method: 'online',
+            payment_link: invoiceResult.data.invoice.invoice_url
           })
           .eq('id', booking.id);
 
