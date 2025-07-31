@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -123,14 +124,13 @@ const PaymentMethodSelection = ({
         await supabase
           .from('transactions')
           .insert({
-            reference_id: booking.id,
             booking_id: booking.id,
             amount: invoiceAmount,
             type: 'online',
             description: description,
             performed_by: booking.user_id,
-            payment_type: isInstallment ? 'installment' : 'booking',
-            status: 'unpaid' // Will be updated via webhook later
+            payment_type: isInstallment ? 'installment' : 'online',
+            status: 'pending' // Will be updated via status checker later
           });
 
         toast.success('Invoice berhasil dibuat! Anda akan diarahkan ke halaman pembayaran.');

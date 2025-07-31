@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -127,11 +128,11 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
       const transactionData = {
         booking_id: bookingId,
         amount: parseFloat(installmentData.amount),
-        payment_type: installmentData.paymentMethod as 'offline' | 'online' | 'installment',
+        payment_type: 'installment',
         status: 'paid' as const,
         description: `Pembayaran cicilan - ${installmentData.note || 'Cicilan'}`,
         performed_by: currentUserId,
-        type: 'installment'
+        type: installmentData.paymentMethod as 'offline' | 'online'
       };
 
       const { error: transactionError } = await supabase
