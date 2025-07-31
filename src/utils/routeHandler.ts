@@ -8,6 +8,8 @@ export class RouteHandler {
     switch (pathname) {
       case '/v1/create/invoice':
         return await InvoiceAPIHandler.handleCreateInvoice(request);
+      case '/v1/get/invoice':
+        return await InvoiceAPIHandler.handleGetInvoice(request);
       default:
         return null;
     }

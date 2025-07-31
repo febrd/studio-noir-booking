@@ -1,4 +1,3 @@
-
 import { XenditAuthClient, XenditTestResult } from '@/utils/xenditAuth';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -15,6 +14,12 @@ export interface InvoiceRequest {
   };
   currency?: string;
   invoice_duration?: number;
+}
+
+export interface GetInvoiceRequest {
+  performed_by: string;
+  invoice_id?: string;
+  external_id?: string;
 }
 
 export interface InvoiceResponse {
@@ -153,6 +158,127 @@ export class InvoiceService {
 
     } catch (error) {
       console.error('Unexpected error in invoice creation:', error);
+      
+      return {
+        success: false,
+        error: 'Terjadi kesalahan sistem: ' + (error instanceof Error ? error.message : 'Unknown error'),
+        errorCode: 'INTERNAL_SERVER_ERROR'
+      };
+    }
+  }
+
+  static async getInvoice(requestData: GetInvoiceRequest): Promise<InvoiceResponse> {
+    try {
+      console.log('Getting invoice with data:', requestData);
+
+      // Validate required parameter
+      if (!requestData.performed_by) {
+        return {
+          success: false,
+          error: 'Parameter performed_by diperlukan',
+          errorCode: 'MISSING_PERFORMED_BY'
+        };
+      }
+
+      // Validate that either invoice_id or external_id is provided
+      if (!requestData.invoice_id && !requestData.external_id) {
+        return {
+          success: false,
+          error: 'Parameter invoice_id atau external_id diperlukan',
+          errorCode: 'MISSING_INVOICE_IDENTIFIER'
+        };
+      }
+
+      // Check if performed_by exists in users table
+      console.log('Validating user:', requestData.performed_by);
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('id, name, email, role')
+        .eq('id', requestData.performed_by)
+        .single();
+
+      if (userError || !user) {
+        console.error('User validation error:', userError);
+        return {
+          success: false,
+          error: 'User tidak ditemukan atau tidak valid',
+          errorCode: 'USER_NOT_FOUND'
+        };
+      }
+
+      console.log('User validated:', user.name);
+
+      // Get active production payment provider
+      console.log('Fetching active Xendit payment provider...');
+      const { data: paymentProvider, error: dbError } = await supabase
+        .from('payment_providers')
+        .select('*')
+        .eq('environment', 'production')
+        .eq('status', 'active')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (dbError || !paymentProvider) {
+        console.error('Payment provider error:', dbError);
+        return {
+          success: false,
+          error: 'Payment provider tidak ditemukan atau tidak aktif',
+          errorCode: 'PAYMENT_PROVIDER_NOT_FOUND'
+        };
+      }
+
+      if (!paymentProvider.secret_key) {
+        return {
+          success: false,
+          error: 'Secret key tidak ditemukan pada payment provider',
+          errorCode: 'MISSING_SECRET_KEY'
+        };
+      }
+
+      console.log('Using payment provider:', paymentProvider.name);
+
+      // Initialize Xendit Auth with provider data
+      const xenditAuth = new XenditAuthClient(
+        paymentProvider.secret_key,
+        paymentProvider.api_url || 'https://api.xendit.co'
+      );
+
+      // Get the invoice
+      const invoiceResult = await xenditAuth.getInvoice(requestData.invoice_id, requestData.external_id);
+
+      if (invoiceResult.success) {
+        console.log('Invoice retrieved successfully');
+        
+        return {
+          success: true,
+          data: {
+            invoice: invoiceResult.data,
+            performed_by: {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              role: user.role
+            },
+            provider: {
+              id: paymentProvider.id,
+              name: paymentProvider.name,
+              environment: paymentProvider.environment
+            }
+          }
+        };
+      } else {
+        console.error('Invoice retrieval failed:', invoiceResult.error);
+        
+        return {
+          success: false,
+          error: 'Gagal mengambil invoice: ' + (invoiceResult.error || 'Unknown error'),
+          errorCode: invoiceResult.error || 'XENDIT_ERROR'
+        };
+      }
+
+    } catch (error) {
+      console.error('Unexpected error in invoice retrieval:', error);
       
       return {
         success: false,

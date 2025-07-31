@@ -1,4 +1,3 @@
-
 export interface XenditTestResult {
   success: boolean;
   data?: any;
@@ -129,6 +128,50 @@ export class XenditAuthClient {
         };
       }
     } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  // Get invoice by ID or external_id
+  async getInvoice(invoiceId?: string, externalId?: string): Promise<XenditTestResult> {
+    try {
+      let endpoint = '/v2/invoices';
+      
+      if (invoiceId) {
+        endpoint = `/v2/invoices/${invoiceId}`;
+      } else if (externalId) {
+        endpoint = `/v2/invoices?external_id=${encodeURIComponent(externalId)}`;
+      } else {
+        return {
+          success: false,
+          error: 'Either invoice_id or external_id must be provided'
+        };
+      }
+
+      console.log('Getting invoice from endpoint:', endpoint);
+      
+      const response = await this.makeRequest(endpoint);
+      const responseData = await response.json();
+
+      console.log('Xendit Get Invoice Response Status:', response.status);
+      console.log('Xendit Get Invoice Response:', responseData);
+
+      if (response.ok) {
+        return {
+          success: true,
+          data: responseData
+        };
+      } else {
+        return {
+          success: false,
+          error: responseData.message || `HTTP ${response.status}`
+        };
+      }
+    } catch (error) {
+      console.error('Get invoice failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
