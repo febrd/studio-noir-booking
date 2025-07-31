@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,7 +22,7 @@ interface InstallmentManagerProps {
 
 const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }: InstallmentManagerProps) => {
   const [amount, setAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('offline');
+  const [paymentMethod, setPaymentMethod] = useState<'offline' | 'online'>('offline');
   const [note, setNote] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -128,7 +127,7 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
       const transactionData = {
         booking_id: bookingId,
         amount: parseFloat(installmentData.amount),
-        payment_type: 'installment',
+        payment_type: 'installment' as const,
         status: 'paid' as const,
         description: `Pembayaran cicilan - ${installmentData.note || 'Cicilan'}`,
         performed_by: currentUserId,

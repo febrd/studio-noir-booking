@@ -69,8 +69,23 @@ const PaymentMethodSelection = ({
       const isInstallment = autoPaymentOption === '50';
       const invoiceAmount = isInstallment ? totalAmount * 0.5 : totalAmount;
       
-      // Create external_id
-      const externalId = `${customerName.replace(/\s+/g, '-')}-${studioName.replace(/\s+/g, '-')}-${packageTitle.replace(/\s+/g, '-')}${isInstallment ? '-installment-1' : ''}`;
+      // Use booking ID as external_id
+      const externalId = booking.id;
+      
+      // Get customer email from users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('email')
+        .eq('id', booking.user_id)
+        .single();
+
+      if (userError) {
+        console.error('Error fetching user data:', userError);
+        toast.error('Gagal mengambil data pengguna');
+        return;
+      }
+
+      const customerEmail = userData?.email || 'customer@example.com';
       
       // Create description
       let description = `${packageTitle}`;
@@ -87,8 +102,8 @@ const PaymentMethodSelection = ({
         customer: {
           given_names: customerName.split(' ')[0] || customerName,
           surname: customerName.split(' ').slice(1).join(' ') || '',
-          email: 'customer@example.com', // You might want to get this from user profile
-          mobile_number: '+6281234567890' // You might want to get this from user profile
+          email: customerEmail,
+          mobile_number: '' // Leave phone number empty as requested
         },
         currency: 'IDR',
         invoice_duration: 86400 // 24 hours
@@ -101,7 +116,6 @@ const PaymentMethodSelection = ({
         await supabase
           .from('bookings')
           .update({ 
-            status: newStatus,
             payment_method: 'online'
           })
           .eq('id', booking.id);
