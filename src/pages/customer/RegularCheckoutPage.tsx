@@ -688,29 +688,13 @@ const RegularCheckoutPage = () => {
                 <CardContent className="p-6 md:p-8 pt-0">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                     <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                      <span className="text-base md:text-lg font-inter text-gray-600">Jumlah:</span>
+                      <span className="text-base md:text-lg font-inter text-gray-600">Qty (Fixed):</span>
                       <div className="flex items-center gap-3">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleQuantityChange(false)}
-                          disabled
-                          className="border-gray-200 text-gray-600 hover:bg-gray-50"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
+                      
                         <span className="text-xl md:text-2xl font-peace-sans font-black min-w-[3rem] text-center">
                           {packageQuantity}
                         </span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleQuantityChange(true)}
-                          disabled
-                          className="border-gray-200 text-gray-600 hover:bg-gray-50"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                       
                       </div>
                     </div>
                     <div className="text-left md:text-right">
