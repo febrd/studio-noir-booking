@@ -51,8 +51,13 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
   }
 
   const handlePayment = async () => {
-    // Jika payment method online, cek status terbaru dulu
+    console.log('🎯 Handle Payment - Method:', booking.payment_method);
+    
+    // Jika payment method online
     if (booking.payment_method === 'online') {
+      console.log('💳 Online payment - checking invoice...');
+      
+      // Cek status terbaru dulu
       await checkInvoice();
       
       // Jika sudah settled, refresh halaman
@@ -62,14 +67,26 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
         return;
       }
       
+      // Jika expired, tampilkan pesan
+      if (xenditStatus === 'EXPIRED') {
+        toast.error('Link pembayaran sudah expired. Silakan hubungi admin.');
+        return;
+      }
+      
       // Jika ada invoice_url, buka di tab baru
       if (invoice_url) {
+        console.log('🔗 Opening Xendit checkout URL:', invoice_url);
         window.open(invoice_url, '_blank');
+        return;
+      } else {
+        console.log('❌ No invoice_url available');
+        toast.error('Link pembayaran tidak tersedia. Silakan hubungi admin.');
         return;
       }
     }
     
     // Jika offline/manual, tampilkan QRIS
+    console.log('📱 Manual payment - showing QRIS');
     setShowQRIS(true);
   };
 
@@ -145,8 +162,8 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
         {getButtonContent()}
       </Button>
 
-      {/* QRIS Dialog untuk pembayaran manual */}
-      {showQRIS && (
+      {/* QRIS Dialog hanya untuk pembayaran manual */}
+      {showQRIS && booking.payment_method === 'manual' && (
         <QRISPaymentDialog
           isOpen={showQRIS}
           onClose={() => setShowQRIS(false)}
