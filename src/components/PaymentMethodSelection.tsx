@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -129,7 +130,7 @@ const PaymentMethodSelection = ({
             description: description,
             performed_by: booking.user_id,
             payment_type: isInstallment ? 'installment' : 'online',
-            status: 'pending' // Will be updated via webhook later
+            status: 'pending' // Will be updated via status checker later
           });
 
         toast.success('Invoice berhasil dibuat! Anda akan diarahkan ke halaman pembayaran.');
