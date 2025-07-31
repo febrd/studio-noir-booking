@@ -64,7 +64,7 @@ const SelfPhotoCheckoutPage = () => {
           given_names: booking.users.name?.split(' ')[0] || 'Customer',
           surname: booking.users.name?.split(' ').slice(1).join(' ') || '',
           email: booking.users.email || '',
-          mobile_number: booking.participant_count?.toString() || ''
+          mobile_number: booking.package_quantity?.toString() || ''
         },
         currency: 'IDR',
         invoice_duration: 86400
@@ -145,7 +145,7 @@ const SelfPhotoCheckoutPage = () => {
           given_names: booking.users.name?.split(' ')[0] || 'Customer',
           surname: booking.users.name?.split(' ').slice(1).join(' ') || '',
           email: booking.users.email || '',
-          mobile_number: booking.participant_count?.toString() || ''
+          mobile_number: booking.package_quantity?.toString() || ''
         },
         currency: 'IDR',
         invoice_duration: 86400
@@ -278,7 +278,7 @@ const SelfPhotoCheckoutPage = () => {
                   given_names: booking.users.name?.split(' ')[0] || 'Customer',
                   surname: booking.users.name?.split(' ').slice(1).join(' ') || '',
                   email: booking.users.email || '',
-                  mobile_number: booking.participant_count?.toString() || ''
+                  mobile_number: booking.package_quantity?.toString() || ''
                 },
                 currency: 'IDR',
                 invoice_duration: 86400
@@ -330,7 +330,7 @@ const SelfPhotoCheckoutPage = () => {
                 given_names: booking.users.name?.split(' ')[0] || 'Customer',
                 surname: booking.users.name?.split(' ').slice(1).join(' ') || '',
                 email: booking.users.email || '',
-                mobile_number: booking.participant_count?.toString() || ''
+                mobile_number: booking.package_quantity?.toString() || ''
               },
               currency: 'IDR',
               invoice_duration: 86400
@@ -452,8 +452,8 @@ const SelfPhotoCheckoutPage = () => {
                 </div>
                 <Separator />
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">Jumlah Peserta:</p>
-                  <p className="text-lg">{booking.participant_count}</p>
+                  <p className="text-sm font-medium">Jumlah Paket:</p>
+                  <p className="text-lg">{booking.package_quantity}</p>
                 </div>
               </CardContent>
             </Card>
