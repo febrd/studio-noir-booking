@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useInvoiceAPI } from '@/hooks/useInvoiceAPI';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
 
 interface XenditInvoiceStatus {
   status: string | null;
@@ -18,9 +19,10 @@ export const useXenditInvoiceStatus = (bookingId: string, shouldCheck: boolean =
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { getInvoice } = useInvoiceAPI();
+  const { userProfile } = useJWTAuth();
 
   const checkInvoice = async () => {
-    if (!bookingId) return;
+    if (!bookingId || !userProfile?.id) return;
     
     setLoading(true);
     setError(null);
@@ -29,7 +31,7 @@ export const useXenditInvoiceStatus = (bookingId: string, shouldCheck: boolean =
       console.log('🔍 Checking Xendit invoice status for booking:', bookingId);
       
       const result = await getInvoice({
-        performed_by: 'system-check',
+        performed_by: userProfile.id, // Use actual user UUID instead of "system-check"
         external_id: bookingId
       });
 
@@ -51,10 +53,10 @@ export const useXenditInvoiceStatus = (bookingId: string, shouldCheck: boolean =
   };
 
   useEffect(() => {
-    if (shouldCheck && bookingId) {
+    if (shouldCheck && bookingId && userProfile?.id) {
       checkInvoice();
     }
-  }, [bookingId, shouldCheck]);
+  }, [bookingId, shouldCheck, userProfile?.id]);
 
   return {
     status,
