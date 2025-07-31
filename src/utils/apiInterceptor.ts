@@ -58,9 +58,37 @@ export const setupAPIInterceptor = () => {
           );
         }
 
-        // Parse request body
-        const requestData = JSON.parse(init?.body as string);
-        console.log('📝 Request data:', requestData);
+        // Safely parse request body
+        let requestData;
+        try {
+          if (!init?.body) {
+            throw new Error('No request body provided');
+          }
+          
+          const bodyString = typeof init.body === 'string' ? init.body : JSON.stringify(init.body);
+          console.log('📝 Raw request body:', bodyString);
+          
+          requestData = JSON.parse(bodyString);
+          console.log('📝 Parsed request data:', requestData);
+        } catch (parseError) {
+          console.error('❌ JSON Parse Error:', parseError);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: 'Invalid JSON format in request body',
+              errorCode: 'INVALID_JSON'
+            }),
+            {
+              status: 400,
+              headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
 
         let result;
         
@@ -96,19 +124,14 @@ export const setupAPIInterceptor = () => {
       } catch (error) {
         console.error('❌ Error handling API route:', error);
         
-        // Handle JSON parsing errors
-        const isJsonError = error instanceof SyntaxError && error.message.includes('JSON');
-        
         return new Response(
           JSON.stringify({
             success: false,
-            error: isJsonError 
-              ? 'Invalid JSON format in request body' 
-              : 'Terjadi kesalahan sistem: ' + (error instanceof Error ? error.message : 'Unknown error'),
-            errorCode: isJsonError ? 'INVALID_JSON' : 'INTERNAL_SERVER_ERROR'
+            error: 'Terjadi kesalahan sistem: ' + (error instanceof Error ? error.message : 'Unknown error'),
+            errorCode: 'INTERNAL_SERVER_ERROR'
           }),
           {
-            status: isJsonError ? 400 : 500,
+            status: 500,
             headers: {
               'Access-Control-Allow-Origin': '*',
               'Access-Control-Allow-Methods': 'POST, OPTIONS',

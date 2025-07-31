@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { InvoiceRequest, InvoiceResponse, GetInvoiceRequest } from '@/services/invoiceService';
 
@@ -58,13 +59,20 @@ export const useInvoiceAPI = () => {
 
       console.log('🧹 Cleaned invoice data:', cleanInvoiceData);
       
+      // Ensure proper JSON serialization
+      const requestBody = JSON.stringify(cleanInvoiceData);
+      console.log('📦 Request body to send:', requestBody);
+      
       const response = await fetch('/v1/create/invoice', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(cleanInvoiceData),
+        body: requestBody,
       });
+
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
 
       const result: InvoiceResponse = await response.json();
       console.log('📥 Invoice API Response:', result);
@@ -78,7 +86,7 @@ export const useInvoiceAPI = () => {
       console.error('💥 Error calling invoice API:', error);
       return {
         success: false,
-        error: 'Network error or server unavailable',
+        error: 'Network error or server unavailable: ' + (error instanceof Error ? error.message : 'Unknown error'),
         errorCode: 'NETWORK_ERROR'
       };
     } finally {
@@ -108,7 +116,7 @@ export const useInvoiceAPI = () => {
       console.error('Error calling get invoice API:', error);
       return {
         success: false,
-        error: 'Network error or server unavailable',
+        error: 'Network error or server unavailable: ' + (error instanceof Error ? error.message : 'Unknown error'),
         errorCode: 'NETWORK_ERROR'
       };
     } finally {
