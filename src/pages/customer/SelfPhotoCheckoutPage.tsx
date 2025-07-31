@@ -645,14 +645,7 @@ const SelfPhotoCheckoutPage = () => {
                               })}
                             </p>
                           </div>
-                          <Button
-                            onClick={() => handlePayment(booking)}
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700 text-white font-peace-sans font-bold"
-                          >
-                            <CreditCard className="h-4 w-4 mr-2" />
-                            Bayar
-                          </Button>
+                        
                         </div>
                       </div>
                     ))}
