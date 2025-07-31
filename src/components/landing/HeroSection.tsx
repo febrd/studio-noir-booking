@@ -47,10 +47,7 @@ const HeroSection = () => {
             </Button>
           </Link>
           
-          <Button variant="outline" size="lg" className="border-2 border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full transition-all duration-300 w-full sm:w-auto">
-            <Heart className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-            Lihat Portfolio
-          </Button>
+
         </div>
 
         {/* Social Media Quick Access */}
