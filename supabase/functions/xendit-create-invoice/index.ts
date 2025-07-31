@@ -42,7 +42,7 @@ class XenditAuth {
   }
 
   // Create invoice
-  async createInvoice(invoiceData: any): Promise<{ success: boolean; data?: any; error?: string }> {
+  async createInvoice(invoiceData: any): Promise<{ success: boolean; data?: any; error?: string; errorCode?: string }> {
     try {
       console.log('Creating invoice with data:', invoiceData);
       
@@ -61,16 +61,35 @@ class XenditAuth {
           data: responseData
         };
       } else {
+        // Handle different error types from Xendit
+        const errorCode = response.status.toString();
+        let errorMessage = responseData.message || `HTTP ${response.status}: ${response.statusText}`;
+        
+        // Handle specific Xendit error responses
+        if (response.status === 400) {
+          errorMessage = `Bad Request: ${responseData.message || 'Invalid request parameters'}`;
+        } else if (response.status === 401) {
+          errorMessage = 'Authentication failed: Invalid API key or credentials';
+        } else if (response.status === 403) {
+          errorMessage = 'Forbidden: Access denied or insufficient permissions';
+        } else if (response.status === 429) {
+          errorMessage = 'Rate limit exceeded: Too many requests';
+        } else if (response.status >= 500) {
+          errorMessage = 'Xendit server error: Please try again later';
+        }
+
         return {
           success: false,
-          error: responseData.message || `HTTP ${response.status}: ${response.statusText}`
+          error: errorMessage,
+          errorCode: errorCode
         };
       }
     } catch (error) {
       console.error('Xendit invoice creation failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        errorCode: 'NETWORK_ERROR'
       };
     }
   }
@@ -82,10 +101,19 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  if (req.method !== 'POST') {
+  // Only allow POST requests to /v1/create/invoice
+  const url = new URL(req.url);
+  if (req.method !== 'POST' || url.pathname !== '/v1/create/invoice') {
     return new Response(
-      JSON.stringify({ error: 'Method not allowed. Only POST is supported.' }),
-      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        success: false,
+        error: 'Method not allowed or invalid endpoint. Use POST /v1/create/invoice',
+        errorCode: 'INVALID_ENDPOINT'
+      }),
+      { 
+        status: 405, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 
@@ -98,7 +126,8 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Parameter performed_by diperlukan'
+          error: 'Parameter performed_by diperlukan',
+          errorCode: 'MISSING_PERFORMED_BY'
         }),
         {
           status: 400,
@@ -110,6 +139,21 @@ Deno.serve(async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Server configuration error: Missing Supabase credentials',
+          errorCode: 'SERVER_CONFIG_ERROR'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Check if performed_by exists in users table
@@ -125,7 +169,8 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'User tidak ditemukan atau tidak valid'
+          error: 'User tidak ditemukan atau tidak valid',
+          errorCode: 'USER_NOT_FOUND'
         }),
         {
           status: 403,
@@ -152,7 +197,8 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Payment provider tidak ditemukan atau tidak aktif'
+          error: 'Payment provider tidak ditemukan atau tidak aktif',
+          errorCode: 'PAYMENT_PROVIDER_NOT_FOUND'
         }),
         {
           status: 404,
@@ -165,7 +211,8 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Secret key tidak ditemukan pada payment provider'
+          error: 'Secret key tidak ditemukan pada payment provider',
+          errorCode: 'MISSING_SECRET_KEY'
         }),
         {
           status: 400,
@@ -181,7 +228,23 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Parameter external_id dan amount diperlukan'
+          error: 'Parameter external_id dan amount diperlukan',
+          errorCode: 'MISSING_REQUIRED_FIELDS'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Validate amount is a positive number
+    if (typeof invoiceData.amount !== 'number' || invoiceData.amount <= 0) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Amount harus berupa angka positif',
+          errorCode: 'INVALID_AMOUNT'
         }),
         {
           status: 400,
@@ -235,13 +298,27 @@ Deno.serve(async (req) => {
     } else {
       console.error('Invoice creation failed:', invoiceResult.error);
       
+      // Determine appropriate HTTP status based on error code
+      let httpStatus = 400;
+      if (invoiceResult.errorCode === '401') {
+        httpStatus = 401;
+      } else if (invoiceResult.errorCode === '403') {
+        httpStatus = 403;
+      } else if (invoiceResult.errorCode === '429') {
+        httpStatus = 429;
+      } else if (invoiceResult.errorCode && invoiceResult.errorCode.startsWith('5')) {
+        httpStatus = 502; // Bad Gateway for upstream server errors
+      }
+      
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Gagal membuat invoice: ' + (invoiceResult.error || 'Unknown error')
+          error: 'Gagal membuat invoice: ' + (invoiceResult.error || 'Unknown error'),
+          errorCode: invoiceResult.errorCode || 'XENDIT_ERROR',
+          details: invoiceResult.data || null
         }),
         {
-          status: 400,
+          status: httpStatus,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
@@ -249,10 +326,27 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Unexpected error in xendit-create-invoice:', error);
+    
+    // Handle JSON parsing errors
+    if (error instanceof SyntaxError && error.message.includes('JSON')) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Invalid JSON format in request body',
+          errorCode: 'INVALID_JSON'
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
     return new Response(
       JSON.stringify({
         success: false,
-        error: 'Terjadi kesalahan sistem: ' + (error instanceof Error ? error.message : 'Unknown error')
+        error: 'Terjadi kesalahan sistem: ' + (error instanceof Error ? error.message : 'Unknown error'),
+        errorCode: 'INTERNAL_SERVER_ERROR'
       }),
       {
         status: 500,
