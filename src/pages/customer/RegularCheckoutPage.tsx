@@ -706,6 +706,7 @@ const RegularCheckoutPage = () => {
                           variant="outline"
                           size="icon"
                           onClick={() => handleQuantityChange(true)}
+                          disabled={packageQuantity >= 1}
                           className="border-gray-200 text-gray-600 hover:bg-gray-50"
                         >
                           <Plus className="h-4 w-4" />
