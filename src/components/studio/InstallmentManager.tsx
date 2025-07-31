@@ -258,7 +258,7 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
             
             <div className="space-y-2">
               <Label htmlFor="payment-method">Metode Pembayaran</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <Select value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as 'offline' | 'online')}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
