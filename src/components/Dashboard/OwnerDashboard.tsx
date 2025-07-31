@@ -158,7 +158,7 @@ export const OwnerDashboard = () => {
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div>
         <h1 className="text-3xl font-bold">Owner Dashboard</h1>
         <p className="text-muted-foreground">

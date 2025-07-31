@@ -1,149 +1,185 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plus, Search, Filter, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Receipt, Calendar, DollarSign } from 'lucide-react';
-import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { ExpenseForm } from '@/components/expenses/ExpenseForm';
-import { ExpenseFilters } from '@/components/expenses/ExpenseFilters';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
-import type { Expense } from '@/types/expenses';
+import { ExpenseFilters } from '@/components/expenses/ExpenseFilters';
+import { useExpenseFilters } from '@/hooks/useExpenseFilters';
+import { JWTProtectedRoute } from '@/components/auth/JWTProtectedRoute';
+import { ModernLayout } from '@/components/Layout/ModernLayout';
+
+export interface Expense {
+  id: string;
+  title: string;
+  amount: number;
+  description?: string;
+  date: string;
+  performed_by: string;
+  note_file_path?: string;
+  created_at: string;
+  updated_at: string;
+  users?: {
+    name: string;
+    email: string;
+  };
+}
 
 const ExpensesPage = () => {
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [selectedDateRange, setSelectedDateRange] = useState<any>({
-    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date(),
-  });
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { filters, updateFilters, resetFilters, getFilteredQuery } = useExpenseFilters();
 
-  const { data: expenses, isLoading } = useQuery({
-    queryKey: ['expenses', selectedDateRange, selectedCategory],
+  const { data: expenses = [], isLoading } = useQuery({
+    queryKey: ['expenses', filters],
     queryFn: async () => {
       let query = supabase
         .from('expenses')
         .select(`
           *,
-          users (
-            id,
+          users:performed_by (
             name,
             email
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('date', { ascending: false });
 
-      if (selectedDateRange?.from) {
-        query = query.gte('created_at', selectedDateRange.from.toISOString());
-      }
-      if (selectedDateRange?.to) {
-        query = query.lte('created_at', selectedDateRange.to.toISOString());
-      }
-      if (selectedCategory !== 'all') {
-        query = query.eq('category', selectedCategory);
-      }
-
-      const { data, error } = await query;
+      // Apply filters
+      const filteredQuery = getFilteredQuery(query);
+      const { data, error } = await filteredQuery;
+      
       if (error) throw error;
       return data as Expense[];
     },
   });
 
-  const deleteExpenseMutation = useMutation({
-    mutationFn: async (expenseId: string) => {
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('expenses')
         .delete()
-        .eq('id', expenseId);
-
+        .eq('id', id);
+      
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast.success('Expense deleted successfully');
+      toast({
+        title: "Success",
+        description: "Expense deleted successfully",
+      });
     },
     onError: (error) => {
-      console.error('Error deleting expense:', error);
-      toast.error('Failed to delete expense');
+      toast({
+        title: "Error",
+        description: "Failed to delete expense",
+        variant: "destructive",
+      });
     },
   });
 
-  const handleDeleteExpense = (expenseId: string) => {
+  const handleEdit = (expense: Expense) => {
+    setEditingExpense(expense);
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this expense?')) {
-      deleteExpenseMutation.mutate(expenseId);
+      deleteMutation.mutate(id);
     }
   };
 
-  const handleDateRangeChange = (dateRange: any) => {
-    setSelectedDateRange(dateRange);
+  const handleFormClose = () => {
+    setShowForm(false);
+    setEditingExpense(null);
   };
 
-  const handleCategoryChange = (category: string) => {
-    setSelectedCategory(category);
-  };
-
-  const handleEditExpense = (expense: Expense) => {
-    setEditingExpense(expense);
+  const handleFormSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    handleFormClose();
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Expenses Management</h1>
-          <p className="text-gray-600">Kelola pengeluaran dan biaya operasional</p>
-        </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
+    <JWTProtectedRoute allowedRoles={['admin', 'owner', 'keuangan']}>
+      <ModernLayout>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">Daftar Pengeluaran</h1>
+              <p className="text-muted-foreground">Kelola dan pantau pengeluaran perusahaan</p>
+            </div>
+            <Button onClick={() => setShowForm(true)}>
+              <Plus className="h-4 w-4 mr-2" />
               Tambah Pengeluaran
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Tambah Pengeluaran Baru</DialogTitle>
-            </DialogHeader>
-            <ExpenseForm 
-              onClose={() => setIsCreateDialogOpen(false)}
-              onSuccess={() => {
-                setIsCreateDialogOpen(false);
-                queryClient.invalidateQueries({ queryKey: ['expenses'] });
-              }} 
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Filter Pengeluaran</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-4 items-center">
+                <div className="flex-1 min-w-[200px]">
+                  <Input
+                    placeholder="Cari pengeluaran..."
+                    value={filters.search}
+                    onChange={(e) => updateFilters({ search: e.target.value })}
+                    className="w-full"
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filter
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={resetFilters}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reset
+                </Button>
+              </div>
+              
+              {showFilters && (
+                <div className="mt-4">
+                  <ExpenseFilters
+                    filters={filters}
+                    onFiltersChange={updateFilters}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <ExpenseTable
+            expenses={expenses}
+            isLoading={isLoading}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+
+          {showForm && (
+            <ExpenseForm
+              expense={editingExpense}
+              onClose={handleFormClose}
+              onSuccess={handleFormSuccess}
             />
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <ExpenseFilters
-        selectedDateRange={selectedDateRange}
-        selectedCategory={selectedCategory}
-        onDateRangeChange={handleDateRangeChange}
-        onCategoryChange={handleCategoryChange}
-      />
-
-      <ExpenseTable
-        expenses={expenses || []}
-        isLoading={isLoading}
-        onEdit={handleEditExpense}
-        onDelete={handleDeleteExpense}
-      />
-
-      {editingExpense && (
-        <ExpenseForm
-          expense={editingExpense}
-          onClose={() => setEditingExpense(null)}
-          onSuccess={() => {
-            setEditingExpense(null);
-            queryClient.invalidateQueries({ queryKey: ['expenses'] });
-          }}
-        />
-      )}
-    </div>
+          )}
+        </div>
+      </ModernLayout>
+    </JWTProtectedRoute>
   );
 };
 

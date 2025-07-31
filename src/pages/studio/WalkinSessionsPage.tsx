@@ -1,282 +1,504 @@
-
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Users, Clock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Edit, Trash2, Calendar, Clock, User, MapPin, Filter } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { WalkinBookingForm } from '@/components/studio/WalkinBookingForm';
-import WalkinSessionsFilters from '@/components/studio/WalkinSessionsFilters';
-import { WalkinTimeExtensionManager } from '@/components/studio/WalkinTimeExtensionManager';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay } from 'date-fns';
+import WalkinBookingForm from '@/components/studio/WalkinBookingForm';
+import WalkinSessionsFilters, { WalkinFilters } from '@/components/studio/WalkinSessionsFilters';
+import { ModernLayout } from '@/components/Layout/ModernLayout';
+import { formatTimeWITA, formatDateTimeWITA } from '@/utils/timezoneUtils';
+import { useJWTAuth } from '@/hooks/useJWTAuth';
+import { useWalkinSessionsFilter } from '@/hooks/useWalkinSessionsFilter';
 
 const WalkinSessionsPage = () => {
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [selectedSession, setSelectedSession] = useState<any>(null);
-  const [showTimeExtension, setShowTimeExtension] = useState(false);
-  const [filters, setFilters] = useState<any>({
-    dateRange: {
-      from: new Date(),
-      to: new Date()
-    },
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingSession, setEditingSession] = useState(null);
+  const [filters, setFilters] = useState<WalkinFilters>({
+    dateRange: undefined,
+    searchQuery: '',
     status: 'all',
-    studio: 'all'
+    studioId: 'all'
   });
+  
   const queryClient = useQueryClient();
+  const { userProfile } = useJWTAuth();
+  
+  const today = new Date();
+  const startOfDayUtc = startOfDay(today).toISOString();
+  const endOfDayUtc = endOfDay(today).toISOString();
 
-  const { data: sessions, isLoading } = useQuery({
-    queryKey: ['bookings', 'walkin', filters],
+  // Check if user is owner
+  const isOwner = userProfile?.role === 'owner';
+
+  // Fetch studios for filter
+  const { data: studios } = useQuery({
+    queryKey: ['studios'],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
+        .from('studios')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch today's walking sessions with UTC consistency
+  const { data: sessions, isLoading, error } = useQuery({
+    queryKey: ['walkin-sessions', format(today, 'yyyy-MM-dd')],
+    queryFn: async () => {
+      console.log('Fetching walk-in sessions for UTC range:', {
+        start: startOfDayUtc,
+        end: endOfDayUtc
+      });
+
+      const { data, error } = await supabase
         .from('bookings')
         .select(`
           *,
-          studio_packages (
-            title,
-            price,
-            category:package_categories(name)
-          ),
-          studios (
-            name,
-            type
-          ),
-          users (
-            name,
-            email
+          users:user_id (name, email),
+          studios:studio_id (name, type),
+          studio_packages:studio_package_id (title, price, base_time_minutes),
+          package_categories:package_category_id (name),
+          booking_additional_services (
+            quantity,
+            additional_services:additional_service_id (name, price)
           )
         `)
         .eq('is_walking_session', true)
-        .order('created_at', { ascending: false });
+        .gte('created_at', startOfDayUtc)
+        .lte('created_at', endOfDayUtc)
+        .order('start_time', { ascending: true });
 
-      if (filters.status !== 'all') {
-        query = query.eq('status', filters.status);
-      }
+      console.log('Walk-in sessions query result:', { data, error });
 
-      if (filters.studio !== 'all') {
-        query = query.eq('studio_id', filters.studio);
+      if (error) {
+        console.error('Error fetching walk-in sessions:', error);
+        throw error;
       }
-
-      if (filters.dateRange?.from) {
-        query = query.gte('start_time', filters.dateRange.from.toISOString());
-      }
-      if (filters.dateRange?.to) {
-        query = query.lte('start_time', filters.dateRange.to.toISOString());
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
-    },
+      
+      return data || [];
+    }
   });
 
-  const deleteSessionMutation = useMutation({
+  // Use custom hook for filtering
+  const { filteredSessions, totalSessions, filteredCount, isFiltered } = useWalkinSessionsFilter(sessions || [], filters);
+
+  // Delete mutation with proper cleanup and owner-only access
+  const deleteMutation = useMutation({
     mutationFn: async (sessionId: string) => {
-      const { error } = await supabase
+      // Check if user is owner
+      if (!isOwner) {
+        throw new Error('Hanya owner yang dapat menghapus walk-in session');
+      }
+
+      console.log('Deleting walk-in session:', sessionId);
+
+      // Delete related records in order to maintain referential integrity
+      
+      // 1. Delete transactions first
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('booking_id', sessionId);
+      
+      if (transactionError) {
+        console.error('Error deleting transactions:', transactionError);
+        // Continue even if there are no transactions to delete
+      }
+
+      // 2. Delete booking logs (ignoring constraint errors)
+      const { error: logsError } = await supabase
+        .from('booking_logs')
+        .delete()
+        .eq('booking_id', sessionId);
+      
+      if (logsError) {
+        console.error('Error deleting booking logs:', logsError);
+        // Continue even if there are no logs to delete
+      }
+
+      // 3. Delete installments
+      const { error: installmentsError } = await supabase
+        .from('installments')
+        .delete()
+        .eq('booking_id', sessionId);
+      
+      if (installmentsError) {
+        console.error('Error deleting installments:', installmentsError);
+        // Continue even if there are no installments to delete
+      }
+
+      // 4. Delete additional services
+      const { error: servicesError } = await supabase
+        .from('booking_additional_services')
+        .delete()
+        .eq('booking_id', sessionId);
+      
+      if (servicesError) {
+        console.error('Error deleting additional services:', servicesError);
+        // Continue even if there are no additional services to delete
+      }
+
+      // 5. Delete booking sessions
+      const { error: sessionsError } = await supabase
+        .from('booking_sessions')
+        .delete()
+        .eq('booking_id', sessionId);
+      
+      if (sessionsError) {
+        console.error('Error deleting booking sessions:', sessionsError);
+        // Continue even if there are no booking sessions to delete
+      }
+      
+      // 6. Finally delete the main booking record
+      const { error: bookingError } = await supabase
         .from('bookings')
         .delete()
         .eq('id', sessionId);
+      
+      if (bookingError) {
+        console.error('Error deleting booking:', bookingError);
+        throw bookingError;
+      }
 
-      if (error) throw error;
+      console.log('Walk-in session deleted successfully');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings', 'walkin'] });
-      toast.success('Walk-in session deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['walkin-sessions'] });
+      toast.success('Walk-in session berhasil dihapus');
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error deleting session:', error);
-      toast.error('Failed to delete walk-in session');
-    },
+      toast.error(error.message || 'Gagal menghapus walk-in session');
+    }
   });
 
-  const handleDeleteSession = (sessionId: string) => {
-    if (window.confirm('Are you sure you want to delete this walk-in session?')) {
-      deleteSessionMutation.mutate(sessionId);
+  const handleEdit = (session: any) => {
+    setEditingSession(session);
+    setIsDialogOpen(true);
+  };
+
+  const handleDelete = async (sessionId: string) => {
+    if (!isOwner) {
+      toast.error('Hanya owner yang dapat menghapus walk-in session');
+      return;
+    }
+
+    if (confirm('Apakah Anda yakin ingin menghapus walk-in session ini? Data akan terhapus permanen dari database.')) {
+      await deleteMutation.mutateAsync(sessionId);
     }
   };
 
-  const handleTimeExtensionClick = (session: any) => {
-    setSelectedSession(session);
-    setShowTimeExtension(true);
-  };
+  const handleSuccess = async (bookingData?: any) => {
+    // Create transaction for walk-in sessions based on payment method
+    if (bookingData && bookingData.payment_method) {
+      try {
+        const transactionData = {
+          booking_id: bookingData.id,
+          amount: bookingData.total_amount,
+          type: bookingData.payment_method,
+          status: 'paid' as const,
+          payment_type: bookingData.payment_method === 'online' ? 'online' as const : 'offline' as const,
+          description: `Walk-in session ${bookingData.payment_method} - ${bookingData.studio_packages?.title || 'Package'}`,
+          performed_by: null
+        };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0,
-    }).format(amount);
+        const { error: transactionError } = await supabase
+          .from('transactions')
+          .insert(transactionData);
+
+        if (transactionError) {
+          console.error('Error creating transaction for walk-in:', transactionError);
+        } else {
+          console.log('Transaction created successfully:', transactionData);
+        }
+      } catch (error) {
+        console.error('Error creating transaction for walk-in:', error);
+      }
+    }
+
+    setIsDialogOpen(false);
+    setEditingSession(null);
+    // Invalidate both queries to ensure fresh data
+    queryClient.invalidateQueries({ queryKey: ['walkin-sessions'] });
+    queryClient.invalidateQueries({ queryKey: ['bookings-enhanced'] });
   };
 
   const getStatusBadge = (status: string) => {
-    const statusColors = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      confirmed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-      completed: 'bg-blue-100 text-blue-800',
-    };
-    return statusColors[status] || 'bg-gray-100 text-gray-800';
+    const variants = {
+      pending: 'secondary',
+      confirmed: 'default',
+      completed: 'outline',
+      cancelled: 'destructive'
+    } as const;
+    
+    return <Badge variant={variants[status as keyof typeof variants] || 'secondary'}>{status}</Badge>;
   };
+
+  if (error) {
+    console.error('Query error:', error);
+    return (
+      <ModernLayout>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Walk-in Sessions</h1>
+              <p className="text-muted-foreground">{format(today, 'dd MMMM yyyy')}</p>
+            </div>
+          </div>
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-red-600">Error loading data: {error.message}</p>
+            </CardContent>
+          </Card>
+        </div>
+      </ModernLayout>
+    );
+  }
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading walk-in sessions...</p>
+      <ModernLayout>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Walk-in Sessions</h1>
+              <p className="text-muted-foreground">{format(today, 'dd MMMM yyyy')}</p>
+            </div>
+          </div>
+          <div className="text-center py-8">Loading...</div>
         </div>
-      </div>
+      </ModernLayout>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Walk-in Sessions</h1>
-          <p className="text-gray-600">Kelola sesi walk-in pelanggan</p>
-        </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Tambah Walk-in
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Tambah Walk-in Session</DialogTitle>
-            </DialogHeader>
-            <WalkinBookingForm
-              onClose={() => setIsCreateDialogOpen(false)}
-              onSuccess={() => {
-                setIsCreateDialogOpen(false);
-                queryClient.invalidateQueries({ queryKey: ['bookings', 'walkin'] });
-              }}
-            />
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <WalkinSessionsFilters
-        filters={filters}
-        onFiltersChange={setFilters}
-      />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Walk-in Sessions ({sessions?.length || 0})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full table-auto">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4 font-medium">Customer</th>
-                  <th className="text-left py-3 px-4 font-medium">Package</th>
-                  <th className="text-left py-3 px-4 font-medium">Studio</th>
-                  <th className="text-left py-3 px-4 font-medium">Schedule</th>
-                  <th className="text-left py-3 px-4 font-medium">Amount</th>
-                  <th className="text-left py-3 px-4 font-medium">Status</th>
-                  <th className="text-left py-3 px-4 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sessions?.map((session) => (
-                  <tr key={session.id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4">
-                      <div>
-                        <p className="font-medium text-gray-900">{session.users?.name}</p>
-                        <p className="text-sm text-gray-600">{session.users?.email}</p>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div>
-                        <p className="font-medium text-gray-900">{session.studio_packages?.title}</p>
-                        <p className="text-sm text-gray-600">{session.studio_packages?.category?.name}</p>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div>
-                        <p className="font-medium text-gray-900">{session.studios?.name}</p>
-                        <p className="text-sm text-gray-600 capitalize">{session.studios?.type}</p>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div>
-                        {session.start_time && (
-                          <>
-                            <p className="font-medium text-gray-900">
-                              {format(new Date(session.start_time), 'dd MMM yyyy')}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {format(new Date(session.start_time), 'HH:mm')} - 
-                              {session.end_time && format(new Date(session.end_time), 'HH:mm')}
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <p className="font-medium text-gray-900">{formatCurrency(session.total_amount)}</p>
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(session.status)}`}>
-                        {session.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleTimeExtensionClick(session)}
-                        >
-                          <Clock className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDeleteSession(session.id)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {sessions?.length === 0 && (
-              <div className="text-center py-8">
-                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No walk-in sessions found</h3>
-                <p className="text-gray-600">Start by creating your first walk-in session</p>
-              </div>
-            )}
+    <ModernLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Walk-in Sessions</h1>
+            <p className="text-muted-foreground">{format(today, 'dd MMMM yyyy')}</p>
           </div>
-        </CardContent>
-      </Card>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => setEditingSession(null)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Walk-in Session
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingSession ? 'Edit Walk-in Session' : 'Tambah Walk-in Session Baru'}
+                </DialogTitle>
+              </DialogHeader>
+              <WalkinBookingForm booking={editingSession} onSuccess={handleSuccess} />
+            </DialogContent>
+          </Dialog>
+        </div>
 
-      {/* Time Extension Manager Modal */}
-      {showTimeExtension && selectedSession && (
-        <Dialog open={showTimeExtension} onOpenChange={setShowTimeExtension}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Manage Time Extension</DialogTitle>
-            </DialogHeader>
-            <WalkinTimeExtensionManager
-              session={selectedSession}
-              onClose={() => setShowTimeExtension(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
-    </div>
+        {/* Filter Component */}
+        <WalkinSessionsFilters
+          onFilterChange={setFilters}
+          studios={studios || []}
+          isLoading={isLoading}
+        />
+
+        {/* Summary Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-5 w-5 text-blue-500" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Sessions</p>
+                  <p className="text-xl font-bold">
+                    {isFiltered ? `${filteredCount} / ${totalSessions}` : totalSessions}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-5 w-5 text-green-500" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Confirmed</p>
+                  <p className="text-xl font-bold">
+                    {filteredSessions?.filter(s => s.status === 'confirmed').length || 0}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <User className="h-5 w-5 text-purple-500" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Completed</p>
+                  <p className="text-xl font-bold">
+                    {filteredSessions?.filter(s => s.status === 'completed').length || 0}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <MapPin className="h-5 w-5 text-orange-500" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Revenue</p>
+                  <p className="text-xl font-bold">
+                    Rp {filteredSessions?.reduce((total, session) => total + (session.total_amount || 0), 0).toLocaleString('id-ID')}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filter Status Info */}
+        {isFiltered && (
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-blue-700">
+                <Filter className="h-4 w-4" />
+                <span className="text-sm">
+                  Menampilkan {filteredCount} dari {totalSessions} walk-in sessions
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Sessions List with consistent WITA time formatting */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filteredSessions?.map((session: any) => (
+            <Card key={session.id} className="hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{session.users?.name || 'Walk-in Customer'}</CardTitle>
+                  {getStatusBadge(session.status)}
+                </div>
+                <p className="text-sm text-muted-foreground">{session.users?.email || 'No email'}</p>
+              </CardHeader>
+              
+              <CardContent className="space-y-3">
+                <div className="flex items-center text-sm">
+                  <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span>{session.studios?.name}</span>
+                  <Badge variant="outline" className="ml-2 text-xs">
+                    {session.studios?.type === 'self_photo' ? 'Self Photo' : 'Regular'}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center text-sm">
+                  <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <span>
+                    {formatTimeWITA(session.start_time)} - {formatTimeWITA(session.end_time)} WITA
+                  </span>
+                </div>
+                
+                <div className="text-sm">
+                  <p className="font-medium">{session.studio_packages?.title}</p>
+                  {session.package_categories && (
+                    <p className="text-muted-foreground">{session.package_categories.name}</p>
+                  )}
+                  <p className="text-green-600 font-medium">
+                    Rp {(session.total_amount || 0).toLocaleString('id-ID')}
+                  </p>
+                </div>
+
+                {session.booking_additional_services && session.booking_additional_services.length > 0 && (
+                  <div className="text-sm">
+                    <p className="font-medium text-muted-foreground">Additional Services:</p>
+                    {session.booking_additional_services.map((service: any, index: number) => (
+                      <p key={index} className="text-xs">
+                        • {service.additional_services.name} (x{service.quantity})
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {session.additional_time_minutes && session.additional_time_minutes > 0 && (
+                  <div className="text-sm">
+                    <p className="text-orange-600">
+                      +{session.additional_time_minutes} menit tambahan
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEdit(session)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  {isOwner && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(session.id)}
+                      className="text-red-600 hover:text-red-700"
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+
+                <div className="text-xs text-gray-500 border-t pt-2">
+                  <p>Dibuat: {formatDateTimeWITA(session.created_at)} WITA</p>
+                  <p>Payment: {session.payment_method}</p>
+                  {!isOwner && (
+                    <p className="text-orange-600 text-xs mt-1">
+                      * Hanya owner yang dapat menghapus data
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {(!filteredSessions || filteredSessions.length === 0) && (
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-muted-foreground">
+                {isFiltered 
+                  ? 'Tidak ada walk-in session yang sesuai dengan filter'
+                  : 'Belum ada walk-in session hari ini'
+                }
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                {isFiltered 
+                  ? 'Coba ubah filter atau reset untuk melihat semua data'
+                  : 'Klik "Tambah Walk-in Session" untuk menambah session baru'
+                }
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </ModernLayout>
   );
 };
 

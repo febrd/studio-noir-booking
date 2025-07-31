@@ -1,59 +1,69 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { DollarSign, TrendingUp, Calendar, FileText, PieChart as PieChartIcon } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval } from 'date-fns';
+import { DollarSign, TrendingUp, CreditCard, Target, Calendar, AlertCircle } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, subMonths, eachDayOfInterval } from 'date-fns';
 import { id } from 'date-fns/locale';
 
 export const KeuanganDashboard = () => {
-  const currentMonth = new Date();
-  const startDate = startOfMonth(currentMonth);
-  const endDate = endOfMonth(currentMonth);
-  const sixMonthsAgo = subMonths(currentMonth, 5);
-  const interval = { start: sixMonthsAgo, end: currentMonth };
-  const lastSixMonths = eachMonthOfInterval(interval);
-
-  const { data, isLoading } = useQuery({
+  const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['keuangan-dashboard'],
     queryFn: async () => {
-      const [currentMonthBookings, lastSixMonthsBookings] = await Promise.all([
+      const currentMonth = new Date();
+      const lastMonth = subMonths(currentMonth, 1);
+      const monthStart = startOfMonth(currentMonth);
+      const monthEnd = endOfMonth(currentMonth);
+
+      const [currentBookings, lastMonthBookings, installments, targets] = await Promise.all([
         supabase
           .from('bookings')
           .select(`
-            total_amount,
-            payment_method,
-            installments (amount)
+            *,
+            users (name, email),
+            studios (name, type),
+            studio_packages (title, price),
+            installments (amount, paid_at, payment_method)
           `)
-          .gte('created_at', startDate.toISOString())
-          .lte('created_at', endDate.toISOString()),
+          .gte('created_at', monthStart.toISOString())
+          .lte('created_at', monthEnd.toISOString()),
         
-        Promise.all(lastSixMonths.map(month => {
-          const monthStart = startOfMonth(month);
-          const monthEnd = endOfMonth(month);
-          return supabase
-            .from('bookings')
-            .select(`total_amount, installments (amount)`)
-            .gte('created_at', monthStart.toISOString())
-            .lte('created_at', monthEnd.toISOString());
-        }))
+        supabase
+          .from('bookings')
+          .select('total_amount, installments (amount)')
+          .gte('created_at', startOfMonth(lastMonth).toISOString())
+          .lte('created_at', endOfMonth(lastMonth).toISOString()),
+        
+        supabase
+          .from('installments')
+          .select('*')
+          .gte('paid_at', monthStart.toISOString())
+          .lte('paid_at', monthEnd.toISOString()),
+        
+        supabase
+          .from('monthly_targets')
+          .select('*')
+          .eq('month', currentMonth.getMonth() + 1)
+          .eq('year', currentMonth.getFullYear())
       ]);
 
       return {
-        currentMonthBookings: currentMonthBookings.data || [],
-        lastSixMonthsBookings: lastSixMonthsBookings.map(res => res.data || [])
+        currentBookings: currentBookings.data || [],
+        lastMonthBookings: lastMonthBookings.data || [],
+        installments: installments.data || [],
+        targets: targets.data || []
       };
     }
   });
 
   if (isLoading) {
-    return <div className="flex justify-center items-center h-64">Loading financial dashboard...</div>;
+    return <div className="flex justify-center items-center h-64">Loading dashboard...</div>;
   }
 
-  const { currentMonthBookings, lastSixMonthsBookings } = data || {};
+  const { currentBookings, lastMonthBookings, installments, targets } = dashboardData || {};
 
-  // Calculate revenue for the current month including installments
+  // Calculate revenue including installments
   const calculateRevenue = (bookings: any[]) => {
     return bookings?.reduce((sum, booking) => {
       const bookingAmount = booking.total_amount || 0;
@@ -62,56 +72,82 @@ export const KeuanganDashboard = () => {
     }, 0) || 0;
   };
 
-  const currentMonthRevenue = calculateRevenue(currentMonthBookings);
-
-  // Calculate installment revenue
-  const installmentRevenue = currentMonthBookings?.reduce((sum, booking) => {
-    return sum + (booking.installments?.reduce((instSum: number, inst: any) => instSum + (inst.amount || 0), 0) || 0);
-  }, 0) || 0;
-
-  // Calculate daily average revenue
-  const today = new Date();
-  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const timeDiff = today.getTime() - firstDayOfMonth.getTime();
-  const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
-  const dailyAverage = Math.round(currentMonthRevenue / dayDiff);
-
-  // Prepare monthly revenue data for the chart
-  const monthlyData = lastSixMonths.map((month, index) => {
-    const monthName = format(month, 'MMM', { locale: id });
-    const revenue = calculateRevenue(lastSixMonthsBookings[index]);
-    return { month: monthName, revenue };
-  });
-
-  // Calculate revenue growth compared to the previous month
-  const previousMonthRevenue = monthlyData.length > 1 ? monthlyData[monthlyData.length - 2].revenue : 0;
-  const revenueGrowth = previousMonthRevenue > 0 ? ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) * 100 : 0;
+  const currentRevenue = calculateRevenue(currentBookings);
+  const lastMonthRevenue = calculateRevenue(lastMonthBookings);
+  const revenueGrowth = lastMonthRevenue > 0 ? ((currentRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
 
   // Payment method analysis
-  const paymentMethodsAnalysis = currentMonthBookings?.reduce((acc, booking) => {
+  const paymentAnalysis = currentBookings?.reduce((acc, booking) => {
     const method = booking.payment_method || 'unknown';
-    const bookingAmount = booking.total_amount || 0;
-    const installmentAmount = booking.installments?.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0) || 0;
-    const revenue = Math.max(bookingAmount, installmentAmount);
-
     if (!acc[method]) {
-      acc[method] = 0;
+      acc[method] = { count: 0, revenue: 0 };
     }
-    acc[method] += revenue;
+    acc[method].count += 1;
+    const bookingRevenue = booking.total_amount || 0;
+    const installmentRevenue = booking.installments?.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0) || 0;
+    acc[method].revenue += Math.max(bookingRevenue, installmentRevenue);
     return acc;
-  }, {} as Record<string, number>) || {};
+  }, {} as Record<string, { count: number; revenue: number }>) || {};
 
-  const paymentMethods = Object.entries(paymentMethodsAnalysis).map(([method, revenue]) => ({
+  const paymentData = Object.entries(paymentAnalysis).map(([method, data]) => ({
     method: method === 'online' ? 'Online' : 'Offline',
-    revenue
+    ...data
   }));
 
+  // Daily revenue trend for current month - Composed Chart data
+  const monthStart = startOfMonth(new Date());
+  const monthEnd = endOfMonth(new Date());
+  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+  const dailyRevenue = monthDays.slice(0, new Date().getDate()).map(day => {
+    const dayBookings = currentBookings?.filter(booking => {
+      const bookingDate = new Date(booking.created_at);
+      return format(bookingDate, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd');
+    }) || [];
+
+    const revenue = dayBookings.reduce((sum, booking) => {
+      const bookingAmount = booking.total_amount || 0;
+      const installmentAmount = booking.installments?.reduce((instSum: number, inst: any) => instSum + (inst.amount || 0), 0) || 0;
+      return sum + Math.max(bookingAmount, installmentAmount);
+    }, 0);
+
+    return {
+      day: format(day, 'dd'),
+      revenue,
+      bookings: dayBookings.length
+    };
+  });
+
+  const installmentAnalysis = {
+    totalInstallments: installments?.length || 0,
+    totalInstallmentAmount: installments?.reduce((sum, inst) => sum + (inst.amount || 0), 0) || 0,
+    onlineInstallments: installments?.filter(inst => inst.payment_method === 'online').length || 0,
+    offlineInstallments: installments?.filter(inst => inst.payment_method === 'offline').length || 0
+  };
+
+  const outstandingPayments = currentBookings?.filter(booking => {
+    const totalAmount = booking.total_amount || 0;
+    const paidAmount = booking.installments?.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0) || 0;
+    return totalAmount > paidAmount;
+  }) || [];
+
+  const totalOutstanding = outstandingPayments.reduce((sum, booking) => {
+    const totalAmount = booking.total_amount || 0;
+    const paidAmount = booking.installments?.reduce((instSum: number, inst: any) => instSum + (inst.amount || 0), 0) || 0;
+    return sum + (totalAmount - paidAmount);
+  }, 0);
+
+  const currentTarget = targets?.[0]?.target_amount || 20000000;
+  const targetAchievement = (currentRevenue / currentTarget) * 100;
+
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div>
         <h1 className="text-3xl font-bold">Keuangan Dashboard</h1>
         <p className="text-muted-foreground">
-          Monitor performa keuangan studio untuk periode {format(currentMonth, 'MMMM yyyy', { locale: id })}
+          Laporan keuangan lengkap untuk {format(new Date(), 'MMMM yyyy', { locale: id })}
         </p>
       </div>
 
@@ -119,11 +155,11 @@ export const KeuanganDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue Bulan Ini</CardTitle>
+            <CardTitle className="text-sm font-medium">Revenue Bulan Ini</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Rp {currentMonthRevenue.toLocaleString('id-ID')}</div>
+            <div className="text-2xl font-bold">Rp {currentRevenue.toLocaleString('id-ID')}</div>
             <p className={`text-xs ${revenueGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {revenueGrowth >= 0 ? '+' : ''}{revenueGrowth.toFixed(1)}% dari bulan lalu
             </p>
@@ -132,105 +168,118 @@ export const KeuanganDashboard = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Transaksi</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Target Achievement</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{currentMonthBookings?.length || 0}</div>
+            <div className={`text-2xl font-bold ${targetAchievement >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
+              {targetAchievement.toFixed(1)}%
+            </div>
             <p className="text-xs text-muted-foreground">
-              Rata-rata Rp {currentMonthBookings?.length ? Math.round(currentMonthRevenue / currentMonthBookings.length).toLocaleString('id-ID') : 0} per transaksi
+              Target: Rp {currentTarget.toLocaleString('id-ID')}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Installment Revenue</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Installments</CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Rp {installmentRevenue.toLocaleString('id-ID')}</div>
+            <div className="text-2xl font-bold">Rp {installmentAnalysis.totalInstallmentAmount.toLocaleString('id-ID')}</div>
             <p className="text-xs text-muted-foreground">
-              {currentMonthRevenue > 0 ? ((installmentRevenue / currentMonthRevenue) * 100).toFixed(1) : 0}% dari total revenue
+              {installmentAnalysis.totalInstallments} pembayaran
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rata-rata Harian</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Outstanding Payments</CardTitle>
+            <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Rp {dailyAverage.toLocaleString('id-ID')}</div>
+            <div className="text-2xl font-bold text-red-600">Rp {totalOutstanding.toLocaleString('id-ID')}</div>
             <p className="text-xs text-muted-foreground">
-              Berdasarkan {new Date().getDate()} hari berjalan
+              {outstandingPayments.length} booking belum lunas
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Revenue Trends */}
+      {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly Revenue Trend */}
+        {/* Daily Revenue Trend - Composed Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>Tren Revenue 6 Bulan Terakhir</CardTitle>
-            <CardDescription>Perbandingan revenue bulanan termasuk installment</CardDescription>
+            <CardTitle>Tren Revenue Harian</CardTitle>
+            <CardDescription>Perkembangan pendapatan per hari bulan ini</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer
               config={{
-                revenue: { label: "Revenue", color: "hsl(var(--chart-1))" }
+                revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
+                bookings: { label: "Bookings", color: "hsl(var(--chart-2))" }
               }}
               className="h-[300px]"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={monthlyData}>
+                <ComposedChart data={dailyRevenue}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
+                  <XAxis dataKey="day" />
+                  <YAxis yAxisId="left" />
+                  <YAxis yAxisId="right" orientation="right" />
                   <ChartTooltip 
                     content={<ChartTooltipContent />}
-                    formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Revenue']}
+                    formatter={(value, name) => [
+                      name === 'revenue' ? `Rp ${Number(value).toLocaleString('id-ID')}` : value,
+                      name === 'revenue' ? 'Revenue' : 'Bookings'
+                    ]}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="revenue" 
-                    stroke="hsl(var(--chart-1))" 
-                    strokeWidth={3}
-                    dot={{ fill: "hsl(var(--chart-1))", strokeWidth: 2, r: 4 }}
-                  />
-                </LineChart>
+                  <Bar yAxisId="left" dataKey="revenue" fill="hsl(var(--chart-1))" />
+                  <Line yAxisId="right" type="monotone" dataKey="bookings" stroke="hsl(var(--chart-2))" strokeWidth={2} />
+                </ComposedChart>
               </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
         </Card>
 
-        {/* Payment Methods Distribution */}
+        {/* Payment Method Distribution */}
         <Card>
           <CardHeader>
             <CardTitle>Distribusi Metode Pembayaran</CardTitle>
-            <CardDescription>Breakdown revenue berdasarkan metode pembayaran</CardDescription>
+            <CardDescription>Revenue berdasarkan metode pembayaran</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer
               config={{
-                revenue: { label: "Revenue", color: "hsl(var(--chart-2))" }
+                revenue: { label: "Revenue" }
               }}
               className="h-[300px]"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={paymentMethods}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="method" />
-                  <YAxis />
+                <PieChart>
+                  <Pie
+                    data={paymentData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ method, revenue, percent }) => 
+                      `${method}: ${(percent * 100).toFixed(1)}%`
+                    }
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="revenue"
+                  >
+                    {paymentData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
                   <ChartTooltip
-                    content={<ChartTooltipContent />}
                     formatter={(value) => [`Rp ${Number(value).toLocaleString('id-ID')}`, 'Revenue']}
                   />
-                  <Bar dataKey="revenue" fill="hsl(var(--chart-2))" />
-                </BarChart>
+                </PieChart>
               </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
@@ -238,96 +287,125 @@ export const KeuanganDashboard = () => {
       </div>
 
       {/* Financial Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Installment Summary */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Revenue Breakdown
+              <CreditCard className="h-5 w-5" />
+              Ringkasan Installment
             </CardTitle>
-            <CardDescription>Rincian sumber revenue bulan ini</CardDescription>
+            <CardDescription>
+              Pembayaran cicilan bulan ini
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Direct Bookings:</span>
-                <span className="font-medium">Rp {(currentMonthRevenue - installmentRevenue).toLocaleString('id-ID')}</span>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span>Total Installments:</span>
+                <span className="font-medium">{installmentAnalysis.totalInstallments}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Installments:</span>
-                <span className="font-medium text-blue-600">Rp {installmentRevenue.toLocaleString('id-ID')}</span>
+              <div className="flex justify-between items-center">
+                <span>Total Amount:</span>
+                <span className="font-medium text-primary">Rp {installmentAnalysis.totalInstallmentAmount.toLocaleString('id-ID')}</span>
               </div>
-              <div className="border-t pt-2 mt-2">
-                <div className="flex justify-between font-semibold">
-                  <span>Total:</span>
-                  <span>Rp {currentMonthRevenue.toLocaleString('id-ID')}</span>
-                </div>
+              <div className="flex justify-between items-center">
+                <span>Online Payments:</span>
+                <span className="font-medium text-blue-600">{installmentAnalysis.onlineInstallments}</span>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Growth Metrics
-            </CardTitle>
-            <CardDescription>Performa pertumbuhan keuangan</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Month over Month:</span>
-                <span className={`font-medium ${revenueGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {revenueGrowth >= 0 ? '+' : ''}{revenueGrowth.toFixed(1)}%
-                </span>
+              <div className="flex justify-between items-center">
+                <span>Offline Payments:</span>
+                <span className="font-medium text-green-600">{installmentAnalysis.offlineInstallments}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Best Month (6M):</span>
-                <span className="font-medium text-primary">
-                  {monthlyData.reduce((best, month) => 
-                    month.revenue > best.revenue ? month : best, monthlyData[0]
-                  )?.month || 'N/A'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Avg Monthly:</span>
+              <div className="flex justify-between items-center">
+                <span>Avg per Payment:</span>
                 <span className="font-medium">
-                  Rp {monthlyData.length ? Math.round(
-                    monthlyData.reduce((sum, month) => sum + month.revenue, 0) / monthlyData.length
-                  ).toLocaleString('id-ID') : 0}
+                  Rp {installmentAnalysis.totalInstallments > 0 ? Math.round(installmentAnalysis.totalInstallmentAmount / installmentAnalysis.totalInstallments).toLocaleString('id-ID') : 0}
                 </span>
               </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* Outstanding Summary */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <PieChartIcon className="h-5 w-5" />
-              Payment Analytics
+              <AlertCircle className="h-5 w-5" />
+              Outstanding Payments
             </CardTitle>
-            <CardDescription>Analisis metode pembayaran</CardDescription>
+            <CardDescription>
+              Pembayaran yang belum selesai
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {paymentMethods.map((method, index) => (
-                <div key={method.method} className="flex justify-between">
-                  <span className="capitalize">{method.method}:</span>
-                  <div className="text-right">
-                    <span className="font-medium">Rp {method.revenue.toLocaleString('id-ID')}</span>
-                    <div className="text-xs text-muted-foreground">
-                      {currentMonthRevenue > 0 ? ((method.revenue / currentMonthRevenue) * 100).toFixed(1) : 0}%
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span>Booking Belum Lunas:</span>
+                <span className="font-medium text-red-600">{outstandingPayments.length}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Total Outstanding:</span>
+                <span className="font-medium text-red-600">Rp {totalOutstanding.toLocaleString('id-ID')}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Avg per Booking:</span>
+                <span className="font-medium">
+                  Rp {outstandingPayments.length > 0 ? Math.round(totalOutstanding / outstandingPayments.length).toLocaleString('id-ID') : 0}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Collection Rate:</span>
+                <span className={`font-medium ${((currentRevenue / (currentRevenue + totalOutstanding)) * 100) >= 90 ? 'text-green-600' : 'text-orange-600'}`}>
+                  {((currentRevenue / (currentRevenue + totalOutstanding)) * 100).toFixed(1)}%
+                </span>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Monthly Progress */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Progress Bulanan
+          </CardTitle>
+          <CardDescription>
+            Pencapaian target dan proyeksi pendapatan
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span>Target Bulan Ini:</span>
+              <span className="font-bold text-xl">Rp {currentTarget.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>Sudah Tercapai:</span>
+              <span className="font-bold text-xl text-primary">Rp {currentRevenue.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>Sisa Target:</span>
+              <span className={`font-bold text-xl ${currentTarget - currentRevenue <= 0 ? 'text-green-600' : 'text-orange-600'}`}>
+                Rp {Math.max(0, currentTarget - currentRevenue).toLocaleString('id-ID')}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-4">
+              <div 
+                className={`h-4 rounded-full ${targetAchievement >= 100 ? 'bg-green-500' : 'bg-blue-500'}`}
+                style={{ width: `${Math.min(100, targetAchievement)}%` }}
+              ></div>
+            </div>
+            <div className="text-center">
+              <span className={`text-2xl font-bold ${targetAchievement >= 100 ? 'text-green-600' : 'text-blue-600'}`}>
+                {targetAchievement.toFixed(1)}% Target Tercapai
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

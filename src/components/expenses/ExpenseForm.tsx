@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
-import type { Expense } from '@/types/expenses';
+import type { Expense } from '@/pages/expenses/ExpensesPage';
 
 const expenseSchema = z.object({
   title: z.string().min(1, 'Title is required'),
