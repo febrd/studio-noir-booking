@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +14,7 @@ import { toast } from 'sonner';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { formatDateTimeWITA, parseWITAToUTC } from '@/utils/timezoneUtils';
 import QRISPaymentDialog from '@/components/QRISPaymentDialog';
+import PaymentMethodSelection from '@/components/PaymentMethodSelection';
 
 interface Package {
   id: string;
@@ -72,10 +74,14 @@ const SelfPhotoCheckoutPage = () => {
   // Payment dialog state
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [selectedPendingBooking, setSelectedPendingBooking] = useState<any>(null);
+  
+  // Payment method selection state
+  const [showPaymentMethodSelection, setShowPaymentMethodSelection] = useState(false);
+  const [currentBooking, setCurrentBooking] = useState<any>(null);
 
   // Check for pending bookings
   const { data: pendingBookings = [], refetch: refetchPendingBookings } = useQuery({
-    queryKey: ['pending-bookings-self-photo', userProfile?.id],
+    queryKey: ['pending-bookings', userProfile?.id],
     queryFn: async () => {
       if (!userProfile?.id) return [];
       
@@ -423,7 +429,7 @@ const SelfPhotoCheckoutPage = () => {
       <button
         className={`
           w-9 h-9 text-sm rounded-md transition-colors
-          ${isSelected ? 'bg-orange-500 text-white hover:bg-orange-600' : 
+          ${isSelected ? 'bg-blue-500 text-white hover:bg-blue-600' : 
             isUnavailable ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 
             'bg-white border border-green-500 hover:bg-green-50 cursor-pointer'}
           ${isToday && !isSelected ? 'border-2 border-blue-500' : ''}
@@ -493,7 +499,7 @@ const SelfPhotoCheckoutPage = () => {
           end_time: endDateTimeUTC.toISOString(),
           status: 'pending',
           total_amount: totalAmount,
-          payment_method: 'online',
+          payment_method: 'offline', // Will be updated based on payment method selection
           type: 'self_photo',
           performed_by: userProfile.id
         })
@@ -523,9 +529,10 @@ const SelfPhotoCheckoutPage = () => {
         }
       }
 
-      toast.success('Booking berhasil dibuat! Silakan lakukan pembayaran.');
-      refetchPendingBookings();
-      navigate('/customer/order-history');
+      // Set current booking and show payment method selection
+      setCurrentBooking(data);
+      setShowPaymentMethodSelection(true);
+
     } catch (error) {
       console.error('Error creating booking:', error);
       toast.error('Gagal membuat booking');
@@ -537,6 +544,17 @@ const SelfPhotoCheckoutPage = () => {
   const handlePayment = (booking: any) => {
     setSelectedPendingBooking(booking);
     setShowPaymentDialog(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    refetchPendingBookings();
+    navigate('/customer/order-history');
+  };
+
+  const getAdditionalServicesNames = () => {
+    return additionalServices
+      .filter(service => (selectedServices[service.id] || 0) > 0)
+      .map(service => `${service.name} x${selectedServices[service.id]}`);
   };
 
   if (packageLoading) {
@@ -670,8 +688,8 @@ const SelfPhotoCheckoutPage = () => {
                         </div>
                       </div>
                     </div>
-                    <Badge className="bg-red-50 text-red-600 border-red-200 font-peace-sans font-bold self-start">
-                      Sesi Self Photo 
+                    <Badge className="bg-purple-50 text-purple-600 border-purple-200 font-peace-sans font-bold self-start">
+                      Self Photo Session 
                     </Badge>
                   </div>
                 </CardHeader>
@@ -973,7 +991,7 @@ const SelfPhotoCheckoutPage = () => {
                 </Card>
               )}
 
-              {/* Final Booking Summary - Fixed price alignment */}
+              {/* Final Booking Summary */}
               {selectedDate && selectedTimeSlot && (
                 <Card className="border border-gray-100 shadow-none bg-gray-50">
                   <CardHeader className="p-4 md:p-6">
@@ -1034,6 +1052,21 @@ const SelfPhotoCheckoutPage = () => {
           )}
         </div>
       </div>
+
+      {/* Payment Method Selection Dialog */}
+      {currentBooking && (
+        <PaymentMethodSelection
+          isOpen={showPaymentMethodSelection}
+          onClose={() => setShowPaymentMethodSelection(false)}
+          booking={currentBooking}
+          totalAmount={calculateTotal()}
+          customerName={userProfile?.name || 'Customer'}
+          studioName={packageData?.studios?.name || 'Studio'}
+          packageTitle={packageData?.title || 'Package'}
+          additionalServices={getAdditionalServicesNames()}
+          onPaymentSuccess={handlePaymentSuccess}
+        />
+      )}
 
       {/* QRIS Payment Dialog */}
       <QRISPaymentDialog

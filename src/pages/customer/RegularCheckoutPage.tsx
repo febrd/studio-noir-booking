@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { formatDateTimeWITA, parseWITAToUTC } from '@/utils/timezoneUtils';
 import QRISPaymentDialog from '@/components/QRISPaymentDialog';
+import PaymentMethodSelection from '@/components/PaymentMethodSelection';
 
 interface Package {
   id: string;
@@ -72,6 +73,10 @@ const RegularCheckoutPage = () => {
   // Payment dialog state
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [selectedPendingBooking, setSelectedPendingBooking] = useState<any>(null);
+  
+  // Payment method selection state
+  const [showPaymentMethodSelection, setShowPaymentMethodSelection] = useState(false);
+  const [currentBooking, setCurrentBooking] = useState<any>(null);
 
   // Check for pending bookings
   const { data: pendingBookings = [], refetch: refetchPendingBookings } = useQuery({
@@ -493,7 +498,7 @@ const RegularCheckoutPage = () => {
           end_time: endDateTimeUTC.toISOString(),
           status: 'pending',
           total_amount: totalAmount,
-          payment_method: 'online',
+          payment_method: 'offline', // Will be updated based on payment method selection
           type: 'regular',
           performed_by: userProfile.id
         })
@@ -523,9 +528,10 @@ const RegularCheckoutPage = () => {
         }
       }
 
-      toast.success('Booking berhasil dibuat! Silakan lakukan pembayaran.');
-      refetchPendingBookings();
-      navigate('/customer/order-history');
+      // Set current booking and show payment method selection
+      setCurrentBooking(data);
+      setShowPaymentMethodSelection(true);
+
     } catch (error) {
       console.error('Error creating booking:', error);
       toast.error('Gagal membuat booking');
@@ -537,6 +543,17 @@ const RegularCheckoutPage = () => {
   const handlePayment = (booking: any) => {
     setSelectedPendingBooking(booking);
     setShowPaymentDialog(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    refetchPendingBookings();
+    navigate('/customer/order-history');
+  };
+
+  const getAdditionalServicesNames = () => {
+    return additionalServices
+      .filter(service => (selectedServices[service.id] || 0) > 0)
+      .map(service => `${service.name} x${selectedServices[service.id]}`);
   };
 
   if (packageLoading) {
@@ -1034,6 +1051,21 @@ const RegularCheckoutPage = () => {
           )}
         </div>
       </div>
+
+      {/* Payment Method Selection Dialog */}
+      {currentBooking && (
+        <PaymentMethodSelection
+          isOpen={showPaymentMethodSelection}
+          onClose={() => setShowPaymentMethodSelection(false)}
+          booking={currentBooking}
+          totalAmount={calculateTotal()}
+          customerName={userProfile?.name || 'Customer'}
+          studioName={packageData?.studios?.name || 'Studio'}
+          packageTitle={packageData?.title || 'Package'}
+          additionalServices={getAdditionalServicesNames()}
+          onPaymentSuccess={handlePaymentSuccess}
+        />
+      )}
 
       {/* QRIS Payment Dialog */}
       <QRISPaymentDialog

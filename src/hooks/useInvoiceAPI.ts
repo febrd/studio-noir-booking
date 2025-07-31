@@ -9,6 +9,8 @@ export const useInvoiceAPI = () => {
     setLoading(true);
     
     try {
+      console.log('Creating invoice with data:', invoiceData);
+      
       const response = await fetch('/v1/create/invoice', {
         method: 'POST',
         headers: {
@@ -37,6 +39,8 @@ export const useInvoiceAPI = () => {
     setLoading(true);
     
     try {
+      console.log('Getting invoice with data:', invoiceData);
+      
       const response = await fetch('/v1/get/invoice', {
         method: 'POST',
         headers: {
