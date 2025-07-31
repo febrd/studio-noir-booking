@@ -1,4 +1,3 @@
-
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
 import { OwnerDashboard } from '@/components/Dashboard/OwnerDashboard';
@@ -6,6 +5,7 @@ import { AdminDashboard } from '@/components/Dashboard/AdminDashboard';
 import { KeuanganDashboard } from '@/components/Dashboard/KeuanganDashboard';
 import PelangganDashboard from '@/components/Dashboard/PelangganDashboard';
 import { Loader2 } from 'lucide-react';
+import { InvoiceTestPanel } from '@/components/InvoiceTestPanel';
 
 const JWTDashboard = () => {
   const { userProfile, loading } = useJWTAuth();
@@ -38,7 +38,15 @@ const JWTDashboard = () => {
     
     switch (userProfile.role) {
       case 'owner':
-        return <OwnerDashboard />;
+        return (
+          <div className="space-y-6">
+            <OwnerDashboard />
+            {/* Add test panel for owner */}
+            <div className="flex justify-center">
+              <InvoiceTestPanel />
+            </div>
+          </div>
+        );
       case 'admin':
         return <AdminDashboard />;
       case 'keuangan':
