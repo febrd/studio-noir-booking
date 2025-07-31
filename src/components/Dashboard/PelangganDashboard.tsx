@@ -3,25 +3,24 @@ import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, Package, Clock, MapPin, Camera, CreditCard } from 'lucide-react';
+import { CalendarDays, Package, Clock, MapPin, Camera } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import QRISPaymentDialog from '@/components/QRISPaymentDialog';
+import DynamicPaymentButton from '@/components/DynamicPaymentButton';
 import { formatDateTimeWITA } from '@/utils/timezoneUtils';
 
 const PelangganDashboard = () => {
   const { userProfile } = useJWTAuth();
-  const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<any>(null);
 
   // You can customize this QRIS image URL
   const qrisImageUrl = "https://i.imgur.com/6U2GMax.jpeg";
 
   // Fetch user's bookings
-  const { data: bookings = [], isLoading } = useQuery({
+  const { data: bookings = [], isLoading, refetch: refetchBookings } = useQuery({
     queryKey: ['user-bookings', userProfile?.id],
     queryFn: async () => {
       if (!userProfile?.id) return [];
@@ -35,6 +34,7 @@ const PelangganDashboard = () => {
           status,
           total_amount,
           type,
+          payment_method,
           created_at,
           studio_packages!inner(title, description),
           studios!inner(name, type),
@@ -90,13 +90,17 @@ const PelangganDashboard = () => {
     const totalSpending = bookings
       .filter(b => b.status === 'paid' || b.status === 'confirmed' || b.status === 'completed')
       .reduce((sum, b) => sum + (b.total_amount || 0), 0);
-    const pendingBookings = bookings.filter(b => b.status === 'pending').length;
+    const pendingBookings = bookings.filter(b => 
+      b.status === 'pending' || b.status === 'installment'
+    ).length;
     
     return { totalBookings, totalSpending, pendingBookings };
   }, [bookings]);
 
   const recentBookings = bookings.slice(0, 5);
-  const pendingBookings = bookings.filter(b => b.status === 'pending');
+  const pendingBookings = bookings.filter(b => 
+    b.status === 'pending' || b.status === 'installment'
+  );
 
   const getStatusBadgeStyle = (status: string) => {
     switch (status) {
@@ -104,6 +108,8 @@ const PelangganDashboard = () => {
         return 'bg-green-50 text-green-600 border-green-200';
       case 'pending':
         return 'bg-yellow-50 text-yellow-600 border-yellow-200';
+      case 'installment':
+        return 'bg-purple-50 text-purple-600 border-purple-200';
       case 'completed':
         return 'bg-blue-50 text-blue-600 border-blue-200';
       case 'cancelled':
@@ -118,7 +124,8 @@ const PelangganDashboard = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'confirmed': return 'Dikonfirmasi';
-      case 'pending': return 'Menunggu';
+      case 'pending': return 'Menunggu Pembayaran';
+      case 'installment': return 'Cicilan';
       case 'completed': return 'Selesai';
       case 'cancelled': return 'Dibatalkan';
       case 'paid': return 'Dibayar';
@@ -126,8 +133,9 @@ const PelangganDashboard = () => {
     }
   };
 
-  const handlePayment = (booking: any) => {
-    setSelectedBookingForPayment(booking);
+  const handlePaymentUpdate = () => {
+    // Refresh bookings setelah update pembayaran
+    refetchBookings();
   };
 
   if (isLoading) {
@@ -226,7 +234,7 @@ const PelangganDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Pending Payments Section */}
+      {/* Pending Payments Section - Updated dengan Dynamic Button */}
       {pendingBookings.length > 0 && (
         <Card className="border border-orange-200 shadow-sm bg-orange-50">
           <CardHeader className="p-4 md:p-6">
@@ -261,13 +269,11 @@ const PelangganDashboard = () => {
                         minimumFractionDigits: 0 
                       })}
                     </p>
-                    <Button
-                      onClick={() => handlePayment(booking)}
-                      className="bg-green-600 hover:bg-green-700 text-white font-peace-sans font-bold"
-                    >
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Bayar
-                    </Button>
+                    <DynamicPaymentButton 
+                      booking={booking}
+                      qrisImageUrl={qrisImageUrl}
+                      onPaymentUpdate={handlePaymentUpdate}
+                    />
                   </div>
                 </div>
               ))}
@@ -356,7 +362,7 @@ const PelangganDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Recent Bookings */}
+        {/* Recent Bookings - Updated dengan Dynamic Button */}
         <Card className="border border-gray-100 shadow-sm">
           <CardHeader className="p-4 md:p-6">
             <div className="flex items-center justify-between">
@@ -410,6 +416,15 @@ const PelangganDashboard = () => {
                           minimumFractionDigits: 0 
                         })}
                       </p>
+                      
+                      {/* Show payment button if pending or installment */}
+                      {(booking.status === 'pending' || booking.status === 'installment') && (
+                        <DynamicPaymentButton 
+                          booking={booking}
+                          qrisImageUrl={qrisImageUrl}
+                          onPaymentUpdate={handlePaymentUpdate}
+                        />
+                      )}
                     </div>
                   </div>
                 ))}
@@ -445,16 +460,6 @@ const PelangganDashboard = () => {
             </Link>
           </CardContent>
         </Card>
-      )}
-
-      {/* QRIS Payment Dialog */}
-      {selectedBookingForPayment && (
-        <QRISPaymentDialog
-          isOpen={!!selectedBookingForPayment}
-          onClose={() => setSelectedBookingForPayment(null)}
-          qrisImageUrl={qrisImageUrl}
-          booking={selectedBookingForPayment}
-        />
       )}
     </div>
   );
