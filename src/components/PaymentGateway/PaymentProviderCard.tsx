@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Edit, Trash2, Settings } from 'lucide-react';
+import { Edit, Trash2, Settings, Eye, EyeOff } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -15,6 +15,10 @@ interface PaymentProvider {
   client_id: string | null;
   client_secret: string | null;
   server_key: string | null;
+  api_key: string | null;
+  secret_key: string | null;
+  public_key: string | null;
+  api_url: string | null;
   environment: 'sandbox' | 'production';
   status: 'active' | 'inactive';
   created_at: string;
@@ -33,6 +37,7 @@ export const PaymentProviderCard = ({
   onDelete,
 }: PaymentProviderCardProps) => {
   const [isActive, setIsActive] = useState(provider.status === 'active');
+  const [showApiKey, setShowApiKey] = useState(false);
   const queryClient = useQueryClient();
 
   const toggleStatusMutation = useMutation({
@@ -46,7 +51,7 @@ export const PaymentProviderCard = ({
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Status provider berhasil diubah');
+      toast.success('Status Xendit provider berhasil diubah');
       queryClient.invalidateQueries({ queryKey: ['payment-providers'] });
     },
     onError: (error: any) => {
@@ -63,9 +68,14 @@ export const PaymentProviderCard = ({
   };
 
   const handleDelete = () => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus provider "${provider.name}"?`)) {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus Xendit provider "${provider.name}"?`)) {
       onDelete(provider.id);
     }
+  };
+
+  const maskApiKey = (key: string) => {
+    if (!key) return 'Not set';
+    return key.substring(0, 8) + '...' + key.substring(key.length - 4);
   };
 
   return (
@@ -91,14 +101,28 @@ export const PaymentProviderCard = ({
       
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          {provider.client_id && (
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Client ID:</span>
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted-foreground">API Key:</span>
+            <div className="flex items-center gap-2">
               <span className="font-mono text-xs">
-                {provider.client_id.substring(0, 8)}...
+                {showApiKey && provider.api_key ? provider.api_key : maskApiKey(provider.api_key || '')}
               </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="h-6 w-6 p-0"
+              >
+                {showApiKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+              </Button>
             </div>
-          )}
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">API URL:</span>
+            <span className="font-mono text-xs">
+              {provider.api_url || 'Not set'}
+            </span>
+          </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Created:</span>
             <span>{new Date(provider.created_at).toLocaleDateString('id-ID')}</span>

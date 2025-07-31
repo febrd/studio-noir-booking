@@ -18,29 +18,37 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    client_id: '',
-    client_secret: '',
-    server_key: '',
+    api_key: '',
+    secret_key: '',
+    public_key: '',
+    api_url: 'https://api.xendit.co',
     environment: 'sandbox' as 'sandbox' | 'production',
     status: 'active' as 'active' | 'inactive'
   });
 
   const addProviderMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      console.log('Adding payment provider:', data);
+      console.log('Adding Xendit payment provider:', data);
       
       // Validate required fields
       if (!data.name.trim()) {
         throw new Error('Nama provider harus diisi');
+      }
+      if (!data.api_key.trim()) {
+        throw new Error('API Key harus diisi');
+      }
+      if (!data.secret_key.trim()) {
+        throw new Error('Secret Key harus diisi');
       }
 
       const { data: result, error } = await supabase
         .from('payment_providers')
         .insert({
           name: data.name.trim(),
-          client_id: data.client_id.trim() || null,
-          client_secret: data.client_secret.trim() || null,
-          server_key: data.server_key.trim() || null,
+          api_key: data.api_key.trim(),
+          secret_key: data.secret_key.trim(),
+          public_key: data.public_key.trim() || null,
+          api_url: data.api_url.trim(),
           environment: data.environment,
           status: data.status
         })
@@ -54,12 +62,13 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
       return result;
     },
     onSuccess: () => {
-      toast.success('Payment provider berhasil ditambahkan');
+      toast.success('Xendit provider berhasil ditambahkan');
       setFormData({
         name: '',
-        client_id: '',
-        client_secret: '',
-        server_key: '',
+        api_key: '',
+        secret_key: '',
+        public_key: '',
+        api_url: 'https://api.xendit.co',
         environment: 'sandbox',
         status: 'active'
       });
@@ -67,8 +76,8 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
       onSuccess();
     },
     onError: (error: any) => {
-      console.error('Error adding payment provider:', error);
-      toast.error('Gagal menambahkan payment provider: ' + error.message);
+      console.error('Error adding Xendit provider:', error);
+      toast.error('Gagal menambahkan Xendit provider: ' + error.message);
     },
   });
 
@@ -80,9 +89,10 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
   const resetForm = () => {
     setFormData({
       name: '',
-      client_id: '',
-      client_secret: '',
-      server_key: '',
+      api_key: '',
+      secret_key: '',
+      public_key: '',
+      api_url: 'https://api.xendit.co',
       environment: 'sandbox',
       status: 'active'
     });
@@ -100,12 +110,12 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
       <DialogTrigger asChild>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
-          Tambah Provider
+          Tambah Xendit Provider
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Tambah Payment Provider</DialogTitle>
+          <DialogTitle>Tambah Xendit Payment Provider</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -114,7 +124,7 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
               id="name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Contoh: Midtrans, Xendit, dll"
+              placeholder="Contoh: Xendit Production, Xendit Sandbox"
               required
             />
           </div>
@@ -158,34 +168,46 @@ export const AddPaymentProviderForm = ({ onSuccess }: AddPaymentProviderFormProp
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="client_id">Client ID</Label>
+            <Label htmlFor="api_key">API Key *</Label>
             <Input
-              id="client_id"
-              value={formData.client_id}
-              onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
-              placeholder="Client ID (opsional)"
+              id="api_key"
+              type="password"
+              value={formData.api_key}
+              onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
+              placeholder="xnd_development_... atau xnd_production_..."
+              required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="client_secret">Client Secret</Label>
+            <Label htmlFor="secret_key">Secret Key *</Label>
             <Input
-              id="client_secret"
+              id="secret_key"
               type="password"
-              value={formData.client_secret}
-              onChange={(e) => setFormData({ ...formData, client_secret: e.target.value })}
-              placeholder="Client Secret (opsional)"
+              value={formData.secret_key}
+              onChange={(e) => setFormData({ ...formData, secret_key: e.target.value })}
+              placeholder="Xendit Secret Key"
+              required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="server_key">Server Key</Label>
+            <Label htmlFor="public_key">Public Key</Label>
             <Input
-              id="server_key"
-              type="password"
-              value={formData.server_key}
-              onChange={(e) => setFormData({ ...formData, server_key: e.target.value })}
-              placeholder="Server Key (opsional)"
+              id="public_key"
+              value={formData.public_key}
+              onChange={(e) => setFormData({ ...formData, public_key: e.target.value })}
+              placeholder="Xendit Public Key (opsional)"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="api_url">API URL</Label>
+            <Input
+              id="api_url"
+              value={formData.api_url}
+              onChange={(e) => setFormData({ ...formData, api_url: e.target.value })}
+              placeholder="https://api.xendit.co"
             />
           </div>
 

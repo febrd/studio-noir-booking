@@ -635,34 +635,46 @@ export type Database = {
       }
       payment_providers: {
         Row: {
+          api_key: string | null
+          api_url: string | null
           client_id: string | null
           client_secret: string | null
           created_at: string
           environment: Database["public"]["Enums"]["payment_environment"]
           id: string
           name: string
+          public_key: string | null
+          secret_key: string | null
           server_key: string | null
           status: Database["public"]["Enums"]["provider_status"]
           updated_at: string
         }
         Insert: {
+          api_key?: string | null
+          api_url?: string | null
           client_id?: string | null
           client_secret?: string | null
           created_at?: string
           environment?: Database["public"]["Enums"]["payment_environment"]
           id?: string
           name: string
+          public_key?: string | null
+          secret_key?: string | null
           server_key?: string | null
           status?: Database["public"]["Enums"]["provider_status"]
           updated_at?: string
         }
         Update: {
+          api_key?: string | null
+          api_url?: string | null
           client_id?: string | null
           client_secret?: string | null
           created_at?: string
           environment?: Database["public"]["Enums"]["payment_environment"]
           id?: string
           name?: string
+          public_key?: string | null
+          secret_key?: string | null
           server_key?: string | null
           status?: Database["public"]["Enums"]["provider_status"]
           updated_at?: string

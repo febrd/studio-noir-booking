@@ -15,6 +15,10 @@ interface PaymentProvider {
   client_id: string | null;
   client_secret: string | null;
   server_key: string | null;
+  api_key: string | null;
+  secret_key: string | null;
+  public_key: string | null;
+  api_url: string | null;
   environment: 'sandbox' | 'production';
   status: 'active' | 'inactive';
   created_at: string;
@@ -121,9 +125,9 @@ const PaymentProviders = () => {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Payment Gateway</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Xendit Payment Gateway</h1>
             <p className="text-muted-foreground">
-              Kelola provider pembayaran untuk sistem booking
+              Kelola konfigurasi Xendit untuk sistem pembayaran
             </p>
           </div>
           
@@ -132,9 +136,9 @@ const PaymentProviders = () => {
 
         {providers && providers.length === 0 ? (
           <div className="text-center py-12">
-            <h3 className="text-lg font-semibold mb-2">Belum ada payment provider</h3>
+            <h3 className="text-lg font-semibold mb-2">Belum ada Xendit provider</h3>
             <p className="text-muted-foreground mb-4">
-              Tambahkan payment provider pertama Anda untuk mulai menerima pembayaran
+              Tambahkan konfigurasi Xendit pertama Anda untuk mulai menerima pembayaran
             </p>
           </div>
         ) : (
