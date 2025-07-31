@@ -14,7 +14,6 @@ import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { formatDateTimeWITA, parseWITAToUTC } from '@/utils/timezoneUtils';
 import QRISPaymentDialog from '@/components/QRISPaymentDialog';
 import PaymentMethodSelection from '@/components/PaymentMethodSelection';
-import { useInvoiceAPI } from '@/hooks/useInvoiceAPI';
 
 interface PackageCategory {
   id: string;
@@ -54,46 +53,11 @@ interface BookedSlot {
   id: string;
 }
 
-// Simplified types to avoid TypeScript complexity
-interface Transaction {
-  id: string;
-  amount: number;
-  status: string;
-  payment_type: string;
-  created_at: string;
-}
-
-interface Installment {
-  id: string;
-  amount: number;
-  installment_number: number;
-}
-
-interface PendingBooking {
-  id: string;
-  start_time: string;
-  end_time: string;
-  total_amount: number;
-  status: string;
-  studio_packages: {
-    title: string;
-  } | null;
-  booking_additional_services: Array<{
-    quantity: number;
-    additional_services: {
-      name: string;
-    } | null;
-  }>;
-  transactions: Transaction[];
-  installments: Installment[];
-}
-
 const RegularCheckoutPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const packageId = searchParams.get('package');
   const { userProfile } = useJWTAuth();
-  const { createInvoice, getInvoice, loading: invoiceLoading } = useInvoiceAPI();
 
   const [selectedCategory, setSelectedCategory] = useState<PackageCategory | null>(null);
   const [selectedServices, setSelectedServices] = useState<{ [key: string]: number }>({});
@@ -106,7 +70,7 @@ const RegularCheckoutPage = () => {
   const [showPaymentMethodSelection, setShowPaymentMethodSelection] = useState(false);
   const [selectedPendingBooking, setSelectedPendingBooking] = useState<any>(null);
 
-  // Check for pending bookings with transaction status - simplified type handling
+  // Check for pending bookings with transaction status
   const { data: pendingBookings = [], refetch: refetchPendingBookings } = useQuery({
     queryKey: ['pending-regular-bookings-with-transactions', userProfile?.id],
     queryFn: async () => {
@@ -147,7 +111,6 @@ const RegularCheckoutPage = () => {
         return [];
       }
 
-      // Return data without complex type casting to avoid TypeScript issues
       return data || [];
     },
     enabled: !!userProfile?.id
@@ -452,13 +415,15 @@ const RegularCheckoutPage = () => {
       const firstInstallmentTx = installmentTransactions[0];
 
       try {
-        const response = await getInvoice({
-          performed_by: userProfile?.id || '',
-          external_id: `installment-${booking.id}-1-${Date.now()}`
+        const response = await supabase.functions.invoke('xendit-get-invoice', {
+          body: {
+            performed_by: userProfile?.id,
+            transaction_id: firstInstallmentTx.id
+          }
         });
 
-        if (response.success && response.data?.invoice) {
-          const invoiceStatus = response.data.invoice.status;
+        if (response.data?.success && response.data?.data?.invoice) {
+          const invoiceStatus = response.data.data.invoice.status;
 
           if (invoiceStatus === 'SETTLED') {
             await supabase
@@ -473,15 +438,19 @@ const RegularCheckoutPage = () => {
             if (remainingAmount > 0) {
               await handleInstallmentPayment(booking, remainingAmount, 2);
             } else {
-              // Keep status as 'pending' instead of changing to 'paid'
-              toast.success('Semua cicilan sudah lunas! Status booking tetap pending.');
+              await supabase
+                .from('bookings')
+                .update({ status: 'paid' })
+                .eq('id', booking.id);
+
+              toast.success('Semua cicilan sudah lunas!');
               refetchPendingBookings();
             }
           } else if (invoiceStatus === 'EXPIRED') {
             await handleInstallmentPayment(booking, firstInstallmentTx.amount, 1);
           } else {
-            if (response.data.invoice.invoice_url) {
-              window.open(response.data.invoice.invoice_url, '_blank');
+            if (response.data.data.invoice.invoice_url) {
+              window.open(response.data.data.invoice.invoice_url, '_blank');
             }
           }
         }
@@ -491,13 +460,14 @@ const RegularCheckoutPage = () => {
       }
     } else {
       setSelectedPendingBooking(booking);
+      setShowPaymentDialog(true);
     }
   };
 
   const handleInstallmentPayment = async (booking: any, amount: number, installmentNumber: number) => {
     try {
       const invoiceData = {
-        performed_by: userProfile?.id || '',
+        performed_by: userProfile?.id,
         external_id: `installment-${booking.id}-${installmentNumber}-${Date.now()}`,
         amount: amount,
         description: `Cicilan ${installmentNumber} - ${booking.studio_packages?.title}`,
@@ -509,9 +479,11 @@ const RegularCheckoutPage = () => {
         }
       };
 
-      const response = await createInvoice(invoiceData);
+      const response = await supabase.functions.invoke('xendit-create-invoice', {
+        body: invoiceData
+      });
 
-      if (response.success && response.data?.invoice) {
+      if (response.data?.success && response.data?.data?.invoice) {
         const invoice = response.data.data.invoice;
 
         await supabase
@@ -536,8 +508,12 @@ const RegularCheckoutPage = () => {
             status: 'pending'
           });
 
-        // Keep booking status as 'pending' - don't change to 'installment'
-        console.log('Installment created, keeping booking status as pending');
+        if (installmentNumber === 1) {
+          await supabase
+            .from('bookings')
+            .update({ status: 'installment' })
+            .eq('id', booking.id);
+        }
 
         if (invoice.invoice_url) {
           window.open(invoice.invoice_url, '_blank');
@@ -546,7 +522,7 @@ const RegularCheckoutPage = () => {
 
         refetchPendingBookings();
       } else {
-        throw new Error(response.error || 'Gagal membuat invoice cicilan');
+        throw new Error(response.data?.error || 'Gagal membuat invoice cicilan');
       }
     } catch (error) {
       console.error('Error creating installment payment:', error);
