@@ -68,7 +68,6 @@ const RegularCheckoutPage = () => {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [currentBooking, setCurrentBooking] = useState<any>(null);
   const [showPaymentMethodSelection, setShowPaymentMethodSelection] = useState(false);
-  const [selectedPendingBooking, setSelectedPendingBooking] = useState<any>(null);
 
   // Check for pending bookings with transaction status
   const { data: pendingBookings = [], refetch: refetchPendingBookings } = useQuery({
@@ -458,9 +457,6 @@ const RegularCheckoutPage = () => {
         console.error('Error checking invoice status:', error);
         toast.error('Gagal memeriksa status pembayaran');
       }
-    } else {
-      setSelectedPendingBooking(booking);
-      setShowPaymentDialog(true);
     }
   };
 
@@ -527,6 +523,23 @@ const RegularCheckoutPage = () => {
     } catch (error) {
       console.error('Error creating installment payment:', error);
       toast.error('Gagal membuat pembayaran cicilan');
+    }
+  };
+
+  const handleCancelBooking = async (bookingId: string) => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'cancelled' })
+        .eq('id', bookingId);
+
+      if (error) throw error;
+
+      toast.success('Pesanan berhasil dibatalkan');
+      refetchPendingBookings();
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      toast.error('Gagal membatalkan pesanan');
     }
   };
 
@@ -798,6 +811,64 @@ const RegularCheckoutPage = () => {
           </Card>
         )}
 
+        {/* Pending Bookings Section */}
+        {pendingBookings.length > 0 && (
+          <Card className="border border-orange-200 shadow-none bg-orange-50 mb-8">
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="font-peace-sans font-black text-orange-800">
+                Pesanan Belum Selesai
+              </CardTitle>
+              <p className="text-orange-700 font-inter text-sm">
+                Anda memiliki pesanan yang belum diselesaikan pembayarannya
+              </p>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0">
+              {pendingBookings.map((booking) => (
+                <div key={booking.id} className="bg-white p-4 rounded-lg mb-4 last:mb-0">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h4 className="font-peace-sans font-bold text-black mb-1">
+                        {booking.studio_packages?.title}
+                      </h4>
+                      <p className="text-sm text-gray-600 mb-2">
+                        {formatDateTimeWITA(booking.start_time)}
+                      </p>
+                      <Badge className={getStatusColor(booking.status) + ' font-peace-sans font-bold border'}>
+                        {getStatusText(booking.status)}
+                      </Badge>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-600">
+                          Status Pembayaran: {getPaymentStatusText(booking)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handlePayment(booking)}
+                        className="bg-green-600 hover:bg-green-700 text-white font-peace-sans font-bold"
+                        size="sm"
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Bayar Sekarang
+                      </Button>
+                      {booking.status === 'pending' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCancelBooking(booking.id)}
+                          className="border-red-200 text-red-600 hover:bg-red-50 font-peace-sans font-bold"
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Payment Method Selection Dialog */}
         {currentBooking && (
           <PaymentMethodSelection
@@ -815,13 +886,6 @@ const RegularCheckoutPage = () => {
             }}
           />
         )}
-
-        {/* QRIS Payment Dialog */}
-        <QRISPaymentDialog
-          isOpen={!!selectedPendingBooking}
-          onClose={() => setSelectedPendingBooking(null)}
-          booking={selectedPendingBooking}
-        />
       </div>
     </div>
   );
