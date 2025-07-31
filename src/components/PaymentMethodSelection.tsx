@@ -111,7 +111,7 @@ const PaymentMethodSelection = ({
 
       if (invoiceResult.success && invoiceResult.data?.invoice?.invoice_url) {
         // Update booking status and payment method
-        const newStatus = isInstallment ? 'installment' : 'paid';
+        const newStatus = isInstallment ? 'installment' : 'pending';
         
         await supabase
           .from('bookings')

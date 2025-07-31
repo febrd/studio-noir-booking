@@ -2,11 +2,11 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Ganti dengan URL Supabase kamu (self-hosted)
-const SUPABASE_URL = "https://core.masukstudio.com";
+const SUPABASE_URL = "https://dduhjdzhxlwuuzidrzzi.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkdWhqZHpoeGx3dXV6aWRyenppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2Nzg4MzUsImV4cCI6MjA2ODI1NDgzNX0.x4Qc8vZJ3j_u14NE1O3NxjpZLRuOmnAKeBTW6AKJwDY";
 
-// Ganti dengan ANON_KEY dari .env kamu
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE";
+// Import the supabase client like this:
+// import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
