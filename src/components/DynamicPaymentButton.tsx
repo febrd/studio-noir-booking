@@ -128,7 +128,7 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
         return (
           <>
             <ExternalLink className="w-4 h-4 mr-2" />
-            Bayar Sekarang
+            Pay Me
           </>
         );
       } else {

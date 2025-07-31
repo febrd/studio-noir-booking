@@ -38,10 +38,12 @@ export const useXenditInvoiceStatus = (bookingId: string, shouldCheck: boolean =
       if (result.success && result.data) {
         console.log('📊 Xendit invoice data:', result.data);
         console.log('📊 Xendit URL invoice data:', result.data.invoice.invoice_url);
+        console.log('📊 Xendit STATUS invoice:', result.data.invoice.status);
+        console.log('📊 Xendit AMOUNT invoice:', result.data.invoice.amount);
 
-        setStatus(result.data.status);
+        setStatus(result.data.invoice.status);
         setInvoiceUrl(result.data.invoice.invoice_url);
-        setPaidAmount(result.data.paid_amount || result.data.amount);
+        setPaidAmount(result.data.invoice.amount || result.data.invoice.amount);
       } else {
         console.log('❌ Failed to get invoice status:', result.error);
         setError(result.error || 'Gagal mengecek status pembayaran');
