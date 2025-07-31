@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Calendar, Clock, User, DollarSign, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, Clock, User, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -30,23 +30,48 @@ const BookingsPage = () => {
         .select(`
           *,
           studios (name, type),
-          studio_packages (title, price),
-          customers (name, phone, email)
+          studio_packages (title, price)
         `)
-        .order('booking_date', { ascending: false });
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
 
-      return data?.map(booking => ({
-        ...booking,
-        customer_name: booking.customers?.name || 'Unknown',
-        customer_phone: booking.customers?.phone || '',
-        customer_email: booking.customers?.email || '',
-        studio_name: booking.studios?.name || 'Unknown Studio',
-        studio_type: booking.studios?.type || 'unknown',
-        package_title: booking.studio_packages?.title || 'Custom Package',
-        package_price: booking.studio_packages?.price || booking.total_amount || 0
-      })) || [];
+      // Get customer details for each booking
+      let enrichedBookings = [];
+      if (data) {
+        for (const booking of data) {
+          let customerName = 'Unknown Customer';
+          let customerPhone = '';
+          let customerEmail = '';
+
+          if (booking.user_id) {
+            const { data: customer } = await supabase
+              .from('customer_profiles')
+              .select('full_name, phone, email')
+              .eq('id', booking.user_id)
+              .single();
+            
+            if (customer) {
+              customerName = customer.full_name;
+              customerPhone = customer.phone || '';
+              customerEmail = customer.email || '';
+            }
+          }
+
+          enrichedBookings.push({
+            ...booking,
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            customer_email: customerEmail,
+            studio_name: booking.studios?.name || 'Unknown Studio',
+            studio_type: booking.studios?.type || 'unknown',
+            package_title: booking.studio_packages?.title || 'Custom Package',
+            package_price: booking.studio_packages?.price || booking.total_amount || 0
+          });
+        }
+      }
+
+      return enrichedBookings;
     }
   });
 
@@ -115,21 +140,6 @@ const BookingsPage = () => {
     }
   };
 
-  const getPaymentStatusBadge = (status: string) => {
-    switch (status) {
-      case 'paid':
-        return <Badge className="bg-green-100 text-green-800">Paid</Badge>;
-      case 'pending':
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
-      case 'partial':
-        return <Badge className="bg-orange-100 text-orange-800">Partial</Badge>;
-      case 'failed':
-        return <Badge className="bg-red-100 text-red-800">Failed</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="p-6">
@@ -181,7 +191,6 @@ const BookingsPage = () => {
                   </div>
                   <div className="flex gap-2">
                     {getStatusBadge(booking.status)}
-                    {getPaymentStatusBadge(booking.payment_status)}
                     {booking.studio_type === 'self_photo' && (
                       <Badge variant="outline">Self Photo</Badge>
                     )}
@@ -226,12 +235,16 @@ const BookingsPage = () => {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4 text-gray-500" />
-                    <span>{new Date(booking.booking_date).toLocaleDateString('id-ID')}</span>
+                    <span>{new Date(booking.created_at).toLocaleDateString('id-ID')}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="h-4 w-4 text-gray-500" />
-                    <span>{booking.start_time} - {booking.end_time}</span>
-                  </div>
+                  {booking.start_time && booking.end_time && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-gray-500" />
+                      <span>
+                        {new Date(booking.start_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} - {new Date(booking.end_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm">
@@ -247,12 +260,6 @@ const BookingsPage = () => {
                     <DollarSign className="h-4 w-4 text-gray-500" />
                     <span>IDR {booking.total_amount?.toLocaleString('id-ID') || '0'}</span>
                   </div>
-                  {booking.remaining_balance > 0 && (
-                    <div className="flex items-center gap-2 text-sm text-orange-600">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>Sisa: IDR {booking.remaining_balance.toLocaleString('id-ID')}</span>
-                    </div>
-                  )}
                 </div>
               </div>
               {booking.notes && (
@@ -315,29 +322,46 @@ const BookingsPage = () => {
       </AlertDialog>
 
       {/* Installment Manager */}
-      {selectedBooking && (
-        <InstallmentManager
-          isOpen={installmentDialogOpen}
-          onClose={() => {
-            setInstallmentDialogOpen(false);
-            setSelectedBooking(null);
-          }}
-          booking={selectedBooking}
-          onUpdate={() => queryClient.invalidateQueries({ queryKey: ['bookings'] })}
-        />
+      {selectedBooking && installmentDialogOpen && (
+        <Dialog open={installmentDialogOpen} onOpenChange={setInstallmentDialogOpen}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Manage Installments - {selectedBooking.customer_name}</DialogTitle>
+            </DialogHeader>
+            <InstallmentManager
+              bookingId={selectedBooking.id}
+              totalAmount={selectedBooking.total_amount || 0}
+              currentStatus={selectedBooking.status}
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ['bookings'] });
+                setInstallmentDialogOpen(false);
+                setSelectedBooking(null);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Time Extension Manager */}
-      {selectedBooking && (
-        <TimeExtensionManager
-          isOpen={extensionDialogOpen}
-          onClose={() => {
-            setExtensionDialogOpen(false);
-            setSelectedBooking(null);
-          }}
-          booking={selectedBooking}
-          onUpdate={() => queryClient.invalidateQueries({ queryKey: ['bookings'] })}
-        />
+      {selectedBooking && extensionDialogOpen && (
+        <Dialog open={extensionDialogOpen} onOpenChange={setExtensionDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Extend Time - {selectedBooking.customer_name}</DialogTitle>
+            </DialogHeader>
+            <TimeExtensionManager
+              bookingId={selectedBooking.id}
+              currentEndTime={selectedBooking.end_time}
+              studioType={selectedBooking.studio_type}
+              currentAdditionalTime={selectedBooking.additional_time_minutes || 0}
+              onSuccess={() => {
+                queryClient.invalidateQueries({ queryKey: ['bookings'] });
+                setExtensionDialogOpen(false);
+                setSelectedBooking(null);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

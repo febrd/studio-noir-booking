@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import CustomOrderForm from '@/components/studio/CustomOrderForm';
-import CustomOrderDateFilter from '@/components/studio/CustomOrderDateFilter';
+import { CustomOrderDateFilter } from '@/components/studio/CustomOrderDateFilter';
 
 const CustomOrdersPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -26,8 +26,7 @@ const CustomOrdersPage = () => {
         .from('custom_orders')
         .select(`
           *,
-          studios (name),
-          customers (name, phone, email)
+          studios (name)
         `)
         .order('created_at', { ascending: false });
 
@@ -43,11 +42,33 @@ const CustomOrdersPage = () => {
       
       if (error) throw error;
 
-      return data?.map(order => ({
-        ...order,
-        customer_name: order.customers?.name || 'Unknown Customer',
-        studio_name: order.studios?.name || 'Unknown Studio'
-      })) || [];
+      // Get customer details for each order
+      let enrichedOrders = [];
+      if (data) {
+        for (const order of data) {
+          let customerName = 'Unknown Customer';
+
+          if (order.customer_id) {
+            const { data: customer } = await supabase
+              .from('customer_profiles')
+              .select('full_name, phone, email')
+              .eq('id', order.customer_id)
+              .single();
+            
+            if (customer) {
+              customerName = customer.full_name;
+            }
+          }
+
+          enrichedOrders.push({
+            ...order,
+            customer_name: customerName,
+            studio_name: order.studios?.name || 'Unknown Studio'
+          });
+        }
+      }
+
+      return enrichedOrders;
     }
   });
 
@@ -199,10 +220,6 @@ const CustomOrdersPage = () => {
                     <Calendar className="h-4 w-4 text-gray-500" />
                     <span>{new Date(order.order_date).toLocaleDateString('id-ID')}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <User className="h-4 w-4 text-gray-500" />
-                    <span>{order.customers?.phone || 'No phone'}</span>
-                  </div>
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm text-gray-600">
@@ -251,7 +268,6 @@ const CustomOrdersPage = () => {
             <CustomOrderForm 
               isOpen={!!editingOrder}
               onClose={() => setEditingOrder(null)}
-              order={editingOrder} 
               onSuccess={handleEditSuccess} 
             />
           )}

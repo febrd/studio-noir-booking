@@ -17,56 +17,80 @@ const BookingLogsPage = () => {
     queryFn: async () => {
       let query = supabase
         .from('booking_logs')
-        .select(`
-          *,
-          bookings (
-            customers (name, phone),
-            studios (name)
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (actionFilter !== 'all') {
-        query = query.eq('action', actionFilter);
+        query = query.eq('action_type', actionFilter);
       }
 
       const { data, error } = await query;
       
       if (error) throw error;
 
+      // Get booking and user details for each log
+      let enrichedData = [];
+      if (data) {
+        for (const log of data) {
+          // Get booking details
+          const { data: booking } = await supabase
+            .from('bookings')
+            .select(`
+              *,
+              studios (name)
+            `)
+            .eq('id', log.booking_id)
+            .single();
+
+          // Get customer details
+          let customerName = 'Unknown Customer';
+          let customerPhone = '';
+          
+          if (booking?.user_id) {
+            const { data: customer } = await supabase
+              .from('customer_profiles')
+              .select('full_name, phone')
+              .eq('id', booking.user_id)
+              .single();
+            
+            if (customer) {
+              customerName = customer.full_name;
+              customerPhone = customer.phone || '';
+            }
+          }
+
+          enrichedData.push({
+            ...log,
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            studio_name: booking?.studios?.name || 'Unknown Studio'
+          });
+        }
+      }
+
       // Filter by search term if provided
-      let filteredData = data || [];
       if (searchTerm) {
-        filteredData = filteredData.filter(log => 
-          log.bookings?.customers?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          log.bookings?.studios?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          log.details?.toLowerCase().includes(searchTerm.toLowerCase())
+        enrichedData = enrichedData.filter(log => 
+          log.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          log.studio_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          log.note?.toLowerCase().includes(searchTerm.toLowerCase())
         );
       }
 
-      return filteredData.map(log => ({
-        ...log,
-        customer_name: log.bookings?.customers?.name || 'Unknown Customer',
-        customer_phone: log.bookings?.customers?.phone || '',
-        studio_name: log.bookings?.studios?.name || 'Unknown Studio'
-      }));
+      return enrichedData;
     }
   });
 
   const getActionBadge = (action: string) => {
     switch (action) {
-      case 'created':
+      case 'create':
         return <Badge className="bg-green-100 text-green-800">Created</Badge>;
-      case 'updated':
+      case 'update':
         return <Badge className="bg-blue-100 text-blue-800">Updated</Badge>;
-      case 'cancelled':
-        return <Badge className="bg-red-100 text-red-800">Cancelled</Badge>;
-      case 'completed':
-        return <Badge className="bg-purple-100 text-purple-800">Completed</Badge>;
-      case 'payment_updated':
-        return <Badge className="bg-yellow-100 text-yellow-800">Payment Updated</Badge>;
-      case 'time_extended':
-        return <Badge className="bg-orange-100 text-orange-800">Time Extended</Badge>;
+      case 'delete':
+        return <Badge className="bg-red-100 text-red-800">Deleted</Badge>;
+      case 'payment_added':
+        return <Badge className="bg-yellow-100 text-yellow-800">Payment Added</Badge>;
       default:
         return <Badge variant="outline">{action}</Badge>;
     }
@@ -96,7 +120,7 @@ const BookingLogsPage = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
-            placeholder="Cari berdasarkan nama customer, studio, atau detail..."
+            placeholder="Cari berdasarkan nama customer, studio, atau catatan..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -108,12 +132,10 @@ const BookingLogsPage = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Actions</SelectItem>
-            <SelectItem value="created">Created</SelectItem>
-            <SelectItem value="updated">Updated</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="payment_updated">Payment Updated</SelectItem>
-            <SelectItem value="time_extended">Time Extended</SelectItem>
+            <SelectItem value="create">Created</SelectItem>
+            <SelectItem value="update">Updated</SelectItem>
+            <SelectItem value="delete">Deleted</SelectItem>
+            <SelectItem value="payment_added">Payment Added</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -132,7 +154,7 @@ const BookingLogsPage = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    {getActionBadge(log.action)}
+                    {getActionBadge(log.action_type)}
                   </div>
                 </div>
                 <div className="text-right text-sm text-gray-500">
@@ -142,15 +164,15 @@ const BookingLogsPage = () => {
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     <User className="h-4 w-4" />
-                    <span>{log.performed_by}</span>
+                    <span>System</span>
                   </div>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              {log.details && (
+              {log.note && (
                 <div className="bg-gray-50 rounded-md p-3">
-                  <p className="text-sm text-gray-700">{log.details}</p>
+                  <p className="text-sm text-gray-700">{log.note}</p>
                 </div>
               )}
               {log.customer_phone && (
