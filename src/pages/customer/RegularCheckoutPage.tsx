@@ -236,7 +236,7 @@ const RegularCheckoutPage = () => {
 
       setBookedSlots(groupedBookings);
     } catch (error) {
-      console.error('Error fetching booked slots:', error);
+      console.error('Error fetching booked slotsnya:', error);
     }
   };
 
