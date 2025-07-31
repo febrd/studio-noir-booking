@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,16 +53,18 @@ const SelfPhotoCheckoutPage = () => {
     try {
       console.log('🔄 Processing full payment...');
       
+      const bookingCode = `BK-${booking.id.slice(0, 8)}`;
+      
       const invoiceData = {
         performed_by: booking.users.id,
         external_id: `booking-${booking.id}-full-${Date.now()}`,
         amount: booking.total_amount,
-        description: `Pembayaran penuh booking ${booking.booking_code}`,
+        description: `Pembayaran penuh booking ${bookingCode}`,
         customer: {
           given_names: booking.users.name?.split(' ')[0] || 'Customer',
           surname: booking.users.name?.split(' ').slice(1).join(' ') || '',
           email: booking.users.email || '',
-          mobile_number: booking.phone || ''
+          mobile_number: booking.participant_count?.toString() || ''
         },
         currency: 'IDR',
         invoice_duration: 86400
@@ -78,11 +81,10 @@ const SelfPhotoCheckoutPage = () => {
           .insert({
             booking_id: booking.id,
             amount: booking.total_amount,
-            payment_type: 'full',
+            payment_type: 'online',
             status: 'pending',
-            xendit_invoice_id: result.data.invoice.id,
-            external_id: invoiceData.external_id,
-            invoice_url: result.data.invoice.invoice_url
+            reference_id: result.data.invoice.id,
+            description: invoiceData.description
           });
 
         if (transactionError) {
@@ -132,17 +134,18 @@ const SelfPhotoCheckoutPage = () => {
       console.log('🔄 Processing installment payment...');
       
       const firstInstallmentAmount = Math.round(booking.total_amount * 0.5);
+      const bookingCode = `BK-${booking.id.slice(0, 8)}`;
       
       const invoiceData = {
         performed_by: booking.users.id,
         external_id: `booking-${booking.id}-installment-1-${Date.now()}`,
         amount: firstInstallmentAmount,
-        description: `Cicilan 1/2 booking ${booking.booking_code}`,
+        description: `Cicilan 1/2 booking ${bookingCode}`,
         customer: {
           given_names: booking.users.name?.split(' ')[0] || 'Customer',
           surname: booking.users.name?.split(' ').slice(1).join(' ') || '',
           email: booking.users.email || '',
-          mobile_number: booking.phone || ''
+          mobile_number: booking.participant_count?.toString() || ''
         },
         currency: 'IDR',
         invoice_duration: 86400
@@ -161,10 +164,8 @@ const SelfPhotoCheckoutPage = () => {
             amount: firstInstallmentAmount,
             payment_type: 'installment',
             status: 'pending',
-            xendit_invoice_id: result.data.invoice.id,
-            external_id: invoiceData.external_id,
-            invoice_url: result.data.invoice.invoice_url,
-            installment_number: 1
+            reference_id: result.data.invoice.id,
+            description: invoiceData.description
           });
 
         if (transactionError) {
@@ -224,13 +225,12 @@ const SelfPhotoCheckoutPage = () => {
         throw transError;
       }
 
-      if (existingTransaction && existingTransaction.xendit_invoice_id) {
+      if (existingTransaction && existingTransaction.reference_id) {
         console.log('🔍 Found existing transaction, checking status...');
         
-        // Use our internal getInvoice service instead of direct Supabase call
         const statusResult = await getInvoice({
           performed_by: booking.users.id,
-          invoice_id: existingTransaction.xendit_invoice_id
+          invoice_id: existingTransaction.reference_id
         });
 
         if (statusResult.success && statusResult.data?.invoice) {
@@ -248,8 +248,8 @@ const SelfPhotoCheckoutPage = () => {
               console.error('❌ Error updating transaction status:', updateError);
             }
 
-            // Handle installment logic
-            if (existingTransaction.payment_type === 'installment' && existingTransaction.installment_number === 1) {
+            // Handle installment logic for installment payments
+            if (existingTransaction.payment_type === 'installment') {
               // Insert first installment record
               const { error: installmentError } = await supabase
                 .from('installments')
@@ -267,17 +267,18 @@ const SelfPhotoCheckoutPage = () => {
 
               // Create second installment invoice
               const remainingAmount = booking.total_amount - existingTransaction.amount;
+              const bookingCode = `BK-${booking.id.slice(0, 8)}`;
               
               const secondInstallmentData = {
                 performed_by: booking.users.id,
                 external_id: `booking-${booking.id}-installment-2-${Date.now()}`,
                 amount: remainingAmount,
-                description: `Cicilan 2/2 booking ${booking.booking_code}`,
+                description: `Cicilan 2/2 booking ${bookingCode}`,
                 customer: {
                   given_names: booking.users.name?.split(' ')[0] || 'Customer',
                   surname: booking.users.name?.split(' ').slice(1).join(' ') || '',
                   email: booking.users.email || '',
-                  mobile_number: booking.phone || ''
+                  mobile_number: booking.participant_count?.toString() || ''
                 },
                 currency: 'IDR',
                 invoice_duration: 86400
@@ -294,10 +295,8 @@ const SelfPhotoCheckoutPage = () => {
                     amount: remainingAmount,
                     payment_type: 'installment',
                     status: 'pending',
-                    xendit_invoice_id: secondResult.data.invoice.id,
-                    external_id: secondInstallmentData.external_id,
-                    invoice_url: secondResult.data.invoice.invoice_url,
-                    installment_number: 2
+                    reference_id: secondResult.data.invoice.id,
+                    description: secondInstallmentData.description
                   });
 
                 if (!secondTransError) {
@@ -317,19 +316,21 @@ const SelfPhotoCheckoutPage = () => {
           } else if (invoiceStatus === 'EXPIRED') {
             console.log('⏰ Invoice expired, creating new one...');
             
+            const bookingCode = `BK-${booking.id.slice(0, 8)}`;
+            
             // Create new invoice with same data
             const renewData = {
               performed_by: booking.users.id,
-              external_id: `booking-${booking.id}-${existingTransaction.payment_type}-${existingTransaction.installment_number || 'full'}-${Date.now()}`,
+              external_id: `booking-${booking.id}-${existingTransaction.payment_type}-${Date.now()}`,
               amount: existingTransaction.amount,
               description: existingTransaction.payment_type === 'installment' 
-                ? `Cicilan ${existingTransaction.installment_number}/2 booking ${booking.booking_code}`
-                : `Pembayaran penuh booking ${booking.booking_code}`,
+                ? `Cicilan booking ${bookingCode}`
+                : `Pembayaran penuh booking ${bookingCode}`,
               customer: {
                 given_names: booking.users.name?.split(' ')[0] || 'Customer',
                 surname: booking.users.name?.split(' ').slice(1).join(' ') || '',
                 email: booking.users.email || '',
-                mobile_number: booking.phone || ''
+                mobile_number: booking.participant_count?.toString() || ''
               },
               currency: 'IDR',
               invoice_duration: 86400
@@ -342,9 +343,8 @@ const SelfPhotoCheckoutPage = () => {
               const { error: updateError } = await supabase
                 .from('transactions')
                 .update({
-                  xendit_invoice_id: renewResult.data.invoice.id,
-                  external_id: renewData.external_id,
-                  invoice_url: renewResult.data.invoice.invoice_url
+                  reference_id: renewResult.data.invoice.id,
+                  description: renewData.description
                 })
                 .eq('id', existingTransaction.id);
 
@@ -354,9 +354,12 @@ const SelfPhotoCheckoutPage = () => {
               }
             }
           } else {
-            // Still pending, redirect to existing URL
+            // Still pending, redirect to existing URL (we'll need to get this from somewhere)
             console.log('⏳ Invoice still pending, redirecting...');
-            window.location.href = existingTransaction.invoice_url;
+            toast({
+              title: "Invoice Masih Aktif",
+              description: "Silakan lanjutkan pembayaran di tab yang sudah terbuka atau pilih metode pembayaran baru",
+            });
             return;
           }
         }
@@ -410,6 +413,8 @@ const SelfPhotoCheckoutPage = () => {
   if (isLoading) return <div>Loading...</div>;
   if (isError) return <div>Error fetching booking.</div>;
 
+  const bookingCode = booking ? `BK-${booking.id.slice(0, 8)}` : '';
+
   return (
     <ModernLayout>
       <div className="container mx-auto p-6 max-w-4xl">
@@ -427,29 +432,25 @@ const SelfPhotoCheckoutPage = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary">{booking.booking_code}</Badge>
+                  <Badge variant="secondary">{bookingCode}</Badge>
                   <Badge>{booking.status}</Badge>
                 </div>
                 <Separator />
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
-                    <span>{new Date(booking.date).toLocaleDateString()}</span>
+                    <span>{new Date(booking.start_time).toLocaleDateString()}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
-                    <span>{booking.time}</span>
+                    <span>{new Date(booking.start_time).toLocaleTimeString()}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
-                    <span>{booking.location}</span>
+                    <span>Studio Location</span>
                   </div>
                 </div>
                 <Separator />
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Paket:</p>
-                  <p className="text-lg">{booking.package_name}</p>
-                </div>
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Jumlah Peserta:</p>
                   <p className="text-lg">{booking.participant_count}</p>
