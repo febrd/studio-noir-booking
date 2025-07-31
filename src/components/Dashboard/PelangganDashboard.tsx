@@ -125,7 +125,7 @@ const PelangganDashboard = () => {
     switch (status) {
       case 'confirmed': return 'Dikonfirmasi';
       case 'pending': return 'Menunggu Pembayaran';
-      case 'installment': return 'Cicilan';
+      case 'installment': return 'Cicilan/DP';
       case 'completed': return 'Selesai';
       case 'cancelled': return 'Dibatalkan';
       case 'paid': return 'Dibayar';
@@ -156,7 +156,7 @@ const PelangganDashboard = () => {
           Selamat Datang, {userProfile?.name}! 👋
         </h1>
         <p className="text-gray-600 font-inter">
-          Kelola booking Anda dan temukan paket foto terbaik di Studio Noir.
+          Kelola booking Anda dan temukan paket foto terbaik di Masuk Studio.
         </p>
       </div>
 

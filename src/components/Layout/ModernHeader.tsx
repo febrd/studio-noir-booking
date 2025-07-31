@@ -29,7 +29,7 @@ export function ModernHeader() {
       
       <div className="flex flex-1 items-center justify-between">
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold">Studio Management</h1>
+          <h1 className="text-lg font-semibold">Masuk Studio</h1>
         </div>
         
         <div className="flex items-center gap-2">

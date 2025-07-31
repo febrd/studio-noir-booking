@@ -90,9 +90,40 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['installments', bookingId] });
       queryClient.invalidateQueries({ queryKey: ['booking-summary', bookingId] });
+    
+      // Ambil ulang data installment
+      const { data: remainingInstallments, error } = await supabase
+        .from('installments')
+        .select('amount')
+        .eq('booking_id', bookingId);
+    
+      if (error) {
+        console.error('Gagal mengambil data installment:', error);
+        toast.error('Gagal mengecek status cicilan');
+        return;
+      }
+    
+      // Hitung total dibayar setelah penghapusan
+      const totalPaid = remainingInstallments?.reduce((sum, i) => sum + (i.amount || 0), 0) || 0;
+      const remainingAmount = totalAmount - totalPaid;
+    
+      if (remainingInstallments.length === 0) {
+        // Tidak ada cicilan, ubah status jadi 'pending'
+        await supabase
+          .from('bookings')
+          .update({ status: 'pending' })
+          .eq('id', bookingId);
+      } else if (remainingAmount <= 0) {
+        // Sudah lunas semua, ubah status jadi 'paid'
+        await supabase
+          .from('bookings')
+          .update({ status: 'paid' })
+          .eq('id', bookingId);
+      }
+    
       toast.success('Cicilan berhasil dihapus');
     },
     onError: (error: any) => {
@@ -121,6 +152,21 @@ const InstallmentManager = ({ bookingId, totalAmount, currentStatus, onSuccess }
       if (installmentError) {
         console.error('Error inserting installment:', installmentError);
         throw installmentError;
+      } else {
+        // Cek apakah ini installment pertama
+        const { data: existingInstallments } = await supabase
+        .from('installments')
+        .select('id')
+        .eq('booking_id', bookingId);
+
+        if (existingInstallments && existingInstallments.length === 1) {
+        // Ini installment pertama, ubah status booking
+        await supabase
+          .from('bookings')
+          .update({ status: 'installment' })
+          .eq('id', bookingId);
+        }
+
       }
 
       // Then, create a transaction record based on payment method

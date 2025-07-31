@@ -135,7 +135,7 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
         return (
           <>
             <CreditCard className="w-4 h-4 mr-2" />
-            Cek Pembayaran
+            Pay me
           </>
         );
       }
@@ -144,7 +144,7 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
       return (
         <>
           <QrCode className="w-4 h-4 mr-2" />
-          Bayar Manual
+          Paymanual
         </>
       );
     }
