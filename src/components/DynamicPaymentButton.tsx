@@ -74,8 +74,14 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
         return;
       }
       
-      // Prioritas: gunakan invoice_url dari Xendit API, jika tidak ada gunakan dari booking.payment_link
+      // PRIORITAS: gunakan invoice_url dari Xendit API, jika tidak ada gunakan dari booking.payment_link
       const paymentUrl = invoice_url || booking.payment_link;
+      
+      console.log('🔗 Available payment URLs:', {
+        invoice_url_from_xendit: invoice_url,
+        payment_link_from_db: booking.payment_link,
+        final_url: paymentUrl
+      });
       
       if (paymentUrl) {
         console.log('🔗 Opening payment URL:', paymentUrl);
@@ -122,7 +128,7 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
         return (
           <>
             <ExternalLink className="w-4 h-4 mr-2" />
-            Lanjutkan Pembayaran
+            Bayar Sekarang
           </>
         );
       } else {
@@ -134,6 +140,7 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
         );
       }
     } else {
+      // payment_method === 'offline' atau 'manual'
       return (
         <>
           <QrCode className="w-4 h-4 mr-2" />
@@ -165,8 +172,8 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
         {getButtonContent()}
       </Button>
 
-      {/* QRIS Dialog hanya untuk pembayaran manual */}
-      {showQRIS && booking.payment_method === 'manual' && (
+      {/* QRIS Dialog hanya untuk pembayaran manual/offline */}
+      {showQRIS && (booking.payment_method === 'manual' || booking.payment_method === 'offline') && (
         <QRISPaymentDialog
           isOpen={showQRIS}
           onClose={() => setShowQRIS(false)}

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -93,6 +92,8 @@ const PaymentMethodSelection = ({
         description += ` | Layanan tambahan: ${additionalServices.join(', ')}`;
       }
       
+      console.log('🚀 Creating invoice for booking:', booking.id);
+      
       // Create invoice
       const invoiceResult = await createInvoice({
         performed_by: booking.user_id,
@@ -109,17 +110,29 @@ const PaymentMethodSelection = ({
         invoice_duration: 86400 // 24 hours
       });
 
+      console.log('📊 Invoice creation result:', invoiceResult);
+
       if (invoiceResult.success && invoiceResult.data?.invoice?.invoice_url) {
-        // Update booking status, payment method, and save payment link
+        const checkoutUrl = invoiceResult.data.invoice.invoice_url;
+        console.log('💳 Checkout URL created:', checkoutUrl);
+        
+        // Update booking status, payment method, and SAVE PAYMENT LINK
         const newStatus = isInstallment ? 'installment' : 'pending';
         
-        await supabase
+        const { error: updateError } = await supabase
           .from('bookings')
           .update({ 
             payment_method: 'online',
-            payment_link: invoiceResult.data.invoice.invoice_url
+            payment_link: checkoutUrl // SIMPAN CHECKOUT URL KE DATABASE
           })
           .eq('id', booking.id);
+
+        if (updateError) {
+          console.error('❌ Error updating booking with payment link:', updateError);
+          throw new Error('Gagal menyimpan link pembayaran');
+        }
+
+        console.log('✅ Payment link saved to database:', checkoutUrl);
 
         // If installment, create installment record
         if (isInstallment) {
@@ -151,15 +164,17 @@ const PaymentMethodSelection = ({
         toast.success('Invoice berhasil dibuat! Anda akan diarahkan ke halaman pembayaran.');
         
         // Redirect to Xendit checkout
-        window.open(invoiceResult.data.invoice.invoice_url, '_blank');
+        console.log('🔗 Opening checkout URL:', checkoutUrl);
+        window.open(checkoutUrl, '_blank');
         
         onPaymentSuccess();
         onClose();
       } else {
+        console.error('❌ Invoice creation failed:', invoiceResult.error);
         throw new Error(invoiceResult.error || 'Gagal membuat invoice');
       }
     } catch (error) {
-      console.error('Error creating invoice:', error);
+      console.error('💥 Error creating invoice:', error);
       toast.error('Kami tidak dapat memproses invoice, coba lagi nanti atau pilih pembayaran manual.');
       
       // Fallback to manual payment
