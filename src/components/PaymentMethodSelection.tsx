@@ -102,7 +102,7 @@ const PaymentMethodSelection = ({
         description: description,
         customer: {
           given_names: customerName.split(' ')[0] || customerName,
-          surname: customerName.split(' ').slice(1).join(' ') || '',
+          surname: customerName.split(' ').slice(1).join(' ') || '~',
           email: customerEmail,
           mobile_number: customerEmail // Leave phone number empty as requested
         },
