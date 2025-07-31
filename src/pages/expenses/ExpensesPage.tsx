@@ -118,7 +118,7 @@ const ExpensesPage = () => {
             </div>
             <Button onClick={() => setShowForm(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Tambah Pengeluaran
+              Tambah Pengeluaran Studio
             </Button>
           </div>
 
