@@ -482,7 +482,7 @@ const SelfPhotoCheckoutPage = () => {
       const endDateTimeUTC = parseWITAToUTC(endDateTimeWITA);
       const totalAmount = calculateTotal();
 
-      console.log('Creating booking with times:', {
+      console.log('Creating self photo booking with times:', {
         startWITA: startDateTimeWITA,
         endWITA: endDateTimeWITA,
         startUTC: startDateTimeUTC.toISOString(),
@@ -497,7 +497,7 @@ const SelfPhotoCheckoutPage = () => {
           studio_id: packageData.studios?.id,
           start_time: startDateTimeUTC.toISOString(),
           end_time: endDateTimeUTC.toISOString(),
-          status: 'pending',
+          status: 'pending', // Always pending - webhook will update when paid
           total_amount: totalAmount,
           payment_method: 'offline', // Will be updated based on payment method selection
           type: 'self_photo',
@@ -529,12 +529,16 @@ const SelfPhotoCheckoutPage = () => {
         }
       }
 
+      // DO NOT CREATE TRANSACTION OR INSTALLMENT RECORDS
+      // These will be handled by webhook callback
+      console.log('🔄 Skipping transaction creation for self photo booking - will be handled by webhook');
+
       // Set current booking and show payment method selection
       setCurrentBooking(data);
       setShowPaymentMethodSelection(true);
 
     } catch (error) {
-      console.error('Error creating booking:', error);
+      console.error('Error creating self photo booking:', error);
       toast.error('Gagal membuat booking');
     } finally {
       setBookingLoading(false);

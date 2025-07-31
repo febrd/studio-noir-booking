@@ -116,9 +116,8 @@ const PaymentMethodSelection = ({
         const checkoutUrl = invoiceResult.data.invoice.invoice_url;
         console.log('💳 Checkout URL created:', checkoutUrl);
         
-        // Update booking status, payment method, and SAVE PAYMENT LINK
-        const newStatus = isInstallment ? 'installment' : 'pending';
-        
+        // Update booking status and payment method, SAVE PAYMENT LINK
+        // Status remains 'pending' - webhook will update when paid
         const { error: updateError } = await supabase
           .from('bookings')
           .update({ 
@@ -134,32 +133,9 @@ const PaymentMethodSelection = ({
 
         console.log('✅ Payment link saved to database:', checkoutUrl);
 
-        // If installment, create installment record
-        if (isInstallment) {
-          await supabase
-            .from('installments')
-            .insert({
-              booking_id: booking.id,
-              amount: invoiceAmount,
-              installment_number: 1,
-              payment_method: 'online',
-              performed_by: booking.user_id,
-              note: 'Cicilan pertama (50%)'
-            });
-        }
-
-        // Create transaction record
-        await supabase
-          .from('transactions')
-          .insert({
-            booking_id: booking.id,
-            amount: invoiceAmount,
-            type: 'online',
-            description: description,
-            performed_by: booking.user_id,
-            payment_type: isInstallment ? 'installment' : 'online',
-            status: 'pending' // Will be updated via status checker later
-          });
+        // DO NOT CREATE INSTALLMENT OR TRANSACTION RECORDS
+        // These will be handled by the webhook callback
+        console.log('🔄 Skipping transaction/installment creation - will be handled by webhook');
 
         toast.success('Invoice berhasil dibuat! Anda akan diarahkan ke halaman pembayaran.');
         
