@@ -103,7 +103,7 @@ const PaymentMethodSelection = ({
           given_names: customerName.split(' ')[0] || customerName,
           surname: customerName.split(' ').slice(1).join(' ') || '',
           email: customerEmail,
-          mobile_number: '' // Leave phone number empty as requested
+          mobile_number: customerEmail // Leave phone number empty as requested
         },
         currency: 'IDR',
         invoice_duration: 86400 // 24 hours
