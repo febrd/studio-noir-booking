@@ -68,6 +68,7 @@ const RegularCheckoutPage = () => {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [currentBooking, setCurrentBooking] = useState<any>(null);
   const [showPaymentMethodSelection, setShowPaymentMethodSelection] = useState(false);
+  const [selectedPendingBooking, setSelectedPendingBooking] = useState<any>(null);
 
   // Check for pending bookings with transaction status
   const { data: pendingBookings = [], refetch: refetchPendingBookings } = useQuery({
@@ -407,73 +408,59 @@ const RegularCheckoutPage = () => {
   };
 
   const handlePayment = async (booking: any) => {
-    try {
-      const installmentTransactions = booking.transactions?.filter((t: any) => t.payment_type === 'installment') || [];
-      const installmentRecords = booking.installments || [];
-      
-      // Check if this is first installment (cicilan 1)
-      if (installmentTransactions.length === 0 || installmentRecords.length === 0) {
-        // First installment - create new invoice for 50%
-        await handleInstallmentPayment(booking, booking.total_amount * 0.5, 1);
-        return;
-      }
+    const installmentTransactions = booking.transactions?.filter((t: any) => t.payment_type === 'installment') || [];
+    const installmentRecords = booking.installments || [];
 
-      // For existing installments, check status
+    if (installmentTransactions.length > 0) {
       const firstInstallmentTx = installmentTransactions[0];
-      
-      const response = await supabase.functions.invoke('xendit-get-invoice', {
-        body: {
-          performed_by: userProfile?.id,
-          transaction_id: firstInstallmentTx.id
-        }
-      });
 
-      if (response.data?.success && response.data?.data?.invoice) {
-        const invoiceStatus = response.data.data.invoice.status;
+      try {
+        const response = await supabase.functions.invoke('xendit-get-invoice', {
+          body: {
+            performed_by: userProfile?.id,
+            transaction_id: firstInstallmentTx.id
+          }
+        });
 
-        if (invoiceStatus === 'SETTLED') {
-          // Update first installment transaction to paid
-          await supabase
-            .from('transactions')
-            .update({ status: 'paid' })
-            .eq('id', firstInstallmentTx.id);
+        if (response.data?.success && response.data?.data?.invoice) {
+          const invoiceStatus = response.data.data.invoice.status;
 
-          // Insert first installment record
-          await supabase
-            .from('installments')
-            .insert({
-              booking_id: booking.id,
-              amount: booking.total_amount * 0.5,
-              installment_number: 1,
-              payment_method: 'online',
-              performed_by: userProfile?.id
-            });
+          if (invoiceStatus === 'SETTLED') {
+            await supabase
+              .from('transactions')
+              .update({ status: 'paid' })
+              .eq('id', firstInstallmentTx.id);
 
-          // Update booking status to installment
-          await supabase
-            .from('bookings')
-            .update({ status: 'installment' })
-            .eq('id', booking.id);
+            const totalAmount = booking.total_amount || 0;
+            const paidAmount = installmentRecords.reduce((sum: number, inst: any) => sum + inst.amount, 0);
+            const remainingAmount = totalAmount - paidAmount;
 
-          // Create second installment
-          const remainingAmount = booking.total_amount * 0.5;
-          await handleInstallmentPayment(booking, remainingAmount, 2);
-          
-        } else if (invoiceStatus === 'EXPIRED') {
-          // Renew invoice with same data
-          await handleInstallmentPayment(booking, booking.total_amount * 0.5, 1);
-        } else {
-          // Still pending, redirect to existing URL
-          if (response.data.data.invoice.invoice_url) {
-            window.open(response.data.data.invoice.invoice_url, '_blank');
+            if (remainingAmount > 0) {
+              await handleInstallmentPayment(booking, remainingAmount, 2);
+            } else {
+              await supabase
+                .from('bookings')
+                .update({ status: 'paid' })
+                .eq('id', booking.id);
+
+              toast.success('Semua cicilan sudah lunas!');
+              refetchPendingBookings();
+            }
+          } else if (invoiceStatus === 'EXPIRED') {
+            await handleInstallmentPayment(booking, firstInstallmentTx.amount, 1);
+          } else {
+            if (response.data.data.invoice.invoice_url) {
+              window.open(response.data.data.invoice.invoice_url, '_blank');
+            }
           }
         }
+      } catch (error) {
+        console.error('Error checking invoice status:', error);
+        toast.error('Gagal memeriksa status pembayaran');
       }
-
-      refetchPendingBookings();
-    } catch (error) {
-      console.error('Error checking invoice status:', error);
-      toast.error('Gagal memeriksa status pembayaran');
+    } else {
+      setSelectedPendingBooking(booking);
+      setShowPaymentDialog(true);
     }
   };
 
@@ -499,7 +486,16 @@ const RegularCheckoutPage = () => {
       if (response.data?.success && response.data?.data?.invoice) {
         const invoice = response.data.data.invoice;
 
-        // Create transaction record
+        await supabase
+          .from('installments')
+          .insert({
+            booking_id: booking.id,
+            amount: amount,
+            installment_number: installmentNumber,
+            payment_method: 'online',
+            performed_by: userProfile?.id
+          });
+
         await supabase
           .from('transactions')
           .insert({
@@ -511,6 +507,13 @@ const RegularCheckoutPage = () => {
             payment_type: 'installment',
             status: 'pending'
           });
+
+        if (installmentNumber === 1) {
+          await supabase
+            .from('bookings')
+            .update({ status: 'installment' })
+            .eq('id', booking.id);
+        }
 
         if (invoice.invoice_url) {
           window.open(invoice.invoice_url, '_blank');
@@ -524,23 +527,6 @@ const RegularCheckoutPage = () => {
     } catch (error) {
       console.error('Error creating installment payment:', error);
       toast.error('Gagal membuat pembayaran cicilan');
-    }
-  };
-
-  const handleCancelBooking = async (bookingId: string) => {
-    try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'cancelled' })
-        .eq('id', bookingId);
-
-      if (error) throw error;
-
-      toast.success('Pesanan berhasil dibatalkan');
-      refetchPendingBookings();
-    } catch (error) {
-      console.error('Error cancelling booking:', error);
-      toast.error('Gagal membatalkan pesanan');
     }
   };
 
@@ -576,15 +562,13 @@ const RegularCheckoutPage = () => {
     const installmentTransactions = booking.transactions?.filter((t: any) => t.payment_type === 'installment') || [];
     const installmentRecords = booking.installments || [];
 
-    if (booking.status === 'pending') {
-      return 'Belum Dibayar';
-    }
+    if (installmentTransactions.length > 0) {
+      const paidInstallments = installmentTransactions.filter((t: any) => t.status === 'paid').length;
+      const totalInstallments = 2; // Assuming max 2 installments
 
-    if (booking.status === 'installment') {
-      const paidInstallments = installmentRecords.length;
       if (paidInstallments === 0) {
         return 'Cicilan 1/2 - Belum Dibayar';
-      } else if (paidInstallments === 1) {
+      } else if (paidInstallments === 1 && installmentRecords.length < 2) {
         return 'Cicilan 1/2 - Lunas, Menunggu Cicilan 2';
       } else {
         return 'Semua Cicilan Lunas';
@@ -814,66 +798,6 @@ const RegularCheckoutPage = () => {
           </Card>
         )}
 
-        {/* Pending Bookings Section */}
-        {pendingBookings.length > 0 && (
-          <Card className="border border-orange-200 shadow-none bg-orange-50 mb-8">
-            <CardHeader className="p-4 md:p-6">
-              <CardTitle className="font-peace-sans font-black text-orange-800">
-                Pesanan Belum Selesai
-              </CardTitle>
-              <p className="text-orange-700 font-inter text-sm">
-                Anda memiliki pesanan yang belum diselesaikan pembayarannya
-              </p>
-            </CardHeader>
-            <CardContent className="p-4 md:p-6 pt-0">
-              {pendingBookings.map((booking) => (
-                <div key={booking.id} className="bg-white p-4 rounded-lg mb-4 last:mb-0">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                      <h4 className="font-peace-sans font-bold text-black mb-1">
-                        {booking.studio_packages?.title}
-                      </h4>
-                      <p className="text-sm text-gray-600 mb-2">
-                        {formatDateTimeWITA(booking.start_time)}
-                      </p>
-                      <Badge className={getStatusColor(booking.status) + ' font-peace-sans font-bold border'}>
-                        {getStatusText(booking.status)}
-                      </Badge>
-                      <div className="mt-2">
-                        <p className="text-sm text-gray-600">
-                          Status Pembayaran: {getPaymentStatusText(booking)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      {(booking.status === 'pending' || booking.status === 'installment') && (
-                        <Button
-                          onClick={() => handlePayment(booking)}
-                          className="bg-green-600 hover:bg-green-700 text-white font-peace-sans font-bold"
-                          size="sm"
-                        >
-                          <CreditCard className="h-4 w-4 mr-2" />
-                          Bayar Sekarang
-                        </Button>
-                      )}
-                      {booking.status === 'pending' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleCancelBooking(booking.id)}
-                          className="border-red-200 text-red-600 hover:bg-red-50 font-peace-sans font-bold"
-                        >
-                          Cancel
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
         {/* Payment Method Selection Dialog */}
         {currentBooking && (
           <PaymentMethodSelection
@@ -891,6 +815,13 @@ const RegularCheckoutPage = () => {
             }}
           />
         )}
+
+        {/* QRIS Payment Dialog */}
+        <QRISPaymentDialog
+          isOpen={!!selectedPendingBooking}
+          onClose={() => setSelectedPendingBooking(null)}
+          booking={selectedPendingBooking}
+        />
       </div>
     </div>
   );
