@@ -82,16 +82,13 @@ const OrderHistoryPage = () => {
   };
 
   const handlePayment = async (booking: any) => {
-    // Check installment status
     const installmentTransactions = booking.transactions?.filter((t: any) => t.payment_type === 'installment') || [];
     const installmentRecords = booking.installments || [];
     
     if (installmentTransactions.length > 0) {
-      // Handle installment payment logic
       const firstInstallmentTx = installmentTransactions[0];
       
       try {
-        // Check Xendit status for first installment
         const response = await supabase.functions.invoke('xendit-get-invoice', {
           body: {
             performed_by: userProfile?.id,
@@ -103,22 +100,18 @@ const OrderHistoryPage = () => {
           const invoiceStatus = response.data.data.invoice.status;
           
           if (invoiceStatus === 'SETTLED') {
-            // Update transaction status to paid
             await supabase
               .from('transactions')
               .update({ status: 'paid' })
               .eq('id', firstInstallmentTx.id);
             
-            // Check if we need second installment
             const totalAmount = booking.total_amount || 0;
             const paidAmount = installmentRecords.reduce((sum: number, inst: any) => sum + inst.amount, 0);
             const remainingAmount = totalAmount - paidAmount;
             
             if (remainingAmount > 0) {
-              // Create second installment
               await handleInstallmentPayment(booking, remainingAmount, 2);
             } else {
-              // All installments paid
               await supabase
                 .from('bookings')
                 .update({ status: 'paid' })
@@ -128,10 +121,8 @@ const OrderHistoryPage = () => {
               refetch();
             }
           } else if (invoiceStatus === 'EXPIRED') {
-            // Create new invoice for expired installment
             await handleInstallmentPayment(booking, firstInstallmentTx.amount, 1);
           } else {
-            // Open existing invoice URL
             if (response.data.data.invoice.invoice_url) {
               window.open(response.data.data.invoice.invoice_url, '_blank');
             }
@@ -142,7 +133,6 @@ const OrderHistoryPage = () => {
         toast.error('Gagal memeriksa status pembayaran');
       }
     } else {
-      // Regular payment - show QRIS dialog
       setSelectedBookingForPayment(booking);
     }
   };
@@ -169,7 +159,6 @@ const OrderHistoryPage = () => {
       if (response.data?.success && response.data?.data?.invoice) {
         const invoice = response.data.data.invoice;
         
-        // Record new installment
         await supabase
           .from('installments')
           .insert({
@@ -180,7 +169,6 @@ const OrderHistoryPage = () => {
             performed_by: userProfile?.id
           });
 
-        // Create new transaction record
         await supabase
           .from('transactions')
           .insert({
@@ -193,7 +181,6 @@ const OrderHistoryPage = () => {
             status: 'pending'
           });
 
-        // Open payment URL
         if (invoice.invoice_url) {
           window.open(invoice.invoice_url, '_blank');
           toast.success('Invoice cicilan berhasil dibuat!');
@@ -241,7 +228,7 @@ const OrderHistoryPage = () => {
     
     if (installmentTransactions.length > 0) {
       const paidInstallments = installmentTransactions.filter((t: any) => t.status === 'paid').length;
-      const totalInstallments = Math.ceil(installmentRecords.length / 1); // Assuming max 2 installments
+      const totalInstallments = 2;
       
       if (paidInstallments === 0) {
         return 'Cicilan 1/2 - Belum Dibayar';
@@ -355,8 +342,6 @@ const OrderHistoryPage = () => {
                               </span>
                             </div>
                           </div>
-                          
-                          
                         </div>
 
                         {/* Payment Info */}
@@ -388,14 +373,16 @@ const OrderHistoryPage = () => {
                               <CreditCard className="h-4 w-4 mr-2" />
                               Bayar Sekarang
                             </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => handleCancelBooking(booking.id)}
-                              className="border-red-200 text-red-600 hover:bg-red-50 font-peace-sans font-bold"
-                            >
-                              Cancel Pesanan
-                            </Button>
+                            {booking.status === 'pending' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleCancelBooking(booking.id)}
+                                className="border-red-200 text-red-600 hover:bg-red-50 font-peace-sans font-bold"
+                              >
+                                Cancel Pesanan
+                              </Button>
+                            )}
                           </>
                         )}
                       </div>
