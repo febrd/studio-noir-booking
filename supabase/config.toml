@@ -1,3 +1,4 @@
+
 project_id = "dduhjdzhxlwuuzidrzzi"
 
 [api]
@@ -7,13 +8,47 @@ schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
-[auth]
+[db]
+port = 54322
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[realtime]
+enabled = true
+port = 54323
+tenant_id = "realtime-dev"
+
+[studio]
 enabled = true
 port = 54324
+
+[inbucket]
+enabled = true
+port = 54325
+
+[functions.xendit-create-invoice]
+verify_jwt = false
+
+[functions.xendit-webhook]
+verify_jwt = false
+
+[edge-runtime]
+enabled = true
+port = 54326
+
+[[analytics.adapters]]
+enabled = false
+
+[auth]
+enabled = true
+port = 54327
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["https://localhost:3000"]
 jwt_expiry = 3600
 enable_signup = true
-
-[functions.auth]
-verify_jwt = false
+enable_confirmations = false
