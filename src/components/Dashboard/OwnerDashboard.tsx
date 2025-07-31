@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +8,6 @@ import { format, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
 
 export const OwnerDashboard = () => {
-  // Fetch comprehensive dashboard data including walk-ins
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['owner-dashboard'],
     queryFn: async () => {
@@ -19,7 +17,6 @@ export const OwnerDashboard = () => {
       const lastMonth = subDays(startDate, 1);
       const lastMonthStart = startOfMonth(lastMonth);
 
-      // Fetch bookings data for current and last month including walk-ins
       const [currentBookings, currentWalkins, lastMonthBookings, lastMonthWalkins, studios, users, targets] = await Promise.all([
         supabase
           .from('bookings')
@@ -86,7 +83,6 @@ export const OwnerDashboard = () => {
 
   const { currentBookings, currentWalkins, lastMonthBookings, studios, users, targets } = dashboardData || {};
 
-  // Calculate revenue including installments
   const calculateRevenue = (bookings: any[]) => {
     return bookings?.reduce((sum, booking) => {
       const bookingAmount = booking.total_amount || 0;
@@ -99,7 +95,6 @@ export const OwnerDashboard = () => {
   const lastMonthRevenue = calculateRevenue(lastMonthBookings);
   const revenueGrowth = lastMonthRevenue > 0 ? ((currentRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
 
-  // Studio performance analysis including walk-ins
   const studioPerformance = currentBookings?.reduce((acc, booking) => {
     const studioName = booking.studios?.name || 'Unknown';
     if (!acc[studioName]) {
@@ -120,7 +115,6 @@ export const OwnerDashboard = () => {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 5);
 
-  // Payment method analysis
   const paymentAnalysis = currentBookings?.reduce((acc, booking) => {
     const method = booking.payment_method || 'unknown';
     if (!acc[method]) {
@@ -141,7 +135,6 @@ export const OwnerDashboard = () => {
     ...data
   }));
 
-  // User statistics
   const userStats = {
     total: users?.length || 0,
     owners: users?.filter(u => u.role === 'owner').length || 0,
@@ -158,7 +151,7 @@ export const OwnerDashboard = () => {
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Owner Dashboard</h1>
         <p className="text-muted-foreground">
@@ -166,7 +159,6 @@ export const OwnerDashboard = () => {
         </p>
       </div>
 
-      {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -237,9 +229,7 @@ export const OwnerDashboard = () => {
         </Card>
       </div>
 
-      {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Performing Studios */}
         <Card>
           <CardHeader>
             <CardTitle>Top 5 Studios Performance</CardTitle>
@@ -266,7 +256,6 @@ export const OwnerDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Payment Method Distribution */}
         <Card>
           <CardHeader>
             <CardTitle>Payment Method Distribution</CardTitle>
@@ -307,7 +296,6 @@ export const OwnerDashboard = () => {
         </Card>
       </div>
 
-      {/* User Statistics */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -344,7 +332,6 @@ export const OwnerDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Studio Management Summary */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
