@@ -1,18 +1,15 @@
 
-import React from 'react'
+import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
-import { JWTAuthProvider } from './hooks/useJWTAuth.tsx'
 
-const container = document.getElementById("root");
-if (!container) throw new Error('Root element not found');
+// Setup API interceptor before app starts
+import { setupAPIInterceptor } from './utils/apiInterceptor'
+setupAPIInterceptor()
 
-const root = createRoot(container);
-root.render(
-  <React.StrictMode>
-    <JWTAuthProvider>
-      <App />
-    </JWTAuthProvider>
-  </React.StrictMode>
-);
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)

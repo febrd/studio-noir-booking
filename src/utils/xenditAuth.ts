@@ -1,14 +1,8 @@
+
 export interface XenditTestResult {
   success: boolean;
   data?: any;
   error?: string;
-}
-
-export interface XenditProvider {
-  id: string;
-  name: string;
-  environment: 'sandbox' | 'production';
-  api_url?: string;
 }
 
 export class XenditAuthClient {
@@ -45,12 +39,15 @@ export class XenditAuthClient {
     });
   }
 
-  // Test authentication by getting invoices list
+  // Test connection to Xendit API
   async testConnection(): Promise<XenditTestResult> {
     try {
-      console.log('Testing Xendit connection...');
+      console.log('Testing Xendit connection to:', this.apiUrl);
       
-      const response = await this.makeRequest('/v2/invoices?limit=1');
+      const response = await this.makeRequest('/v2/invoices?limit=1', {
+        method: 'GET',
+      });
+      
       const responseData = await response.json();
 
       console.log('Xendit API Response Status:', response.status);
@@ -61,7 +58,7 @@ export class XenditAuthClient {
           success: true,
           data: {
             status: response.status,
-            message: 'Koneksi berhasil ke Xendit API',
+            message: 'Connection successful to Xendit API',
             invoices: responseData,
             timestamp: new Date().toISOString()
           }
@@ -81,40 +78,19 @@ export class XenditAuthClient {
     }
   }
 
-  // Get balance (alternative test endpoint)
-  async getBalance(): Promise<XenditTestResult> {
-    try {
-      const response = await this.makeRequest('/balance');
-      const responseData = await response.json();
-
-      if (response.ok) {
-        return {
-          success: true,
-          data: responseData
-        };
-      } else {
-        return {
-          success: false,
-          error: responseData.message || `HTTP ${response.status}`
-        };
-      }
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      };
-    }
-  }
-
   // Create invoice
   async createInvoice(invoiceData: any): Promise<XenditTestResult> {
     try {
+      console.log('Creating invoice with data:', invoiceData);
+      
       const response = await this.makeRequest('/v2/invoices', {
         method: 'POST',
         body: JSON.stringify(invoiceData)
       });
 
       const responseData = await response.json();
+      console.log('Xendit API Response Status:', response.status);
+      console.log('Xendit API Response:', responseData);
 
       if (response.ok) {
         return {
@@ -122,12 +98,29 @@ export class XenditAuthClient {
           data: responseData
         };
       } else {
+        // Handle different error types from Xendit
+        let errorMessage = responseData.message || `HTTP ${response.status}: ${response.statusText}`;
+        
+        // Handle specific Xendit error responses
+        if (response.status === 400) {
+          errorMessage = `Bad Request: ${responseData.message || 'Invalid request parameters'}`;
+        } else if (response.status === 401) {
+          errorMessage = 'Authentication failed: Invalid API key or credentials';
+        } else if (response.status === 403) {
+          errorMessage = 'Forbidden: Access denied or insufficient permissions';
+        } else if (response.status === 429) {
+          errorMessage = 'Rate limit exceeded: Too many requests';
+        } else if (response.status >= 500) {
+          errorMessage = 'Xendit server error: Please try again later';
+        }
+
         return {
           success: false,
-          error: responseData.message || `HTTP ${response.status}`
+          error: errorMessage
         };
       }
     } catch (error) {
+      console.error('Xendit invoice creation failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -138,40 +131,63 @@ export class XenditAuthClient {
   // Get invoice by ID or external_id
   async getInvoice(invoiceId?: string, externalId?: string): Promise<XenditTestResult> {
     try {
-      let endpoint = '/v2/invoices';
+      let endpoint: string;
       
       if (invoiceId) {
         endpoint = `/v2/invoices/${invoiceId}`;
+        console.log('Getting invoice by ID:', invoiceId);
       } else if (externalId) {
         endpoint = `/v2/invoices?external_id=${encodeURIComponent(externalId)}`;
+        console.log('Getting invoice by external_id:', externalId);
       } else {
         return {
           success: false,
           error: 'Either invoice_id or external_id must be provided'
         };
       }
-
-      console.log('Getting invoice from endpoint:', endpoint);
       
-      const response = await this.makeRequest(endpoint);
-      const responseData = await response.json();
+      const response = await this.makeRequest(endpoint, {
+        method: 'GET'
+      });
 
+      const responseData = await response.json();
       console.log('Xendit Get Invoice Response Status:', response.status);
       console.log('Xendit Get Invoice Response:', responseData);
 
       if (response.ok) {
+        // Handle array response when querying by external_id
+        let invoiceData = responseData;
+        if (externalId && Array.isArray(responseData) && responseData.length > 0) {
+          invoiceData = responseData[0]; // Get first matching invoice
+        } else if (externalId && Array.isArray(responseData) && responseData.length === 0) {
+          return {
+            success: false,
+            error: 'No invoice found with the specified external_id'
+          };
+        }
+
         return {
           success: true,
-          data: responseData
+          data: invoiceData
         };
       } else {
+        let errorMessage = responseData.message || `HTTP ${response.status}: ${response.statusText}`;
+        
+        if (response.status === 404) {
+          errorMessage = 'Invoice not found';
+        } else if (response.status === 401) {
+          errorMessage = 'Authentication failed: Invalid API key or credentials';
+        } else if (response.status === 403) {
+          errorMessage = 'Forbidden: Access denied or insufficient permissions';
+        }
+
         return {
           success: false,
-          error: responseData.message || `HTTP ${response.status}`
+          error: errorMessage
         };
       }
     } catch (error) {
-      console.error('Get invoice failed:', error);
+      console.error('Xendit get invoice failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
