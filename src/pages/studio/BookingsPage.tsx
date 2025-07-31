@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Calendar, Users, Clock } from 'lucide-react';
 import { toast } from 'sonner';
-import { BookingForm } from '@/components/studio/BookingForm';
+import BookingForm from '@/components/studio/BookingForm';
 import InstallmentManager from '@/components/studio/InstallmentManager';
 import TimeExtensionManager from '@/components/studio/TimeExtensionManager';
 import { format } from 'date-fns';
@@ -168,7 +169,7 @@ const BookingsPage = () => {
             <DialogHeader>
               <DialogTitle>Tambah Booking Baru</DialogTitle>
             </DialogHeader>
-            <BookingForm onClose={() => setIsCreateDialogOpen(false)} />
+            <BookingForm onSuccess={() => setIsCreateDialogOpen(false)} />
           </DialogContent>
         </Dialog>
       </div>
@@ -327,7 +328,7 @@ const BookingsPage = () => {
               <DialogTitle>Manage Installments</DialogTitle>
             </DialogHeader>
             <InstallmentManager
-              booking={selectedBooking}
+              bookingId={selectedBooking.id}
               onClose={() => setShowInstallments(false)}
             />
           </DialogContent>
@@ -342,7 +343,7 @@ const BookingsPage = () => {
               <DialogTitle>Manage Time Extension</DialogTitle>
             </DialogHeader>
             <TimeExtensionManager
-              booking={selectedBooking}
+              bookingId={selectedBooking.id}
               onClose={() => setShowTimeExtension(false)}
             />
           </DialogContent>
