@@ -1,4 +1,6 @@
+
 import { InvoiceService, InvoiceRequest, InvoiceResponse, GetInvoiceRequest } from '@/services/invoiceService';
+import { WebhookHandler } from './webhookHandler';
 
 export class InvoiceAPIHandler {
   static async handleCreateInvoice(request: Request): Promise<Response> {
@@ -161,5 +163,9 @@ export class InvoiceAPIHandler {
         }
       );
     }
+  }
+
+  static async handleWebhookCallback(request: Request): Promise<Response> {
+    return await WebhookHandler.handleXenditWebhook(request);
   }
 }

@@ -1,6 +1,7 @@
 
 // API Route Interceptor for Invoice Endpoints
 import { InvoiceService } from '@/services/invoiceService';
+import { WebhookHandler } from '@/api/webhookHandler';
 
 export const setupAPIInterceptor = () => {
   // Only run in development/browser environment
@@ -17,7 +18,7 @@ export const setupAPIInterceptor = () => {
     console.log('🔍 Intercepting request:', pathname);
 
     // Check if this is one of our API routes
-    if (pathname === '/v1/create/invoice' || pathname === '/v1/get/invoice') {
+    if (pathname === '/v1/create/invoice' || pathname === '/v1/get/invoice' || pathname === '/v1/callback') {
       console.log('🎯 Handling API route:', pathname);
       
       try {
@@ -33,7 +34,13 @@ export const setupAPIInterceptor = () => {
           });
         }
 
-        // Only allow POST method
+        // Handle webhook callback
+        if (pathname === '/v1/callback') {
+          console.log('🔔 Routing to webhook callback handler');
+          return await WebhookHandler.handleXenditWebhook(new Request(url, init));
+        }
+
+        // Only allow POST method for other endpoints
         if (init?.method !== 'POST') {
           return new Response(
             JSON.stringify({

@@ -28,16 +28,7 @@ export class RouteHandler {
         
       case '/v1/callback':
         console.log('🔔 Routing to webhook callback handler');
-        // For webhook callbacks, we need to call the edge function
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/xendit-webhook/v1/callback`, {
-          method: request.method,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: request.method !== 'GET' ? await request.text() : undefined,
-        });
-        return response;
+        return await InvoiceAPIHandler.handleWebhookCallback(request);
         
       default:
         console.log('❓ No handler found for route:', pathname);
