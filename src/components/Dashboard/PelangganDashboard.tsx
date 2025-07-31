@@ -417,14 +417,7 @@ const PelangganDashboard = () => {
                         })}
                       </p>
                       
-                      {/* Show payment button if pending or installment */}
-                      {(booking.status === 'pending' || booking.status === 'installment') && (
-                        <DynamicPaymentButton 
-                          booking={booking}
-                          qrisImageUrl={qrisImageUrl}
-                          onPaymentUpdate={handlePaymentUpdate}
-                        />
-                      )}
+                      
                     </div>
                   </div>
                 ))}

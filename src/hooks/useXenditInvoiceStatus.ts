@@ -37,8 +37,10 @@ export const useXenditInvoiceStatus = (bookingId: string, shouldCheck: boolean =
 
       if (result.success && result.data) {
         console.log('📊 Xendit invoice data:', result.data);
+        console.log('📊 Xendit URL invoice data:', result.data.invoice.invoice_url);
+
         setStatus(result.data.status);
-        setInvoiceUrl(result.data.invoice_url);
+        setInvoiceUrl(result.data.invoice.invoice_url);
         setPaidAmount(result.data.paid_amount || result.data.amount);
       } else {
         console.log('❌ Failed to get invoice status:', result.error);

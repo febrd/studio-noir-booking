@@ -220,7 +220,7 @@ const OrderHistoryPage = () => {
                         {/* Payment Info */}
                         <div className="bg-gray-50 p-4 rounded-sm">
                           <div className="flex justify-between items-center">
-                            <span className="text-sm font-inter text-gray-600">Total Pembayaran</span>
+                            <span className="text-sm font-inter text-gray-600">Total Bayar</span>
                             <span className="text-lg font-peace-sans font-black text-black">
                               {(booking.total_amount || 0).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 })}
                             </span>
@@ -229,7 +229,7 @@ const OrderHistoryPage = () => {
                             <div className="mt-2 pt-2 border-t border-gray-200">
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-xs font-inter text-gray-500">Sudah Dibayar</span>
+                                  <span className="text-xs font-inter text-gray-500">Terbayar</span>
                                   <Badge className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
                                     Cicilan {booking.installments.length}x
                                   </Badge>
