@@ -1,10 +1,81 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.51.0'
-import { XenditAuth } from '../xendit-auth-test/index.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Xendit Authentication Module
+class XenditAuth {
+  private secretKey: string;
+  private apiUrl: string;
+
+  constructor(secretKey: string, apiUrl: string = 'https://api.xendit.co') {
+    this.secretKey = secretKey;
+    this.apiUrl = apiUrl;
+  }
+
+  // Create Basic Auth header
+  getAuthHeader(): string {
+    const credentials = `${this.secretKey}:`;
+    const base64Credentials = btoa(credentials);
+    return `Basic ${base64Credentials}`;
+  }
+
+  // Generic method to make authenticated requests to Xendit
+  async makeRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
+    const url = `${this.apiUrl}${endpoint}`;
+    
+    const defaultHeaders = {
+      'Authorization': this.getAuthHeader(),
+      'Content-Type': 'application/json',
+    };
+
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+    });
+  }
+
+  // Test authentication by getting invoices list
+  async testConnection(): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      console.log('Testing Xendit connection...');
+      
+      const response = await this.makeRequest('/v2/invoices?limit=1');
+      const responseData = await response.json();
+
+      console.log('Xendit API Response Status:', response.status);
+      console.log('Xendit API Response:', responseData);
+
+      if (response.ok) {
+        return {
+          success: true,
+          data: {
+            status: response.status,
+            message: 'Koneksi berhasil ke Xendit API',
+            invoices: responseData,
+            timestamp: new Date().toISOString()
+          }
+        };
+      } else {
+        return {
+          success: false,
+          error: responseData.message || `HTTP ${response.status}: ${response.statusText}`
+        };
+      }
+    } catch (error) {
+      console.error('Xendit connection test failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
 }
 
 Deno.serve(async (req) => {

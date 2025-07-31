@@ -7,7 +7,7 @@ const corsHeaders = {
 }
 
 // Xendit Authentication Module
-export class XenditAuth {
+class XenditAuth {
   private secretKey: string;
   private apiUrl: string;
 
