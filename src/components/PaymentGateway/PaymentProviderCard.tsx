@@ -33,7 +33,7 @@ class XenditAuthHelper {
   private secretKey: string;
   private apiUrl: string;
 
-  constructor(secretKey: string, apiUrl: string = 'https://api.xendit.co') {
+  constructor(secretKey: string, apiUrl: string = 'https://api.xendit.co/v2/') {
     this.secretKey = secretKey;
     this.apiUrl = apiUrl;
   }
@@ -48,7 +48,7 @@ class XenditAuthHelper {
     try {
       console.log('Testing Xendit connection to:', this.apiUrl);
       
-      const response = await fetch(`${this.apiUrl}/v2/invoices?limit=1`, {
+      const response = await fetch(`${this.apiUrl}/invoices?limit=1`, {
         method: 'GET',
         headers: {
           'Authorization': this.getAuthHeader(),
