@@ -124,7 +124,7 @@ const ExpensesPage = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Filter Pengeluaran</CardTitle>
+              <CardTitle>Filter Pengeluaran Studio</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-4 items-center">
