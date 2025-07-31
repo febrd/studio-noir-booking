@@ -11,7 +11,8 @@ export class XenditAuthClient {
 
   constructor(secretKey: string, apiUrl: string = 'https://api.xendit.co') {
     this.secretKey = secretKey;
-    this.apiUrl = apiUrl;
+    // Ensure API URL doesn't have trailing slash for consistency
+    this.apiUrl = apiUrl.replace(/\/$/, '');
   }
 
   // Create Basic Auth header
@@ -23,7 +24,11 @@ export class XenditAuthClient {
 
   // Generic method to make authenticated requests to Xendit
   async makeRequest(endpoint: string, options: RequestInit = {}): Promise<Response> {
-    const url = `${this.apiUrl}${endpoint}`;
+    // Ensure endpoint starts with /
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${this.apiUrl}${normalizedEndpoint}`;
+    
+    console.log('🌐 Making request to:', url);
     
     const defaultHeaders = {
       'Authorization': this.getAuthHeader(),
@@ -42,16 +47,16 @@ export class XenditAuthClient {
   // Test connection to Xendit API
   async testConnection(): Promise<XenditTestResult> {
     try {
-      console.log('Testing Xendit connection to:', this.apiUrl);
+      console.log('🧪 Testing Xendit connection to:', this.apiUrl);
       
-      const response = await this.makeRequest('invoices?limit=1', {
+      const response = await this.makeRequest('/v2/invoices?limit=1', {
         method: 'GET',
       });
       
       const responseData = await response.json();
 
-      console.log('Xendit API Response Status:', response.status);
-      console.log('Xendit API Response:', responseData);
+      console.log('📊 Xendit API Response Status:', response.status);
+      console.log('📋 Xendit API Response:', responseData);
 
       if (response.ok) {
         return {
@@ -70,7 +75,7 @@ export class XenditAuthClient {
         };
       }
     } catch (error) {
-      console.error('Xendit connection test failed:', error);
+      console.error('❌ Xendit connection test failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -81,16 +86,16 @@ export class XenditAuthClient {
   // Create invoice
   async createInvoice(invoiceData: any): Promise<XenditTestResult> {
     try {
-      console.log('Creating invoice with data:', invoiceData);
+      console.log('📝 Creating invoice with data:', invoiceData);
       
-      const response = await this.makeRequest('invoices', {
+      const response = await this.makeRequest('/v2/invoices', {
         method: 'POST',
         body: JSON.stringify(invoiceData)
       });
 
       const responseData = await response.json();
-      console.log('Xendit API Response Status:', response.status);
-      console.log('Xendit API Response:', responseData);
+      console.log('📊 Xendit Create Invoice Response Status:', response.status);
+      console.log('📋 Xendit Create Invoice Response:', responseData);
 
       if (response.ok) {
         return {
@@ -120,7 +125,7 @@ export class XenditAuthClient {
         };
       }
     } catch (error) {
-      console.error('Xendit invoice creation failed:', error);
+      console.error('❌ Xendit invoice creation failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -135,10 +140,10 @@ export class XenditAuthClient {
       
       if (invoiceId) {
         endpoint = `/v2/invoices/${invoiceId}`;
-        console.log('Getting invoice by ID:', invoiceId);
+        console.log('🔍 Getting invoice by ID:', invoiceId);
       } else if (externalId) {
         endpoint = `/v2/invoices?external_id=${encodeURIComponent(externalId)}`;
-        console.log('Getting invoice by external_id:', externalId);
+        console.log('🔍 Getting invoice by external_id:', externalId);
       } else {
         return {
           success: false,
@@ -151,8 +156,8 @@ export class XenditAuthClient {
       });
 
       const responseData = await response.json();
-      console.log('Xendit Get Invoice Response Status:', response.status);
-      console.log('Xendit Get Invoice Response:', responseData);
+      console.log('📊 Xendit Get Invoice Response Status:', response.status);
+      console.log('📋 Xendit Get Invoice Response:', responseData);
 
       if (response.ok) {
         // Handle array response when querying by external_id
@@ -187,7 +192,7 @@ export class XenditAuthClient {
         };
       }
     } catch (error) {
-      console.error('Xendit get invoice failed:', error);
+      console.error('❌ Xendit get invoice failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'

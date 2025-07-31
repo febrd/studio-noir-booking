@@ -1,3 +1,4 @@
+
 import { XenditAuthClient, XenditTestResult } from '@/utils/xenditAuth';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -32,7 +33,7 @@ export interface InvoiceResponse {
 export class InvoiceService {
   static async createInvoice(requestData: InvoiceRequest): Promise<InvoiceResponse> {
     try {
-      console.log('Creating invoice with data:', requestData);
+      console.log('🚀 Creating invoice with data:', requestData);
 
       // Validate required parameter
       if (!requestData.performed_by) {
@@ -44,7 +45,7 @@ export class InvoiceService {
       }
 
       // Check if performed_by exists in users table
-      console.log('Validating user:', requestData.performed_by);
+      console.log('👤 Validating user:', requestData.performed_by);
       const { data: user, error: userError } = await supabase
         .from('users')
         .select('id, name, email, role')
@@ -52,7 +53,7 @@ export class InvoiceService {
         .single();
 
       if (userError || !user) {
-        console.error('User validation error:', userError);
+        console.error('❌ User validation error:', userError);
         return {
           success: false,
           error: 'User tidak ditemukan atau tidak valid',
@@ -60,21 +61,36 @@ export class InvoiceService {
         };
       }
 
-      console.log('User validated:', user.name);
+      console.log('✅ User validated:', user.name);
 
-      // Get active production payment provider
-      console.log('Fetching active Xendit payment provider...');
-      const { data: paymentProvider, error: dbError } = await supabase
+      // Get active payment provider (production first, then any active)
+      console.log('🔍 Fetching active Xendit payment provider...');
+      let { data: paymentProvider, error: dbError } = await supabase
         .from('payment_providers')
         .select('*')
-        .eq('environment', 'production')
         .eq('status', 'active')
+        .eq('environment', 'production')
         .order('updated_at', { ascending: false })
         .limit(1)
         .single();
 
+      // If no production provider, try any active provider
       if (dbError || !paymentProvider) {
-        console.error('Payment provider error:', dbError);
+        console.log('🔍 No production provider found, trying any active provider...');
+        const { data: anyProvider, error: anyError } = await supabase
+          .from('payment_providers')
+          .select('*')
+          .eq('status', 'active')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        paymentProvider = anyProvider;
+        dbError = anyError;
+      }
+
+      if (dbError || !paymentProvider) {
+        console.error('❌ Payment provider error:', dbError);
         return {
           success: false,
           error: 'Payment provider tidak ditemukan atau tidak aktif',
@@ -90,7 +106,7 @@ export class InvoiceService {
         };
       }
 
-      console.log('Using payment provider:', paymentProvider.name);
+      console.log('✅ Using payment provider:', paymentProvider.name, '(' + paymentProvider.environment + ')');
 
       // Validate required invoice fields
       if (!requestData.external_id || !requestData.amount) {
@@ -117,6 +133,8 @@ export class InvoiceService {
         ...requestData,
       };
 
+      console.log('📝 Final invoice data:', finalInvoiceData);
+
       // Initialize Xendit Auth with provider data
       const xenditAuth = new XenditAuthClient(
         paymentProvider.secret_key,
@@ -124,10 +142,11 @@ export class InvoiceService {
       );
 
       // Create the invoice
+      console.log('🔄 Calling Xendit API...');
       const invoiceResult = await xenditAuth.createInvoice(finalInvoiceData);
 
       if (invoiceResult.success) {
-        console.log('Invoice created successfully');
+        console.log('✅ Invoice created successfully');
         
         return {
           success: true,
@@ -147,7 +166,7 @@ export class InvoiceService {
           }
         };
       } else {
-        console.error('Invoice creation failed:', invoiceResult.error);
+        console.error('❌ Invoice creation failed:', invoiceResult.error);
         
         return {
           success: false,
@@ -157,7 +176,7 @@ export class InvoiceService {
       }
 
     } catch (error) {
-      console.error('Unexpected error in invoice creation:', error);
+      console.error('💥 Unexpected error in invoice creation:', error);
       
       return {
         success: false,
@@ -169,7 +188,7 @@ export class InvoiceService {
 
   static async getInvoice(requestData: GetInvoiceRequest): Promise<InvoiceResponse> {
     try {
-      console.log('Getting invoice with data:', requestData);
+      console.log('🔍 Getting invoice with data:', requestData);
 
       // Validate required parameter
       if (!requestData.performed_by) {
@@ -190,7 +209,7 @@ export class InvoiceService {
       }
 
       // Check if performed_by exists in users table
-      console.log('Validating user:', requestData.performed_by);
+      console.log('👤 Validating user:', requestData.performed_by);
       const { data: user, error: userError } = await supabase
         .from('users')
         .select('id, name, email, role')
@@ -198,7 +217,7 @@ export class InvoiceService {
         .single();
 
       if (userError || !user) {
-        console.error('User validation error:', userError);
+        console.error('❌ User validation error:', userError);
         return {
           success: false,
           error: 'User tidak ditemukan atau tidak valid',
@@ -206,21 +225,36 @@ export class InvoiceService {
         };
       }
 
-      console.log('User validated:', user.name);
+      console.log('✅ User validated:', user.name);
 
-      // Get active production payment provider
-      console.log('Fetching active Xendit payment provider...');
-      const { data: paymentProvider, error: dbError } = await supabase
+      // Get active payment provider (production first, then any active)
+      console.log('🔍 Fetching active Xendit payment provider...');
+      let { data: paymentProvider, error: dbError } = await supabase
         .from('payment_providers')
         .select('*')
-        .eq('environment', 'production')
         .eq('status', 'active')
+        .eq('environment', 'production')
         .order('updated_at', { ascending: false })
         .limit(1)
         .single();
 
+      // If no production provider, try any active provider
       if (dbError || !paymentProvider) {
-        console.error('Payment provider error:', dbError);
+        console.log('🔍 No production provider found, trying any active provider...');
+        const { data: anyProvider, error: anyError } = await supabase
+          .from('payment_providers')
+          .select('*')
+          .eq('status', 'active')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        paymentProvider = anyProvider;
+        dbError = anyError;
+      }
+
+      if (dbError || !paymentProvider) {
+        console.error('❌ Payment provider error:', dbError);
         return {
           success: false,
           error: 'Payment provider tidak ditemukan atau tidak aktif',
@@ -236,7 +270,7 @@ export class InvoiceService {
         };
       }
 
-      console.log('Using payment provider:', paymentProvider.name);
+      console.log('✅ Using payment provider:', paymentProvider.name, '(' + paymentProvider.environment + ')');
 
       // Initialize Xendit Auth with provider data
       const xenditAuth = new XenditAuthClient(
@@ -245,10 +279,11 @@ export class InvoiceService {
       );
 
       // Get the invoice
+      console.log('🔄 Calling Xendit API to get invoice...');
       const invoiceResult = await xenditAuth.getInvoice(requestData.invoice_id, requestData.external_id);
 
       if (invoiceResult.success) {
-        console.log('Invoice retrieved successfully');
+        console.log('✅ Invoice retrieved successfully');
         
         return {
           success: true,
@@ -268,7 +303,7 @@ export class InvoiceService {
           }
         };
       } else {
-        console.error('Invoice retrieval failed:', invoiceResult.error);
+        console.error('❌ Invoice retrieval failed:', invoiceResult.error);
         
         return {
           success: false,
@@ -278,7 +313,7 @@ export class InvoiceService {
       }
 
     } catch (error) {
-      console.error('Unexpected error in invoice retrieval:', error);
+      console.error('💥 Unexpected error in invoice retrieval:', error);
       
       return {
         success: false,

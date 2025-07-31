@@ -1,6 +1,6 @@
 
 // API Route Interceptor for Invoice Endpoints
-import { RouteHandler } from './routeHandler';
+import { InvoiceService } from '@/services/invoiceService';
 
 export const setupAPIInterceptor = () => {
   // Only run in development/browser environment
@@ -21,33 +21,92 @@ export const setupAPIInterceptor = () => {
       console.log('🎯 Handling API route:', pathname);
       
       try {
-        // Create a Request object from the input
-        const request = new Request(url, init);
-        
-        // Handle the route using static import
-        const response = await RouteHandler.handleAPIRoute(pathname, request);
-        
-        if (response) {
-          console.log('✅ API route handled successfully');
-          return response;
-        }
-      } catch (error) {
-        console.error('❌ Error handling API route:', error);
-        
-        // Return error response
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'Internal server error: ' + (error instanceof Error ? error.message : 'Unknown error'),
-            errorCode: 'INTERNAL_SERVER_ERROR'
-          }),
-          {
-            status: 500,
+        // Handle CORS preflight requests
+        if (init?.method === 'OPTIONS') {
+          return new Response(null, {
+            status: 200,
             headers: {
-              'Content-Type': 'application/json',
               'Access-Control-Allow-Origin': '*',
               'Access-Control-Allow-Methods': 'POST, OPTIONS',
               'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            }
+          });
+        }
+
+        // Only allow POST method
+        if (init?.method !== 'POST') {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: 'Method not allowed. Use POST method.',
+              errorCode: 'METHOD_NOT_ALLOWED'
+            }),
+            {
+              status: 405,
+              headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        }
+
+        // Parse request body
+        const requestData = JSON.parse(init?.body as string);
+        console.log('📝 Request data:', requestData);
+
+        let result;
+        
+        // Handle create invoice
+        if (pathname === '/v1/create/invoice') {
+          console.log('📝 Routing to create invoice handler');
+          result = await InvoiceService.createInvoice(requestData);
+        } 
+        // Handle get invoice
+        else if (pathname === '/v1/get/invoice') {
+          console.log('📋 Routing to get invoice handler');
+          result = await InvoiceService.getInvoice(requestData);
+        }
+
+        console.log('✅ API handler result:', result);
+
+        // Return response
+        const httpStatus = result?.success ? 200 : 400;
+        
+        return new Response(
+          JSON.stringify(result),
+          {
+            status: httpStatus,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+      } catch (error) {
+        console.error('❌ Error handling API route:', error);
+        
+        // Handle JSON parsing errors
+        const isJsonError = error instanceof SyntaxError && error.message.includes('JSON');
+        
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: isJsonError 
+              ? 'Invalid JSON format in request body' 
+              : 'Terjadi kesalahan sistem: ' + (error instanceof Error ? error.message : 'Unknown error'),
+            errorCode: isJsonError ? 'INVALID_JSON' : 'INTERNAL_SERVER_ERROR'
+          }),
+          {
+            status: isJsonError ? 400 : 500,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+              'Content-Type': 'application/json'
             }
           }
         );
