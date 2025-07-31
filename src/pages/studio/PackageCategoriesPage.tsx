@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -117,8 +118,8 @@ const PackageCategoriesPage = () => {
                   <div>
                     <CardTitle className="text-lg">{category.name}</CardTitle>
                     <div className="flex gap-2 mt-1">
-                      <Badge variant={category.is_active ? 'outline' : 'destructive'}>
-                        {category.is_active ? 'Active' : 'Inactive'}
+                      <Badge variant="outline">
+                        Active
                       </Badge>
                     </div>
                   </div>
