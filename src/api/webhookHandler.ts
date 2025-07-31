@@ -100,11 +100,13 @@ export class WebhookHandler {
 
       // Get Xendit credentials from payment providers
       const { data: provider, error: providerError } = await supabase
-        .from('payment_providers')
-        .select('secret_key, api_url')
-        .eq('name', 'Xendit')
-        .eq('status', 'active')
-        .single();
+      .from('payment_providers')
+      .select('secret_key, api_url')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false }) // urutkan terbaru dulu
+      .limit(1)
+      .single(); // ambil hanya satu objek, bukan array
+    
 
       if (providerError || !provider) {
         console.error('❌ Xendit provider not found:', providerError);
@@ -214,72 +216,101 @@ export class WebhookHandler {
   }
 
   private static async handlePaidStatus(payload: XenditWebhookPayload, booking: any, xenditInvoice: any) {
-    console.log('💰 Processing PAID/SETTLED status for booking:', booking.id);
-
-    // Use the actual paid amount from Xendit verification
-    const paidAmount = xenditInvoice.paid_amount || xenditInvoice.amount;
-
-    // Check if booking has installments
+    console.log('💰 Processing PAID/SETTLED status for booking:', booking?.id);
+  
+    const paidAmount = Number(xenditInvoice?.paid_amount || xenditInvoice?.amount || 0);
+    const invoiceAmount = Number(booking?.amount || 0);
+  
+    if (!booking || !xenditInvoice?.id || !booking.id) {
+      console.error('❌ Invalid booking or invoice data');
+      return;
+    }
+  
+    // Check existing installments
     const { data: installments, error: installmentsError } = await supabase
       .from('installments')
       .select('amount')
       .eq('booking_id', booking.id);
-
+  
     if (installmentsError) {
       console.error('❌ Error fetching installments:', installmentsError);
       return;
     }
-
+  
     const hasInstallments = installments && installments.length > 0;
     let newStatus: 'paid' | 'installment' = 'paid';
-
+  
     if (hasInstallments) {
-      // Calculate total paid installments
-      const totalPaid = installments.reduce((sum, inst) => sum + Number(inst.amount), 0);
-      const totalAmount = Number(booking.total_amount);
-
-      console.log('📊 Installment check:', { totalPaid, totalAmount, paidAmount });
-
-      if (totalPaid >= totalAmount) {
-        newStatus = 'paid';
-      } else {
+      const totalPaidBefore = installments.reduce((sum, inst) => sum + Number(inst.amount), 0);
+      const totalCombined = totalPaidBefore + paidAmount;
+  
+      console.log('📊 Installment check (existing):', {
+        totalPaidBefore,
+        thisPayment: paidAmount,
+        totalCombined,
+        requiredAmount: invoiceAmount
+      });
+  
+      if (totalCombined < invoiceAmount) {
+        newStatus = 'installment';
+      }
+    } else {
+      if (paidAmount < invoiceAmount) {
+        console.warn('⚠️ Detected partial payment without prior installments. Marking as INSTALLMENT.');
         newStatus = 'installment';
       }
     }
-
-    // Update booking status
+  
+    // ⬇️ INSERT INTO INSTALLMENTS if status is installment
+    if (newStatus === 'installment') {
+      const { error: installmentInsertError } = await supabase
+        .from('installments')
+        .insert({
+          booking_id: booking.id,
+          amount: paidAmount,
+          paid_at: new Date().toISOString(),
+          method: xenditInvoice.payment_method || 'Xendit',
+          reference: xenditInvoice.id
+        });
+  
+      if (installmentInsertError) {
+        console.error('❌ Error inserting installment record:', installmentInsertError);
+      }
+    }
+  
+    // ⬇️ Update booking status
     const { error: updateError } = await supabase
       .from('bookings')
-      .update({ 
+      .update({
         status: newStatus,
         updated_at: new Date().toISOString()
       })
       .eq('id', booking.id);
-
+  
     if (updateError) {
       console.error('❌ Error updating booking status:', updateError);
       return;
     }
-
-    // Create transaction record with verified data
+  
+    // ⬇️ Create transaction record
     const { error: transactionError } = await supabase
       .from('transactions')
       .insert({
-        reference_id: xenditInvoice.id,
+        reference_id: booking.id,
         booking_id: booking.id,
         amount: paidAmount,
         type: 'online',
         description: `Payment verified via ${xenditInvoice.payment_method || 'Xendit'} - Invoice: ${xenditInvoice.id}`,
         performed_by: booking.user_id,
-        payment_type: hasInstallments ? 'installment' : 'online',
+        payment_type: newStatus === 'installment' ? 'installment' : 'online',
         status: 'paid'
       });
-
+  
     if (transactionError) {
       console.error('❌ Error creating transaction:', transactionError);
     }
-
-    // Log booking activity with verified data
+  
+    // ⬇️ Log booking activity
     const { error: logError } = await supabase
       .from('booking_logs')
       .insert({
@@ -287,16 +318,16 @@ export class WebhookHandler {
         action_type: 'payment_received',
         performed_by: booking.user_id,
         new_data: JSON.parse(JSON.stringify(xenditInvoice)) as any,
-        note: `Payment verified from Xendit API. Status: ${xenditInvoice.status}. Amount: ${paidAmount}. Updated booking status to ${newStatus}`
+        note: `Payment verified from Xendit API. Status: ${xenditInvoice.status}. Paid: ${paidAmount}. Updated booking to '${newStatus}'.`
       });
-
+  
     if (logError) {
-      console.error('❌ Error logging activity:', logError);
+      console.error('❌ Error logging booking activity:', logError);
     }
-
+  
     console.log('✅ Payment processed and verified successfully');
   }
-
+  
   private static async handleExpiredStatus(payload: XenditWebhookPayload, booking: any, xenditInvoice: any) {
     console.log('⏰ Processing EXPIRED status for booking:', booking.id);
 
