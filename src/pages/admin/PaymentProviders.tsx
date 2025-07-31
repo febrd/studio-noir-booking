@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, CreditCard, Settings } from 'lucide-react';
 import { toast } from 'sonner';
-import AddPaymentProviderForm from '@/components/PaymentGateway/AddPaymentProviderForm';
+import { AddPaymentProviderForm } from '@/components/PaymentGateway/AddPaymentProviderForm';
 import { PaymentProviderCard } from '@/components/PaymentGateway/PaymentProviderCard';
 
 const PaymentProviders = () => {

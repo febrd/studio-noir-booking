@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { MoreHorizontal, Edit, Trash2, Eye, Download } from 'lucide-react';
 import { format } from 'date-fns';
@@ -10,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import type { Expense } from '@/pages/expenses/ExpensesPage';
+import type { Expense } from '@/types/expenses';
 
 interface ExpenseTableProps {
   expenses: Expense[];

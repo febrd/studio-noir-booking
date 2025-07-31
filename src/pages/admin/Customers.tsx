@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Users, Edit, Trash2, Phone } from 'lucide-react';
 import { toast } from 'sonner';
-import AddCustomerForm from '@/components/admin/AddCustomerForm';
-import EditCustomerForm from '@/components/admin/EditCustomerForm';
+import { AddCustomerForm } from '@/components/admin/AddCustomerForm';
+import { EditCustomerForm } from '@/components/admin/EditCustomerForm';
 
 const Customers = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -16,10 +17,10 @@ const Customers = () => {
   const queryClient = useQueryClient();
 
   const { data: customers, isLoading } = useQuery({
-    queryKey: ['customers'],
+    queryKey: ['customer-profiles'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('customers')
+        .from('customer_profiles')
         .select('*')
         .order('created_at', { ascending: false });
       
@@ -31,14 +32,14 @@ const Customers = () => {
   const deleteCustomerMutation = useMutation({
     mutationFn: async (customerId: string) => {
       const { error } = await supabase
-        .from('customers')
+        .from('customer_profiles')
         .delete()
         .eq('id', customerId);
       
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-profiles'] });
       toast.success('Customer berhasil dihapus');
       setDeletingCustomer(null);
     },
@@ -50,12 +51,12 @@ const Customers = () => {
 
   const handleCreateSuccess = () => {
     setIsCreateDialogOpen(false);
-    queryClient.invalidateQueries({ queryKey: ['customers'] });
+    queryClient.invalidateQueries({ queryKey: ['customer-profiles'] });
   };
 
   const handleEditSuccess = () => {
     setEditingCustomer(null);
-    queryClient.invalidateQueries({ queryKey: ['customers'] });
+    queryClient.invalidateQueries({ queryKey: ['customer-profiles'] });
   };
 
   const handleDelete = (customer: any) => {
@@ -97,10 +98,11 @@ const Customers = () => {
             <DialogHeader>
               <DialogTitle>Tambah Customer Baru</DialogTitle>
             </DialogHeader>
-            <AddCustomerForm onSuccess={() => {
-              setIsCreateDialogOpen(false);
-              queryClient.invalidateQueries({ queryKey: ['customers'] });
-            }} />
+            <AddCustomerForm 
+              open={isCreateDialogOpen}
+              onOpenChange={setIsCreateDialogOpen}
+              onSuccess={handleCreateSuccess}
+            />
           </DialogContent>
         </Dialog>
       </div>
@@ -115,12 +117,14 @@ const Customers = () => {
                     <Users className="h-6 w-6 text-gray-600" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">{customer.name}</CardTitle>
+                    <CardTitle className="text-lg">{customer.full_name}</CardTitle>
                     <p className="text-sm text-gray-600">{customer.email}</p>
-                    <p className="text-sm text-gray-600 flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      {customer.phone}
-                    </p>
+                    {customer.phone && (
+                      <p className="text-sm text-gray-600 flex items-center gap-2">
+                        <Phone className="h-4 w-4" />
+                        {customer.phone}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -170,19 +174,12 @@ const Customers = () => {
       )}
 
       {/* Edit Dialog */}
-      <Dialog open={!!editingCustomer} onOpenChange={() => setEditingCustomer(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Customer</DialogTitle>
-          </DialogHeader>
-          {editingCustomer && (
-            <EditCustomerForm 
-              customer={editingCustomer} 
-              onSuccess={handleEditSuccess} 
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <EditCustomerForm
+        customer={editingCustomer}
+        open={!!editingCustomer}
+        onOpenChange={() => setEditingCustomer(null)}
+        onSuccess={handleEditSuccess}
+      />
 
       {/* Delete Confirmation */}
       <Dialog open={!!deletingCustomer} onOpenChange={() => setDeletingCustomer(null)}>

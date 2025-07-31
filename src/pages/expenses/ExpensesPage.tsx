@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,12 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Receipt, Calendar, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
-import ExpenseForm from '@/components/expenses/ExpenseForm';
+import { ExpenseForm } from '@/components/expenses/ExpenseForm';
 import { ExpenseFilters } from '@/components/expenses/ExpenseFilters';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
+import type { Expense } from '@/types/expenses';
 
 const ExpensesPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [selectedDateRange, setSelectedDateRange] = useState<any>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date(),
@@ -24,7 +27,14 @@ const ExpensesPage = () => {
     queryFn: async () => {
       let query = supabase
         .from('expenses')
-        .select('*')
+        .select(`
+          *,
+          users (
+            id,
+            name,
+            email
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (selectedDateRange?.from) {
@@ -39,7 +49,7 @@ const ExpensesPage = () => {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      return data as Expense[];
     },
   });
 
@@ -89,6 +99,10 @@ const ExpensesPage = () => {
     setSelectedCategory(category);
   };
 
+  const handleEditExpense = (expense: Expense) => {
+    setEditingExpense(expense);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -107,10 +121,13 @@ const ExpensesPage = () => {
             <DialogHeader>
               <DialogTitle>Tambah Pengeluaran Baru</DialogTitle>
             </DialogHeader>
-            <ExpenseForm onSuccess={() => {
-              setIsCreateDialogOpen(false);
-              queryClient.invalidateQueries({ queryKey: ['expenses'] });
-            }} />
+            <ExpenseForm 
+              onClose={() => setIsCreateDialogOpen(false)}
+              onSuccess={() => {
+                setIsCreateDialogOpen(false);
+                queryClient.invalidateQueries({ queryKey: ['expenses'] });
+              }} 
+            />
           </DialogContent>
         </Dialog>
       </div>
@@ -124,10 +141,22 @@ const ExpensesPage = () => {
       />
 
       <ExpenseTable
-        expenses={expenses}
+        expenses={expenses || []}
         isLoading={isLoading}
+        onEdit={handleEditExpense}
         onDelete={handleDeleteExpense}
       />
+
+      {editingExpense && (
+        <ExpenseForm
+          expense={editingExpense}
+          onClose={() => setEditingExpense(null)}
+          onSuccess={() => {
+            setEditingExpense(null);
+            queryClient.invalidateQueries({ queryKey: ['expenses'] });
+          }}
+        />
+      )}
     </div>
   );
 };
