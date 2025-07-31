@@ -20,8 +20,11 @@ const OrderHistoryPage = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedBookingForPayment, setSelectedBookingForPayment] = useState<any>(null);
 
+  // You can customize this QRIS image URL
+  const qrisImageUrl = "https://i.imgur.com/6U2GMax.jpeg";
+
   const { data: bookings = [], isLoading, refetch } = useQuery({
-    queryKey: ['customer-bookings-with-transactions', userProfile?.id],
+    queryKey: ['customer-bookings', userProfile?.id],
     queryFn: async () => {
       if (!userProfile?.id) return [];
 
@@ -31,14 +34,7 @@ const OrderHistoryPage = () => {
           *,
           studios (name, type),
           studio_packages (title, price, base_time_minutes),
-          transactions(
-            id,
-            amount,
-            status,
-            payment_type,
-            created_at
-          ),
-          installments (amount, paid_at, payment_method, installment_number),
+          installments (amount, paid_at, payment_method),
           booking_additional_services(
             quantity,
             additional_services(name)
@@ -81,132 +77,8 @@ const OrderHistoryPage = () => {
     }
   };
 
-  const handlePayment = async (booking: any) => {
-    // Check installment status
-    const installmentTransactions = booking.transactions?.filter((t: any) => t.payment_type === 'installment') || [];
-    const installmentRecords = booking.installments || [];
-    
-    if (installmentTransactions.length > 0) {
-      // Handle installment payment logic
-      const firstInstallmentTx = installmentTransactions[0];
-      
-      try {
-        // Check Xendit status for first installment
-        const response = await supabase.functions.invoke('xendit-get-invoice', {
-          body: {
-            performed_by: userProfile?.id,
-            transaction_id: firstInstallmentTx.id
-          }
-        });
-
-        if (response.data?.success && response.data?.data?.invoice) {
-          const invoiceStatus = response.data.data.invoice.status;
-          
-          if (invoiceStatus === 'SETTLED') {
-            // Update transaction status to paid
-            await supabase
-              .from('transactions')
-              .update({ status: 'paid' })
-              .eq('id', firstInstallmentTx.id);
-            
-            // Check if we need second installment
-            const totalAmount = booking.total_amount || 0;
-            const paidAmount = installmentRecords.reduce((sum: number, inst: any) => sum + inst.amount, 0);
-            const remainingAmount = totalAmount - paidAmount;
-            
-            if (remainingAmount > 0) {
-              // Create second installment
-              await handleInstallmentPayment(booking, remainingAmount, 2);
-            } else {
-              // All installments paid
-              await supabase
-                .from('bookings')
-                .update({ status: 'paid' })
-                .eq('id', booking.id);
-              
-              toast.success('Semua cicilan sudah lunas!');
-              refetch();
-            }
-          } else if (invoiceStatus === 'EXPIRED') {
-            // Create new invoice for expired installment
-            await handleInstallmentPayment(booking, firstInstallmentTx.amount, 1);
-          } else {
-            // Open existing invoice URL
-            if (response.data.data.invoice.invoice_url) {
-              window.open(response.data.data.invoice.invoice_url, '_blank');
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error checking invoice status:', error);
-        toast.error('Gagal memeriksa status pembayaran');
-      }
-    } else {
-      // Regular payment - show QRIS dialog
-      setSelectedBookingForPayment(booking);
-    }
-  };
-
-  const handleInstallmentPayment = async (booking: any, amount: number, installmentNumber: number) => {
-    try {
-      const invoiceData = {
-        performed_by: userProfile?.id,
-        external_id: `installment-${booking.id}-${installmentNumber}-${Date.now()}`,
-        amount: amount,
-        description: `Cicilan ${installmentNumber} - ${booking.studio_packages?.title}`,
-        customer: {
-          given_names: userProfile?.name?.split(' ')[0] || 'Customer',
-          surname: userProfile?.name?.split(' ').slice(1).join(' ') || '',
-          email: userProfile?.email || 'customer@example.com',
-          mobile_number: '+6281234567890'
-        }
-      };
-
-      const response = await supabase.functions.invoke('xendit-create-invoice', {
-        body: invoiceData
-      });
-
-      if (response.data?.success && response.data?.data?.invoice) {
-        const invoice = response.data.data.invoice;
-        
-        // Record new installment
-        await supabase
-          .from('installments')
-          .insert({
-            booking_id: booking.id,
-            amount: amount,
-            installment_number: installmentNumber,
-            payment_method: 'online',
-            performed_by: userProfile?.id
-          });
-
-        // Create new transaction record
-        await supabase
-          .from('transactions')
-          .insert({
-            booking_id: booking.id,
-            amount: amount,
-            type: 'online',
-            description: `Cicilan ${installmentNumber} - ${booking.studio_packages?.title}`,
-            performed_by: userProfile?.id,
-            payment_type: 'installment',
-            status: 'pending'
-          });
-
-        // Open payment URL
-        if (invoice.invoice_url) {
-          window.open(invoice.invoice_url, '_blank');
-          toast.success('Invoice cicilan berhasil dibuat!');
-        }
-        
-        refetch();
-      } else {
-        throw new Error(response.data?.error || 'Gagal membuat invoice cicilan');
-      }
-    } catch (error) {
-      console.error('Error creating installment payment:', error);
-      toast.error('Gagal membuat pembayaran cicilan');
-    }
+  const handlePayment = (booking: any) => {
+    setSelectedBookingForPayment(booking);
   };
 
   const getStatusColor = (status: string) => {
@@ -233,26 +105,6 @@ const OrderHistoryPage = () => {
 
   const getTypeText = (type: string) => {
     return type === 'self_photo' ? 'Self Photo' : 'Studio Reguler';
-  };
-
-  const getPaymentStatusText = (booking: any) => {
-    const installmentTransactions = booking.transactions?.filter((t: any) => t.payment_type === 'installment') || [];
-    const installmentRecords = booking.installments || [];
-    
-    if (installmentTransactions.length > 0) {
-      const paidInstallments = installmentTransactions.filter((t: any) => t.status === 'paid').length;
-      const totalInstallments = Math.ceil(installmentRecords.length / 1); // Assuming max 2 installments
-      
-      if (paidInstallments === 0) {
-        return 'Cicilan 1/2 - Belum Dibayar';
-      } else if (paidInstallments === 1 && installmentRecords.length < 2) {
-        return 'Cicilan 1/2 - Lunas, Menunggu Cicilan 2';
-      } else {
-        return 'Semua Cicilan Lunas';
-      }
-    }
-    
-    return booking.status === 'paid' ? 'Lunas' : 'Belum Dibayar';
   };
 
   if (isLoading) {
@@ -367,19 +219,26 @@ const OrderHistoryPage = () => {
                               {(booking.total_amount || 0).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 })}
                             </span>
                           </div>
-                          <div className="mt-2 pt-2 border-t border-gray-200">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-inter text-gray-500">Status Pembayaran</span>
-                              <span className="text-sm font-inter font-medium text-blue-600">
-                                {getPaymentStatusText(booking)}
-                              </span>
+                          {booking.installments && booking.installments.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-gray-200">
+                              <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-inter text-gray-500">Sudah Dibayar</span>
+                                  <Badge className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                                    Cicilan {booking.installments.length}x
+                                  </Badge>
+                                </div>
+                                <span className="text-sm font-inter font-medium text-green-600">
+                                  {booking.installments.reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0).toLocaleString('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 })}
+                                </span>
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       </div>
 
                       <div className="flex flex-col sm:flex-row gap-3">
-                        {(booking.status === 'pending' || booking.status === 'installment') && (
+                        {booking.status === 'pending' && (
                           <>
                             <Button
                               onClick={() => handlePayment(booking)}
@@ -398,6 +257,8 @@ const OrderHistoryPage = () => {
                             </Button>
                           </>
                         )}
+
+                    
                       </div>
                     </div>
                   </CardContent>
@@ -431,6 +292,7 @@ const OrderHistoryPage = () => {
         <QRISPaymentDialog
           isOpen={!!selectedBookingForPayment}
           onClose={() => setSelectedBookingForPayment(null)}
+          qrisImageUrl={qrisImageUrl}
           booking={selectedBookingForPayment}
         />
       )}

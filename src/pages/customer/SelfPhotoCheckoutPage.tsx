@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -78,9 +79,9 @@ const SelfPhotoCheckoutPage = () => {
   const [showPaymentMethodSelection, setShowPaymentMethodSelection] = useState(false);
   const [currentBooking, setCurrentBooking] = useState<any>(null);
 
-  // Check for pending bookings with transaction status
+  // Check for pending bookings
   const { data: pendingBookings = [], refetch: refetchPendingBookings } = useQuery({
-    queryKey: ['pending-bookings-with-transactions', userProfile?.id],
+    queryKey: ['pending-bookings', userProfile?.id],
     queryFn: async () => {
       if (!userProfile?.id) return [];
       
@@ -96,22 +97,10 @@ const SelfPhotoCheckoutPage = () => {
           booking_additional_services(
             quantity,
             additional_services(name)
-          ),
-          transactions(
-            id,
-            amount,
-            status,
-            payment_type,
-            created_at
-          ),
-          installments(
-            id,
-            amount,
-            installment_number
           )
         `)
         .eq('user_id', userProfile.id)
-        .in('status', ['pending', 'installment'])
+        .eq('status', 'pending')
         .eq('type', 'self_photo');
 
       if (error) {
@@ -510,7 +499,7 @@ const SelfPhotoCheckoutPage = () => {
           end_time: endDateTimeUTC.toISOString(),
           status: 'pending',
           total_amount: totalAmount,
-          payment_method: 'online',
+          payment_method: 'offline', // Will be updated based on payment method selection
           type: 'self_photo',
           performed_by: userProfile.id
         })
@@ -552,145 +541,9 @@ const SelfPhotoCheckoutPage = () => {
     }
   };
 
-  const handlePayment = async (booking: any) => {
-    // Check if this booking has installment transactions
-    const installmentTransactions = booking.transactions?.filter((t: any) => t.payment_type === 'installment') || [];
-    const installmentRecords = booking.installments || [];
-    
-    if (installmentTransactions.length > 0) {
-      // Check status dari Xendit untuk cicilan pertama
-      const firstInstallmentTx = installmentTransactions[0];
-      
-      try {
-        // Call invoice API to get current status
-        const response = await supabase.functions.invoke('xendit-get-invoice', {
-          body: {
-            performed_by: userProfile?.id,
-            transaction_id: firstInstallmentTx.id
-          }
-        });
-
-        if (response.data?.success && response.data?.data?.invoice) {
-          const invoiceStatus = response.data.data.invoice.status;
-          
-          if (invoiceStatus === 'SETTLED') {
-            // Update transaction status to paid
-            await supabase
-              .from('transactions')
-              .update({ status: 'paid' })
-              .eq('id', firstInstallmentTx.id);
-            
-            // Check if we need second installment
-            const paidInstallments = installmentRecords.length;
-            const totalAmount = booking.total_amount || 0;
-            const remainingAmount = totalAmount - (installmentRecords.reduce((sum: number, inst: any) => sum + inst.amount, 0));
-            
-            if (remainingAmount > 0) {
-              // Create second installment
-              toast.success('Cicilan pertama sudah lunas. Silakan bayar cicilan kedua.');
-              // Trigger payment for remaining amount
-              await handleInstallmentPayment(booking, remainingAmount, 2);
-            } else {
-              // Update booking status to paid
-              await supabase
-                .from('bookings')
-                .update({ status: 'paid' })
-                .eq('id', booking.id);
-              
-              toast.success('Semua cicilan sudah lunas!');
-              refetchPendingBookings();
-            }
-          } else if (invoiceStatus === 'EXPIRED') {
-            // Create new invoice for first installment
-            toast.info('Invoice sebelumnya sudah expired. Membuat invoice baru...');
-            await handleInstallmentPayment(booking, firstInstallmentTx.amount, 1);
-          } else {
-            // Invoice masih pending, redirect to existing checkout URL
-            if (response.data.data.invoice.invoice_url) {
-              window.open(response.data.data.invoice.invoice_url, '_blank');
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error checking invoice status:', error);
-        toast.error('Gagal memeriksa status pembayaran');
-      }
-    } else {
-      // No installment yet, show payment method selection
-      setSelectedPendingBooking(booking);
-      setShowPaymentDialog(true);
-    }
-  };
-
-  const handleInstallmentPayment = async (booking: any, amount: number, installmentNumber: number) => {
-    try {
-      // Create new invoice for installment
-      const invoiceData = {
-        performed_by: userProfile?.id,
-        external_id: `installment-${booking.id}-${installmentNumber}-${Date.now()}`,
-        amount: amount,
-        description: `Cicilan ${installmentNumber} - ${booking.studio_packages?.title}`,
-        customer: {
-          given_names: userProfile?.name?.split(' ')[0] || 'Customer',
-          surname: userProfile?.name?.split(' ').slice(1).join(' ') || '',
-          email: userProfile?.email || 'customer@example.com',
-          mobile_number: '+6281234567890'
-        }
-      };
-
-      const response = await supabase.functions.invoke('xendit-create-invoice', {
-        body: invoiceData
-      });
-
-      if (response.data?.success && response.data?.data?.invoice) {
-        const invoice = response.data.data.invoice;
-        
-        // Record installment
-        await supabase
-          .from('installments')
-          .insert({
-            booking_id: booking.id,
-            amount: amount,
-            installment_number: installmentNumber,
-            payment_method: 'online',
-            performed_by: userProfile?.id
-          });
-
-        // Create transaction record
-        await supabase
-          .from('transactions')
-          .insert({
-            booking_id: booking.id,
-            amount: amount,
-            type: 'online',
-            description: `Cicilan ${installmentNumber} - ${booking.studio_packages?.title}`,
-            performed_by: userProfile?.id,
-            payment_type: 'installment',
-            status: 'pending'
-          });
-
-        // Update booking status to installment if first payment
-        if (installmentNumber === 1) {
-          await supabase
-            .from('bookings')
-            .update({ status: 'installment' })
-            .eq('id', booking.id);
-        }
-
-        // Open payment URL
-        if (invoice.invoice_url) {
-          window.open(invoice.invoice_url, '_blank');
-          toast.success('Invoice berhasil dibuat! Silakan selesaikan pembayaran.');
-        }
-        
-        refetchPendingBookings();
-      } else {
-        throw new Error(response.data?.error || 'Gagal membuat invoice');
-      }
-    } catch (error) {
-      console.error('Error creating installment payment:', error);
-      toast.error('Gagal membuat pembayaran cicilan');
-    }
+  const handlePayment = (booking: any) => {
+    setSelectedPendingBooking(booking);
+    setShowPaymentDialog(true);
   };
 
   const handlePaymentSuccess = () => {
