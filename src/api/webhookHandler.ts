@@ -200,14 +200,14 @@ export class WebhookHandler {
       console.error('❌ Error creating transaction:', transactionError);
     }
 
-    // Log booking activity
+    // Log booking activity - convert payload to JSON string to satisfy Json type
     const { error: logError } = await supabase
       .from('booking_logs')
       .insert({
         booking_id: booking.id,
         action_type: 'payment_received',
         performed_by: booking.user_id,
-        new_data: payload,
+        new_data: JSON.parse(JSON.stringify(payload)) as any,
         note: `Payment received via Xendit. Status updated to ${newStatus}`
       });
 
@@ -235,14 +235,14 @@ export class WebhookHandler {
       return;
     }
 
-    // Log booking activity
+    // Log booking activity - convert payload to JSON string to satisfy Json type
     const { error: logError } = await supabase
       .from('booking_logs')
       .insert({
         booking_id: booking.id,
         action_type: 'payment_expired',
         performed_by: booking.user_id,
-        new_data: payload,
+        new_data: JSON.parse(JSON.stringify(payload)) as any,
         note: 'Invoice expired via Xendit webhook'
       });
 
