@@ -53,19 +53,6 @@ const ExpensesPage = () => {
     },
   });
 
-  const { data: categories } = useQuery({
-    queryKey: ['expenseCategories'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('expense_categories')
-        .select('*')
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const deleteExpenseMutation = useMutation({
     mutationFn: async (expenseId: string) => {
       const { error } = await supabase
@@ -133,7 +120,6 @@ const ExpensesPage = () => {
       </div>
 
       <ExpenseFilters
-        categories={categories}
         selectedDateRange={selectedDateRange}
         selectedCategory={selectedCategory}
         onDateRangeChange={handleDateRangeChange}

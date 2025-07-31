@@ -155,7 +155,6 @@ const PaymentProviders = () => {
               <DialogTitle>Edit Payment Provider</DialogTitle>
             </DialogHeader>
             <AddPaymentProviderForm
-              provider={paymentProviderToEdit}
               onSuccess={() => {
                 setPaymentProviderToEdit(null);
                 queryClient.invalidateQueries({ queryKey: ['paymentProviders'] });

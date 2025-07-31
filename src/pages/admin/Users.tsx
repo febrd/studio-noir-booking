@@ -1,16 +1,17 @@
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Users, Edit, Trash2 } from 'lucide-react';
+import { Plus, Users as UsersIcon, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
-import AddUserForm from '@/components/admin/AddUserForm';
-import EditUserForm from '@/components/admin/EditUserForm';
+import { AddUserForm } from '@/components/admin/AddUserForm';
+import { EditUserForm } from '@/components/admin/EditUserForm';
 
-const Users = () => {
+const UsersPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [deletingUser, setDeletingUser] = useState<any>(null);
@@ -209,7 +210,7 @@ const Users = () => {
 
       {users?.length === 0 && (
         <div className="text-center py-12">
-          <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <UsersIcon size={48} className="text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
             Belum ada user
           </h3>
@@ -262,9 +263,9 @@ const Users = () => {
               <Button
                 variant="destructive"
                 onClick={confirmDelete}
-                disabled={deleteUserMutation.isLoading}
+                disabled={deleteUserMutation.isPending}
               >
-                {deleteUserMutation.isLoading ? (
+                {deleteUserMutation.isPending ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 ) : (
                   'Hapus'
@@ -278,4 +279,4 @@ const Users = () => {
   );
 };
 
-export default Users;
+export default UsersPage;
