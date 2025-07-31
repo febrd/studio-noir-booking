@@ -1,9 +1,24 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
+export interface XenditWebhookPayload {
+  id: string;
+  external_id: string;
+  user_id?: string;
+  status: 'PAID' | 'EXPIRED' | 'PENDING';
+  amount: number;
+  paid_amount?: number;
+  payment_method?: string;
+  bank_code?: string;
+  paid_at?: string;
+  payment_channel?: string;
+  payment_destination?: string;
+  created?: string;
+  updated?: string;
+}
+
 export class WebhookHandler {
   static async handleXenditWebhook(request: Request): Promise<Response> {
-    // Handle CORS
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -37,31 +52,31 @@ export class WebhookHandler {
     }
 
     try {
-      // Parse JSON body
-      const payload = await request.json();
+      const payload: XenditWebhookPayload = await request.json();
       console.log('📥 Received Xendit webhook:', payload);
 
-      const { external_id, status, amount, paid_amount, payment_method, paid_at } = payload;
+      const { external_id, status } = payload;
 
-      if (!external_id || !status) {
+      if (!external_id) {
         return new Response(
           JSON.stringify({
             success: false,
-            error: 'Missing required fields: external_id and status',
-            errorCode: 'MISSING_FIELDS'
+            error: 'Missing external_id in webhook payload'
           }),
           {
             status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
           }
         );
       }
 
-      // Find booking by external_id (which is booking ID)
-      console.log('🔍 Looking for booking with ID:', external_id);
+      // Find booking by external_id (which is the booking ID)
       const { data: booking, error: bookingError } = await supabase
         .from('bookings')
-        .select('id, user_id, total_amount, status')
+        .select('*')
         .eq('id', external_id)
         .single();
 
@@ -70,228 +85,171 @@ export class WebhookHandler {
         return new Response(
           JSON.stringify({
             success: false,
-            error: 'Booking not found with the provided external_id',
-            errorCode: 'BOOKING_NOT_FOUND'
+            error: 'Booking not found'
           }),
           {
             status: 404,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            }
           }
         );
       }
 
-      console.log('✅ Found booking:', booking);
-
       if (status === 'PAID') {
-        console.log('💰 Processing PAID status');
-        
-        // Check if booking has installments
-        const { data: installments, error: installmentsError } = await supabase
-          .from('installments')
-          .select('amount')
-          .eq('booking_id', external_id);
-
-        if (installmentsError) {
-          console.error('❌ Error fetching installments:', installmentsError);
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: 'Error checking installments',
-              errorCode: 'DATABASE_ERROR'
-            }),
-            {
-              status: 500,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            }
-          );
-        }
-
-        let newBookingStatus = 'paid';
-        
-        if (installments && installments.length > 0) {
-          // Booking has installments, check total paid
-          const totalPaidFromInstallments = installments.reduce((sum, inst) => sum + Number(inst.amount), 0);
-          const totalPaidWithThisPayment = totalPaidFromInstallments + Number(paid_amount || amount);
-          
-          console.log('📊 Payment calculation:', {
-            totalBookingAmount: booking.total_amount,
-            totalPaidFromInstallments,
-            thisPaymentAmount: paid_amount || amount,
-            totalPaidWithThisPayment
-          });
-          
-          if (totalPaidWithThisPayment >= Number(booking.total_amount)) {
-            newBookingStatus = 'paid';
-            console.log('✅ Full payment completed, setting status to paid');
-          } else {
-            newBookingStatus = 'installment';
-            console.log('📝 Partial payment, keeping installment status');
-          }
-        } else {
-          // No installments, this is a full payment
-          newBookingStatus = 'paid';
-          console.log('✅ Full payment without installments, setting status to paid');
-        }
-
-        // Update booking status
-        const { error: updateError } = await supabase
-          .from('bookings')
-          .update({ status: newBookingStatus })
-          .eq('id', external_id);
-
-        if (updateError) {
-          console.error('❌ Error updating booking status:', updateError);
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: 'Failed to update booking status',
-              errorCode: 'UPDATE_ERROR'
-            }),
-            {
-              status: 500,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            }
-          );
-        }
-
-        // Create transaction record
-        const { error: transactionError } = await supabase
-          .from('transactions')
-          .insert({
-            reference_id: payload.id, // Xendit invoice ID
-            booking_id: external_id,
-            amount: paid_amount || amount,
-            type: 'online',
-            description: `Online payment via ${payment_method || 'Xendit'} - Invoice ID: ${payload.id}`,
-            performed_by: booking.user_id,
-            payment_type: installments && installments.length > 0 ? 'installment' : 'online',
-            status: 'paid'
-          });
-
-        if (transactionError) {
-          console.error('❌ Error creating transaction record:', transactionError);
-          // Don't return error here as the main operation succeeded
-        } else {
-          console.log('✅ Transaction record created');
-        }
-
-        // Log booking activity
-        const { error: logError } = await supabase
-          .from('booking_logs')
-          .insert({
-            booking_id: external_id,
-            action_type: 'payment_received',
-            performed_by: booking.user_id,
-            new_data: payload,
-            note: `Payment received via Xendit webhook - Status: ${status}, Amount: ${paid_amount || amount}`
-          });
-
-        if (logError) {
-          console.error('❌ Error logging activity:', logError);
-        }
-
-        console.log('🎉 PAID status processed successfully');
-        
+        await this.handlePaidStatus(payload, booking);
       } else if (status === 'EXPIRED') {
-        console.log('⏰ Processing EXPIRED status');
-        
-        // Update booking status to expired
-        const { error: updateError } = await supabase
-          .from('bookings')
-          .update({ status: 'expired' })
-          .eq('id', external_id);
-
-        if (updateError) {
-          console.error('❌ Error updating booking to expired:', updateError);
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: 'Failed to update booking to expired status',
-              errorCode: 'UPDATE_ERROR'
-            }),
-            {
-              status: 500,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            }
-          );
-        }
-
-        // Log booking activity
-        const { error: logError } = await supabase
-          .from('booking_logs')
-          .insert({
-            booking_id: external_id,
-            action_type: 'invoice_expired',
-            performed_by: booking.user_id,
-            new_data: payload,
-            note: `Invoice expired - Xendit Invoice ID: ${payload.id}`
-          });
-
-        if (logError) {
-          console.error('❌ Error logging expired activity:', logError);
-        }
-
-        console.log('⏰ EXPIRED status processed successfully');
-        
-      } else {
-        console.log('ℹ️ Unhandled status:', status);
-        // For other statuses, we just log them but don't take action
-        const { error: logError } = await supabase
-          .from('booking_logs')
-          .insert({
-            booking_id: external_id,
-            action_type: 'webhook_received',
-            performed_by: booking.user_id,
-            new_data: payload,
-            note: `Xendit webhook received with status: ${status}`
-          });
-
-        if (logError) {
-          console.error('❌ Error logging webhook activity:', logError);
-        }
+        await this.handleExpiredStatus(payload, booking);
       }
 
       return new Response(
         JSON.stringify({
           success: true,
-          message: `Webhook processed successfully for status: ${status}`,
-          external_id: external_id
+          message: 'Webhook processed successfully'
         }),
         {
           status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
         }
       );
 
     } catch (error) {
-      console.error('💥 Unexpected error in xendit webhook:', error);
-      
-      // Handle JSON parsing errors
-      if (error instanceof SyntaxError && error.message.includes('JSON')) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'Invalid JSON format in request body',
-            errorCode: 'INVALID_JSON'
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
+      console.error('💥 Webhook processing error:', error);
       
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Terjadi kesalahan sistem: ' + (error instanceof Error ? error.message : 'Unknown error'),
-          errorCode: 'INTERNAL_SERVER_ERROR'
+          error: 'Internal server error',
+          details: error instanceof Error ? error.message : 'Unknown error'
         }),
         {
           status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
         }
       );
     }
+  }
+
+  private static async handlePaidStatus(payload: XenditWebhookPayload, booking: any) {
+    console.log('💰 Processing PAID status for booking:', booking.id);
+
+    // Check if booking has installments
+    const { data: installments, error: installmentsError } = await supabase
+      .from('installments')
+      .select('amount')
+      .eq('booking_id', booking.id);
+
+    if (installmentsError) {
+      console.error('❌ Error fetching installments:', installmentsError);
+      return;
+    }
+
+    const hasInstallments = installments && installments.length > 0;
+    let newStatus: 'paid' | 'installment' = 'paid';
+
+    if (hasInstallments) {
+      // Calculate total paid installments
+      const totalPaid = installments.reduce((sum, inst) => sum + Number(inst.amount), 0);
+      const totalAmount = Number(booking.total_amount);
+
+      console.log('📊 Installment check:', { totalPaid, totalAmount });
+
+      if (totalPaid >= totalAmount) {
+        newStatus = 'paid';
+      } else {
+        newStatus = 'installment';
+      }
+    }
+
+    // Update booking status
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({ 
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', booking.id);
+
+    if (updateError) {
+      console.error('❌ Error updating booking status:', updateError);
+      return;
+    }
+
+    // Create transaction record
+    const { error: transactionError } = await supabase
+      .from('transactions')
+      .insert({
+        reference_id: payload.id,
+        booking_id: booking.id,
+        amount: payload.paid_amount || payload.amount,
+        type: 'online',
+        description: `Payment received via ${payload.payment_method || 'Xendit'}`,
+        performed_by: booking.user_id,
+        payment_type: hasInstallments ? 'installment' : 'online',
+        status: 'paid'
+      });
+
+    if (transactionError) {
+      console.error('❌ Error creating transaction:', transactionError);
+    }
+
+    // Log booking activity
+    const { error: logError } = await supabase
+      .from('booking_logs')
+      .insert({
+        booking_id: booking.id,
+        action_type: 'payment_received',
+        performed_by: booking.user_id,
+        new_data: payload,
+        note: `Payment received via Xendit. Status updated to ${newStatus}`
+      });
+
+    if (logError) {
+      console.error('❌ Error logging activity:', logError);
+    }
+
+    console.log('✅ Payment processed successfully');
+  }
+
+  private static async handleExpiredStatus(payload: XenditWebhookPayload, booking: any) {
+    console.log('⏰ Processing EXPIRED status for booking:', booking.id);
+
+    // Update booking status to expired
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({ 
+        status: 'expired' as const,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', booking.id);
+
+    if (updateError) {
+      console.error('❌ Error updating booking to expired:', updateError);
+      return;
+    }
+
+    // Log booking activity
+    const { error: logError } = await supabase
+      .from('booking_logs')
+      .insert({
+        booking_id: booking.id,
+        action_type: 'payment_expired',
+        performed_by: booking.user_id,
+        new_data: payload,
+        note: 'Invoice expired via Xendit webhook'
+      });
+
+    if (logError) {
+      console.error('❌ Error logging expired activity:', logError);
+    }
+
+    console.log('✅ Booking marked as expired');
   }
 }
