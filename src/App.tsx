@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -43,9 +44,9 @@ function App() {
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
               
-              {/* Dashboard */}
+              {/* Dashboard - Allow all authenticated users */}
               <Route path="/dashboard" element={
-                <JWTProtectedRoute>
+                <JWTProtectedRoute allowedRoles={['owner', 'admin', 'keuangan', 'pelanggan']}>
                   <JWTDashboard />
                 </JWTProtectedRoute>
               } />
