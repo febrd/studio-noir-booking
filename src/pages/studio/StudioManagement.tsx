@@ -1,6 +1,5 @@
 
 import { Routes, Route } from 'react-router-dom';
-import { ModernLayout } from '@/components/Layout/ModernLayout';
 import StudiosPage from './StudiosPage';
 import PackageCategoriesPage from './PackageCategoriesPage';
 import PackagesPage from './PackagesPage';
@@ -15,7 +14,7 @@ import WalkinSessionsPage from './WalkinSessionsPage';
 
 const StudioManagement = () => {
   return (
-    <ModernLayout>
+    <div className="p-6">
       <Routes>
         <Route index element={<StudioDashboard />} />
         <Route path="studios" element={<StudiosPage />} />
@@ -29,7 +28,7 @@ const StudioManagement = () => {
         <Route path="custom-orders" element={<CustomOrdersPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
       </Routes>
-    </ModernLayout>
+    </div>
   );
 };
 
