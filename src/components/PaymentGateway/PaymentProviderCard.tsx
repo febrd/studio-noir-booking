@@ -1,11 +1,9 @@
 
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Edit, Trash2, Settings, Eye, EyeOff } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Edit, Trash2, TestTube, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -31,138 +29,157 @@ interface PaymentProviderCardProps {
   onDelete: (id: string) => void;
 }
 
-export const PaymentProviderCard = ({
-  provider,
-  onEdit,
-  onDelete,
-}: PaymentProviderCardProps) => {
-  const [isActive, setIsActive] = useState(provider.status === 'active');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const queryClient = useQueryClient();
+export const PaymentProviderCard = ({ provider, onEdit, onDelete }: PaymentProviderCardProps) => {
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
 
-  const toggleStatusMutation = useMutation({
-    mutationFn: async (newStatus: 'active' | 'inactive') => {
-      console.log('Toggling provider status:', provider.id, newStatus);
-      const { error } = await supabase
-        .from('payment_providers')
-        .update({ status: newStatus })
-        .eq('id', provider.id);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success('Status Xendit provider berhasil diubah');
-      queryClient.invalidateQueries({ queryKey: ['payment-providers'] });
-    },
-    onError: (error: any) => {
-      console.error('Error toggling provider status:', error);
-      toast.error('Gagal mengubah status provider: ' + error.message);
-      setIsActive(provider.status === 'active'); // Reset switch
-    },
-  });
-
-  const handleToggle = (checked: boolean) => {
-    setIsActive(checked);
-    const newStatus = checked ? 'active' : 'inactive';
-    toggleStatusMutation.mutate(newStatus);
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('id-ID', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  const handleDelete = () => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus Xendit provider "${provider.name}"?`)) {
-      onDelete(provider.id);
+  const maskSecretKey = (key: string | null) => {
+    if (!key) return 'Not set';
+    if (key.length <= 8) return key;
+    return key.substring(0, 4) + '****' + key.substring(key.length - 4);
+  };
+
+  const handleTestConnection = async () => {
+    if (!provider.secret_key) {
+      toast.error('Secret key tidak ditemukan untuk testing koneksi');
+      return;
+    }
+
+    setIsTestingConnection(true);
+    console.log('Testing connection for provider:', provider.id);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('xendit-test-provider', {
+        body: { providerId: provider.id }
+      });
+
+      console.log('Test connection response:', data);
+
+      if (error) {
+        console.error('Test connection error:', error);
+        toast.error('Gagal melakukan test koneksi: ' + error.message);
+        return;
+      }
+
+      if (data?.test?.success) {
+        toast.success(`✅ Koneksi berhasil ke Xendit API (${provider.environment})`);
+        console.log('Test result data:', data.test.data);
+      } else {
+        toast.error(`❌ Test koneksi gagal: ${data?.test?.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Unexpected test error:', error);
+      toast.error('Terjadi kesalahan saat testing koneksi');
+    } finally {
+      setIsTestingConnection(false);
     }
   };
 
-  const maskApiKey = (key: string) => {
-    if (!key) return 'Not set';
-    return key.substring(0, 8) + '...' + key.substring(key.length - 4);
-  };
-
   return (
-    <Card className="glass-card hover-lift">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg text-elegant">{provider.name}</CardTitle>
-          <div className="flex items-center gap-2">
-            <Badge
+    <Card className="w-full">
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="text-xl">{provider.name}</CardTitle>
+            <CardDescription>
+              Diperbarui: {formatDate(provider.updated_at)}
+            </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Badge 
               variant={provider.environment === 'production' ? 'default' : 'secondary'}
             >
               {provider.environment}
             </Badge>
-            <Switch
-              checked={isActive}
-              onCheckedChange={handleToggle}
-              disabled={toggleStatusMutation.isPending}
-              className="data-[state=checked]:bg-primary"
-            />
+            <Badge 
+              variant={provider.status === 'active' ? 'default' : 'destructive'}
+            >
+              {provider.status}
+            </Badge>
           </div>
         </div>
       </CardHeader>
       
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-muted-foreground">API Key:</span>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs">
-                {showApiKey && provider.api_key ? provider.api_key : maskApiKey(provider.api_key || '')}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowApiKey(!showApiKey)}
-                className="h-6 w-6 p-0"
-              >
-                {showApiKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-              </Button>
-            </div>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="font-medium text-muted-foreground">API Key:</span>
+            <p className="text-xs font-mono bg-muted p-2 rounded mt-1">
+              {maskSecretKey(provider.api_key)}
+            </p>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">API URL:</span>
-            <span className="font-mono text-xs">
-              {provider.api_url || 'Not set'}
-            </span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Created:</span>
-            <span>{new Date(provider.created_at).toLocaleDateString('id-ID')}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Status:</span>
-            <Badge variant={isActive ? 'default' : 'secondary'}>
-              {isActive ? 'Active' : 'Inactive'}
-            </Badge>
+          <div>
+            <span className="font-medium text-muted-foreground">Secret Key:</span>
+            <p className="text-xs font-mono bg-muted p-2 rounded mt-1">
+              {maskSecretKey(provider.secret_key)}
+            </p>
           </div>
         </div>
-
-        <div className="flex gap-2 pt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onEdit(provider)}
-            className="flex-1 hover-scale"
-          >
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="hover-scale"
-            onClick={() => toast.info('Fitur konfigurasi akan datang')}
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDelete}
-            className="text-destructive hover:text-destructive hover-scale"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+        
+        {provider.public_key && (
+          <div>
+            <span className="font-medium text-muted-foreground">Public Key:</span>
+            <p className="text-xs font-mono bg-muted p-2 rounded mt-1">
+              {maskSecretKey(provider.public_key)}
+            </p>
+          </div>
+        )}
+        
+        <div>
+          <span className="font-medium text-muted-foreground">API URL:</span>
+          <p className="text-xs text-blue-600 mt-1">
+            {provider.api_url || 'https://api.xendit.co'}
+          </p>
         </div>
       </CardContent>
+
+      <CardFooter className="flex gap-2 pt-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleTestConnection}
+          disabled={isTestingConnection || !provider.secret_key}
+          className="flex-1"
+        >
+          {isTestingConnection ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Testing...
+            </>
+          ) : (
+            <>
+              <TestTube className="h-4 w-4 mr-2" />
+              Test Koneksi
+            </>
+          )}
+        </Button>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onEdit(provider)}
+        >
+          <Edit className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onDelete(provider.id)}
+          className="text-destructive hover:text-destructive"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </CardFooter>
     </Card>
   );
 };
