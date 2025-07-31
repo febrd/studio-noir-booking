@@ -49,7 +49,7 @@ export class XenditAuthClient {
     try {
       console.log('🧪 Testing Xendit connection to:', this.apiUrl);
       
-      const response = await this.makeRequest('/v2/invoices?limit=1', {
+      const response = await this.makeRequest('invoices?limit=1', {
         method: 'GET',
       });
       
@@ -88,7 +88,7 @@ export class XenditAuthClient {
     try {
       console.log('📝 Creating invoice with data:', invoiceData);
       
-      const response = await this.makeRequest('/v2/invoices', {
+      const response = await this.makeRequest('invoices', {
         method: 'POST',
         body: JSON.stringify(invoiceData)
       });
@@ -139,10 +139,10 @@ export class XenditAuthClient {
       let endpoint: string;
       
       if (invoiceId) {
-        endpoint = `/v2/invoices/${invoiceId}`;
+        endpoint = `invoices/${invoiceId}`;
         console.log('🔍 Getting invoice by ID:', invoiceId);
       } else if (externalId) {
-        endpoint = `/v2/invoices?external_id=${encodeURIComponent(externalId)}`;
+        endpoint = `invoices?external_id=${encodeURIComponent(externalId)}`;
         console.log('🔍 Getting invoice by external_id:', externalId);
       } else {
         return {
