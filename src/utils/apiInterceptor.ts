@@ -1,5 +1,7 @@
 
 // API Route Interceptor for Invoice Endpoints
+import { RouteHandler } from './routeHandler';
+
 export const setupAPIInterceptor = () => {
   // Only run in development/browser environment
   if (typeof window === 'undefined') return;
@@ -19,13 +21,10 @@ export const setupAPIInterceptor = () => {
       console.log('🎯 Handling API route:', pathname);
       
       try {
-        // Import the route handler dynamically
-        const { RouteHandler } = await import('./routeHandler');
-        
         // Create a Request object from the input
         const request = new Request(url, init);
         
-        // Handle the route
+        // Handle the route using static import
         const response = await RouteHandler.handleAPIRoute(pathname, request);
         
         if (response) {
