@@ -2,9 +2,10 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2, TestTube, Loader2 } from 'lucide-react';
+import { Edit, Trash2, TestTube, Loader2, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useInvoiceAPI } from '@/hooks/useInvoiceAPI';
 
 interface PaymentProvider {
   id: string;
@@ -89,6 +90,9 @@ class XenditAuthHelper {
 
 export const PaymentProviderCard = ({ provider, onEdit, onDelete }: PaymentProviderCardProps) => {
   const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [isTestingInvoice, setIsTestingInvoice] = useState(false);
+  const [isTestingGetInvoice, setIsTestingGetInvoice] = useState(false);
+  const { createInvoice, getInvoice } = useInvoiceAPI();
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('id-ID', {
@@ -136,6 +140,89 @@ export const PaymentProviderCard = ({ provider, onEdit, onDelete }: PaymentProvi
       toast.error('Terjadi kesalahan saat testing koneksi');
     } finally {
       setIsTestingConnection(false);
+    }
+  };
+
+  const handleTestCreateInvoice = async () => {
+    setIsTestingInvoice(true);
+    console.log('Testing create invoice for provider:', provider.id);
+
+    try {
+      const testInvoiceData = {
+        performed_by: "677bf602-3af9-48a2-9533-ec89cceb623b",
+        external_id: `test-invoice-${Date.now()}`,
+        amount: 10000,
+        description: `Test invoice dari ${provider.name} (${provider.environment})`
+      };
+
+      console.log('🧪 Testing create invoice with data:', testInvoiceData);
+      
+      const result = await createInvoice(testInvoiceData);
+      
+      if (result.success) {
+        toast.success(`✅ Test create invoice berhasil!`);
+        console.log('✅ Create Invoice Test Success:', result);
+        if (result.data?.invoice?.invoice_url) {
+          console.log('🔗 Invoice URL:', result.data.invoice.invoice_url);
+        }
+      } else {
+        toast.error(`❌ Test create invoice gagal: ${result.error}`);
+        console.log('❌ Create Invoice Test Failed:', result);
+      }
+    } catch (error) {
+      console.error('💥 Create Invoice Test Error:', error);
+      toast.error('Terjadi kesalahan saat testing create invoice');
+    } finally {
+      setIsTestingInvoice(false);
+    }
+  };
+
+  const handleTestGetInvoice = async () => {
+    setIsTestingGetInvoice(true);
+    console.log('Testing get invoice for provider:', provider.id);
+
+    try {
+      // First create a test invoice, then try to retrieve it
+      const testInvoiceData = {
+        performed_by: "677bf602-3af9-48a2-9533-ec89cceb623b",
+        external_id: `test-get-invoice-${Date.now()}`,
+        amount: 5000,
+        description: `Test get invoice dari ${provider.name} (${provider.environment})`
+      };
+
+      console.log('🧪 Creating test invoice first:', testInvoiceData);
+      
+      const createResult = await createInvoice(testInvoiceData);
+      
+      if (createResult.success) {
+        console.log('✅ Test invoice created, now trying to get it...');
+        
+        // Now try to get the invoice
+        const getInvoiceData = {
+          performed_by: "677bf602-3af9-48a2-9533-ec89cceb623b",
+          external_id: testInvoiceData.external_id
+        };
+
+        console.log('🔍 Getting invoice with data:', getInvoiceData);
+        
+        const getResult = await getInvoice(getInvoiceData);
+        
+        if (getResult.success) {
+          toast.success(`✅ Test get invoice berhasil!`);
+          console.log('✅ Get Invoice Test Success:', getResult);
+        } else {
+          toast.error(`❌ Test get invoice gagal: ${getResult.error}`);
+          console.log('❌ Get Invoice Test Failed:', getResult);
+        }
+      } else {
+        toast.error(`❌ Gagal membuat test invoice: ${createResult.error}`);
+        console.log('❌ Create test invoice failed:', createResult);
+      }
+    } catch (error) {
+      console.error('💥 Get Invoice Test Error:', error);
+      toast.error('Terjadi kesalahan saat testing get invoice');
+    } finally {
+      setIsTestingGetInvoice(false);
     }
   };
 
@@ -197,43 +284,87 @@ export const PaymentProviderCard = ({ provider, onEdit, onDelete }: PaymentProvi
         </div>
       </CardContent>
 
-      <CardFooter className="flex gap-2 pt-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleTestConnection}
-          disabled={isTestingConnection || !provider.secret_key}
-          className="flex-1"
-        >
-          {isTestingConnection ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Testing...
-            </>
-          ) : (
-            <>
-              <TestTube className="h-4 w-4 mr-2" />
-              Test Koneksi
-            </>
-          )}
-        </Button>
+      <CardFooter className="flex flex-col gap-2 pt-4">
+        <div className="flex gap-2 w-full">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTestConnection}
+            disabled={isTestingConnection || !provider.secret_key}
+            className="flex-1"
+          >
+            {isTestingConnection ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Testing...
+              </>
+            ) : (
+              <>
+                <TestTube className="h-4 w-4 mr-2" />
+                Test Koneksi
+              </>
+            )}
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onEdit(provider)}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onDelete(provider.id)}
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
         
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onEdit(provider)}
-        >
-          <Edit className="h-4 w-4" />
-        </Button>
-        
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onDelete(provider.id)}
-          className="text-destructive hover:text-destructive"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex gap-2 w-full">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTestCreateInvoice}
+            disabled={isTestingInvoice || !provider.secret_key}
+            className="flex-1"
+          >
+            {isTestingInvoice ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Testing...
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                Test Create Invoice
+              </>
+            )}
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTestGetInvoice}
+            disabled={isTestingGetInvoice || !provider.secret_key}
+            className="flex-1"
+          >
+            {isTestingGetInvoice ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Testing...
+              </>
+            ) : (
+              <>
+                <Search className="h-4 w-4 mr-2" />
+                Test Get Invoice
+              </>
+            )}
+          </Button>
+        </div>
       </CardFooter>
     </Card>
   );
