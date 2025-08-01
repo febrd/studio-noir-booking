@@ -6,16 +6,23 @@ export interface XenditWebhookPayload {
   id: string;
   external_id: string;
   user_id?: string;
-  status: 'PAID' | 'EXPIRED' | 'PENDING';
+  is_high?: boolean;
+  payment_method?: string;
+  status: 'PAID' | 'SETTLED' | 'EXPIRED' | 'PENDING';
+  merchant_name?: string;
   amount: number;
   paid_amount?: number;
-  payment_method?: string;
   bank_code?: string;
   paid_at?: string;
+  payer_email?: string;
+  description?: string;
+  adjusted_received_amount?: number;
+  fees_paid_amount?: number;
+  updated?: string;
+  created?: string;
+  currency?: string;
   payment_channel?: string;
   payment_destination?: string;
-  created?: string;
-  updated?: string;
 }
 
 export class WebhookHandler {
@@ -24,6 +31,7 @@ export class WebhookHandler {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Content-Type': 'application/json'
     };
 
     // Handle CORS preflight
@@ -44,35 +52,58 @@ export class WebhookHandler {
         }),
         {
           status: 405,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
+          headers: corsHeaders
         }
       );
     }
 
     try {
       const payload: XenditWebhookPayload = await request.json();
-      console.log('📥 Received Xendit webhook:', payload);
+      console.log('📥 Received Xendit webhook payload:', JSON.stringify(payload, null, 2));
 
-      const { id: invoiceId, external_id, status } = payload;
-
-      if (!external_id || !invoiceId) {
+      // Validate essential fields from Xendit payload
+      if (!payload.id || !payload.external_id) {
+        console.error('❌ Missing essential fields in webhook payload');
         return new Response(
           JSON.stringify({
             success: false,
-            error: 'Missing external_id or invoice_id in webhook payload'
+            error: 'Missing essential fields: id or external_id',
+            errorCode: 'INVALID_PAYLOAD'
           }),
           {
             status: 400,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json'
-            }
+            headers: corsHeaders
           }
         );
       }
+
+      // Validate amount fields
+      if (!payload.amount || payload.amount <= 0) {
+        console.error('❌ Invalid amount in webhook payload:', payload.amount);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Invalid amount in webhook payload',
+            errorCode: 'INVALID_AMOUNT'
+          }),
+          {
+            status: 400,
+            headers: corsHeaders
+          }
+        );
+      }
+
+      const { id: invoiceId, external_id, status, amount, paid_amount } = payload;
+      const actualPaidAmount = paid_amount || amount; // Fallback jika paid_amount tidak ada
+
+      console.log('💰 Payment details:', {
+        invoiceId,
+        external_id,
+        status,
+        amount,
+        paid_amount,
+        actualPaidAmount
+      });
 
       // Find booking by external_id (which is the booking ID)
       const { data: booking, error: bookingError } = await supabase
@@ -86,46 +117,41 @@ export class WebhookHandler {
         return new Response(
           JSON.stringify({
             success: false,
-            error: 'Booking not found'
+            error: 'Booking not found',
+            errorCode: 'BOOKING_NOT_FOUND'
           }),
           {
             status: 404,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json'
-            }
+            headers: corsHeaders
           }
         );
       }
 
       // Get Xendit credentials from payment providers
       const { data: provider, error: providerError } = await supabase
-      .from('payment_providers')
-      .select('secret_key, api_url')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false }) // urutkan terbaru dulu
-      .limit(1)
-      .single(); // ambil hanya satu objek, bukan array
-    
+        .from('payment_providers')
+        .select('secret_key, api_url')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
       if (providerError || !provider) {
-        console.error('❌ Xendit provider not found:', providerError);
+        console.error('❌ Payment provider not found:', providerError);
         return new Response(
           JSON.stringify({
             success: false,
-            error: 'Payment provider not configured'
+            error: 'Payment provider not configured',
+            errorCode: 'PROVIDER_NOT_FOUND'
           }),
           {
             status: 500,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json'
-            }
+            headers: corsHeaders
           }
         );
       }
 
-      // Verify invoice status directly from Xendit
+      // Verify invoice status directly from Xendit API
       const xenditClient = new XenditAuthClient(provider.secret_key, provider.api_url);
       console.log('🔍 Verifying invoice status from Xendit API for invoice:', invoiceId);
       
@@ -136,46 +162,40 @@ export class WebhookHandler {
         return new Response(
           JSON.stringify({
             success: false,
-            error: 'Failed to verify invoice status from Xendit: ' + verificationResult.error
+            error: 'Failed to verify invoice status: ' + verificationResult.error,
+            errorCode: 'VERIFICATION_FAILED'
           }),
           {
             status: 400,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json'
-            }
+            headers: corsHeaders
           }
         );
       }
 
       const xenditInvoice = verificationResult.data;
-      console.log('📊 Verified invoice from Xendit:', xenditInvoice);
+      console.log('📊 Verified invoice from Xendit API:', xenditInvoice);
 
-      // Check if the webhook status matches the actual Xendit status
-      const xenditStatus = xenditInvoice.status;
-      if (status !== xenditStatus) {
-        console.warn('⚠️ Webhook status mismatch. Webhook:', status, 'Xendit API:', xenditStatus);
-        // Use the status from Xendit API instead of webhook
-      }
+      // Use verified data from Xendit API
+      const verifiedStatus = xenditInvoice.status;
+      const verifiedPaidAmount = Number(xenditInvoice.paid_amount || xenditInvoice.amount || 0);
+      const verifiedAmount = Number(xenditInvoice.amount || booking.total_amount || 0);
 
-      // Only proceed if the Xendit API confirms SETTLED (PAID) or EXPIRED status
-      if (xenditStatus === 'SETTLED' || xenditStatus === 'PAID') {
-        await this.handlePaidStatus(payload, booking, xenditInvoice);
-      } else if (xenditStatus === 'EXPIRED') {
+      // Check status and process accordingly
+      if (verifiedStatus === 'SETTLED' || verifiedStatus === 'PAID') {
+        await this.handlePaidStatus(payload, booking, xenditInvoice, verifiedPaidAmount, verifiedAmount);
+      } else if (verifiedStatus === 'EXPIRED') {
         await this.handleExpiredStatus(payload, booking, xenditInvoice);
       } else {
-        console.log('📝 Invoice status not actionable:', xenditStatus);
+        console.log('📝 Invoice status not actionable:', verifiedStatus);
         return new Response(
           JSON.stringify({
             success: true,
-            message: 'Invoice status not actionable: ' + xenditStatus
+            message: 'Invoice status not actionable: ' + verifiedStatus,
+            status: verifiedStatus
           }),
           {
             status: 200,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json'
-            }
+            headers: corsHeaders
           }
         );
       }
@@ -184,14 +204,14 @@ export class WebhookHandler {
         JSON.stringify({
           success: true,
           message: 'Webhook processed successfully',
-          verifiedStatus: xenditStatus
+          invoice_id: invoiceId,
+          external_id: external_id,
+          verified_status: verifiedStatus,
+          verified_paid_amount: verifiedPaidAmount
         }),
         {
           status: 200,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
+          headers: corsHeaders
         }
       );
 
@@ -202,83 +222,90 @@ export class WebhookHandler {
         JSON.stringify({
           success: false,
           error: 'Internal server error',
-          details: error instanceof Error ? error.message : 'Unknown error'
+          details: error instanceof Error ? error.message : 'Unknown error',
+          errorCode: 'INTERNAL_ERROR'
         }),
         {
           status: 500,
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
+          headers: corsHeaders
         }
       );
     }
   }
 
-  private static async handlePaidStatus(payload: XenditWebhookPayload, booking: any, xenditInvoice: any) {
-    console.log('💰 Processing PAID/SETTLED status for booking:', booking?.id);
-  
-    const paidAmount = Number(xenditInvoice?.paid_amount || xenditInvoice?.amount || 0);
-    const invoiceAmount = Number(booking?.amount || 0);
-  
+  private static async handlePaidStatus(
+    payload: XenditWebhookPayload, 
+    booking: any, 
+    xenditInvoice: any,
+    paidAmount: number,
+    invoiceAmount: number
+  ) {
+    console.log('💰 Processing PAID/SETTLED status for booking:', booking.id);
+    console.log('💵 Payment analysis:', {
+      paidAmount,
+      invoiceAmount,
+      bookingTotalAmount: booking.total_amount,
+      isPartialPayment: paidAmount < invoiceAmount
+    });
+
     if (!booking || !xenditInvoice?.id || !booking.id) {
       console.error('❌ Invalid booking or invoice data');
       return;
     }
-  
-    // Check existing installments
-    const { data: installments, error: installmentsError } = await supabase
+
+    // Get existing installments to calculate total paid before this payment
+    const { data: existingInstallments, error: installmentsError } = await supabase
       .from('installments')
       .select('amount')
       .eq('booking_id', booking.id);
-  
+
     if (installmentsError) {
-      console.error('❌ Error fetching installments:', installmentsError);
+      console.error('❌ Error fetching existing installments:', installmentsError);
       return;
     }
-  
-    const hasInstallments = installments && installments.length > 0;
+
+    const totalPaidBefore = existingInstallments?.reduce((sum, inst) => sum + Number(inst.amount), 0) || 0;
+    const totalPaidAfter = totalPaidBefore + paidAmount;
+    const requiredAmount = Number(booking.total_amount || invoiceAmount);
+    
+    console.log('📊 Payment calculation:', {
+      totalPaidBefore,
+      currentPayment: paidAmount,
+      totalPaidAfter,
+      requiredAmount,
+      remainingAmount: requiredAmount - totalPaidAfter
+    });
+
+    // Determine new booking status based on payment amount
     let newStatus: 'paid' | 'installment' = 'paid';
-  
-    if (hasInstallments) {
-      const totalPaidBefore = installments.reduce((sum, inst) => sum + Number(inst.amount), 0);
-      const totalCombined = totalPaidBefore + paidAmount;
-  
-      console.log('📊 Installment check (existing):', {
-        totalPaidBefore,
-        thisPayment: paidAmount,
-        totalCombined,
-        requiredAmount: invoiceAmount
-      });
-  
-      if (totalCombined < invoiceAmount) {
-        newStatus = 'installment';
-      }
+    
+    // If this payment doesn't complete the total amount, it's an installment
+    if (totalPaidAfter < requiredAmount) {
+      newStatus = 'installment';
+      console.log('📝 Marking as installment - payment incomplete');
     } else {
-      if (paidAmount < invoiceAmount) {
-        console.warn('⚠️ Detected partial payment without prior installments. Marking as INSTALLMENT.');
-        newStatus = 'installment';
-      }
+      console.log('✅ Payment complete - marking as paid');
     }
-  
-    // ⬇️ INSERT INTO INSTALLMENTS if status is installment
-    if (newStatus === 'installment') {
-      const { error: installmentInsertError } = await supabase
-        .from('installments')
-        .insert({
-          booking_id: booking.id,
-          amount: paidAmount,
-          paid_at: new Date().toISOString(),
-          method: xenditInvoice.payment_method || 'Xendit',
-          reference: xenditInvoice.id
-        });
-  
-      if (installmentInsertError) {
-        console.error('❌ Error inserting installment record:', installmentInsertError);
-      }
+
+    // Create installment record
+    const { error: installmentError } = await supabase
+      .from('installments')
+      .insert({
+        booking_id: booking.id,
+        amount: paidAmount,
+        paid_at: xenditInvoice.paid_at || new Date().toISOString(),
+        payment_method: 'online',
+        performed_by: booking.user_id,
+        note: `Payment via ${xenditInvoice.payment_method || 'Xendit'} - Invoice: ${xenditInvoice.id}`
+      });
+
+    if (installmentError) {
+      console.error('❌ Error creating installment record:', installmentError);
+    } else {
+      console.log('✅ Installment record created successfully');
     }
-  
-    // ⬇️ Update booking status
+
+    // Update booking status
     const { error: updateError } = await supabase
       .from('bookings')
       .update({
@@ -286,13 +313,15 @@ export class WebhookHandler {
         updated_at: new Date().toISOString()
       })
       .eq('id', booking.id);
-  
+
     if (updateError) {
       console.error('❌ Error updating booking status:', updateError);
       return;
     }
-  
-    // ⬇️ Create transaction record
+
+    console.log(`✅ Booking status updated to: ${newStatus}`);
+
+    // Create transaction record
     const { error: transactionError } = await supabase
       .from('transactions')
       .insert({
@@ -305,12 +334,14 @@ export class WebhookHandler {
         payment_type: newStatus === 'installment' ? 'installment' : 'online',
         status: 'paid'
       });
-  
+
     if (transactionError) {
-      console.error('❌ Error creating transaction:', transactionError);
+      console.error('❌ Error creating transaction record:', transactionError);
+    } else {
+      console.log('✅ Transaction record created successfully');
     }
-  
-    // ⬇️ Log booking activity
+
+    // Log booking activity
     const { error: logError } = await supabase
       .from('booking_logs')
       .insert({
@@ -320,12 +351,14 @@ export class WebhookHandler {
         new_data: JSON.parse(JSON.stringify(xenditInvoice)) as any,
         note: `Payment verified from Xendit API. Status: ${xenditInvoice.status}. Paid: ${paidAmount}. Updated booking to '${newStatus}'.`
       });
-  
+
     if (logError) {
       console.error('❌ Error logging booking activity:', logError);
+    } else {
+      console.log('✅ Booking activity logged successfully');
     }
-  
-    console.log('✅ Payment processed and verified successfully');
+
+    console.log('🎉 Payment processing completed successfully');
   }
   
   private static async handleExpiredStatus(payload: XenditWebhookPayload, booking: any, xenditInvoice: any) {
@@ -345,6 +378,8 @@ export class WebhookHandler {
       return;
     }
 
+    console.log('✅ Booking marked as expired');
+
     // Log booking activity with verified data
     const { error: logError } = await supabase
       .from('booking_logs')
@@ -358,8 +393,10 @@ export class WebhookHandler {
 
     if (logError) {
       console.error('❌ Error logging expired activity:', logError);
+    } else {
+      console.log('✅ Expiration activity logged successfully');
     }
 
-    console.log('✅ Booking marked as expired after verification');
+    console.log('✅ Booking expiration processing completed');
   }
 }
