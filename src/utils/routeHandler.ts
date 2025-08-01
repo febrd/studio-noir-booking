@@ -1,5 +1,6 @@
 
 import { InvoiceAPIHandler } from '@/api/invoiceHandler';
+import { WebhookHandler } from '@/api/webhookHandler';
 
 export class RouteHandler {
   static async handleAPIRoute(pathname: string, request: Request): Promise<Response | null> {
@@ -27,8 +28,10 @@ export class RouteHandler {
         return await InvoiceAPIHandler.handleGetInvoice(request);
         
       case '/v1/callback':
+      case '/webhook/xendit':
+      case '/api/webhook/xendit':
         console.log('🔔 Routing to webhook callback handler');
-        return await InvoiceAPIHandler.handleWebhookCallback(request);
+        return await WebhookHandler.handleXenditWebhook(request);
         
       default:
         console.log('❓ No handler found for route:', pathname);
