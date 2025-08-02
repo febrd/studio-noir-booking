@@ -82,7 +82,6 @@ const PelangganDashboard = () => {
       })
       .slice(-6); // Last 6 months
 
-    console.log('Chart spending data:', sortedData);
     return sortedData;
   }, [bookings]);
 
@@ -147,7 +146,6 @@ const PelangganDashboard = () => {
     );
   }
 
-  console.log('Rendering dashboard - bookings:', bookings.length, 'spendingData:', spendingData);
 
   // Bar chart colors - gradient from light to dark blue
   const getBarColor = (index: number, total: number) => {
