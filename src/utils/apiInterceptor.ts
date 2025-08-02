@@ -14,12 +14,10 @@ export const setupAPIInterceptor = () => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const pathname = new URL(url, window.location.origin).pathname;
 
-    console.log('🔍 Intercepting request:', pathname);
 
     // Check if this is one of our API routes
     if (pathname === '/v1/create/invoice' || pathname === '/v1/get/invoice' || 
         pathname === '/v1/callback' || pathname === '/webhook/xendit' || pathname === '/api/webhook/xendit') {
-      console.log('🎯 Handling API route:', pathname);
       
       try {
         // Handle CORS preflight requests
@@ -36,7 +34,6 @@ export const setupAPIInterceptor = () => {
 
         // Handle webhook callback
         if (pathname === '/v1/callback' || pathname === '/webhook/xendit' || pathname === '/api/webhook/xendit') {
-          console.log('🔔 Routing to webhook callback handler');
           return await WebhookHandler.handleXenditWebhook(new Request(url, init));
         }
 
@@ -66,10 +63,8 @@ export const setupAPIInterceptor = () => {
           }
           
           const bodyString = typeof init.body === 'string' ? init.body : JSON.stringify(init.body);
-          console.log('📝 Raw request body:', bodyString);
           
           requestData = JSON.parse(bodyString);
-          console.log('📝 Parsed request data:', requestData);
         } catch (parseError) {
           console.error('❌ JSON Parse Error:', parseError);
           return new Response(
@@ -94,16 +89,13 @@ export const setupAPIInterceptor = () => {
         
         // Handle create invoice
         if (pathname === '/v1/create/invoice') {
-          console.log('📝 Routing to create invoice handler');
           result = await InvoiceService.createInvoice(requestData);
         } 
         // Handle get invoice
         else if (pathname === '/v1/get/invoice') {
-          console.log('📋 Routing to get invoice handler');
           result = await InvoiceService.getInvoice(requestData);
         }
 
-        console.log('✅ API handler result:', result);
 
         // Return response
         const httpStatus = result?.success ? 200 : 400;
@@ -147,5 +139,4 @@ export const setupAPIInterceptor = () => {
     return originalFetch(input, init);
   };
 
-  console.log('🚀 API Interceptor setup complete');
 };

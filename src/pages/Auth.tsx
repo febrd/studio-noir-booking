@@ -35,12 +35,9 @@ const Auth = () => {
   const [loginCaptchaReset, setLoginCaptchaReset] = useState(false);
   const [registerCaptchaReset, setRegisterCaptchaReset] = useState(false);
 
-  console.log('Auth page - userProfile:', userProfile);
-  console.log('Auth page - loading:', loading);
 
   // Redirect if already authenticated
   if (userProfile) {
-    console.log('User is authenticated, redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -73,7 +70,6 @@ const Auth = () => {
     setSuccess('');
 
     try {
-      console.log('Starting login process...');
       const result = await signIn(loginForm.email, loginForm.password);
       
       if (!result.success) {
@@ -81,7 +77,6 @@ const Auth = () => {
         setError(result.error || 'Login gagal. Periksa email dan password Anda.');
         setLoginCaptchaReset(!loginCaptchaReset);
       } else {
-        console.log('Login successful, redirecting...');
         window.location.href = '/dashboard';
       }
     } catch (err) {
@@ -121,7 +116,6 @@ const Auth = () => {
     setSuccess('');
 
     try {
-      console.log('Starting registration process...');
       const result = await signUp(registerForm.email, registerForm.password, registerForm.name);
       
       if (!result.success) {
@@ -129,7 +123,6 @@ const Auth = () => {
         setError(result.error || 'Registrasi gagal. Coba lagi.');
         setRegisterCaptchaReset(!registerCaptchaReset);
       } else {
-        console.log('Registration successful');
         setSuccess('Registrasi berhasil! Silakan login dengan akun baru Anda.');
         setRegisterForm({ email: '', password: '', confirmPassword: '', name: '' });
         

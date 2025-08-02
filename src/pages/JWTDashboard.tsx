@@ -10,8 +10,6 @@ import { InvoiceTestPanel } from '@/components/InvoiceTestPanel';
 const JWTDashboard = () => {
   const { userProfile, loading } = useJWTAuth();
 
-  console.log('JWT Dashboard - User Profile:', userProfile);
-  console.log('JWT Dashboard - Loading:', loading);
 
   if (loading) {
     return (
@@ -22,7 +20,6 @@ const JWTDashboard = () => {
   }
 
   if (!userProfile) {
-    console.log('JWT Dashboard - No user profile found');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -34,7 +31,6 @@ const JWTDashboard = () => {
   }
 
   const renderDashboard = () => {
-    console.log('JWT Dashboard - Rendering dashboard for role:', userProfile.role);
     
     switch (userProfile.role) {
       case 'owner':
