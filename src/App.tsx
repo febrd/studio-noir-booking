@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -21,6 +20,7 @@ import { JWTProtectedRoute } from './components/auth/JWTProtectedRoute';
 import NotFound from './pages/NotFound';
 import Unauthorized from './pages/Unauthorized';
 import { JWTAuthProvider } from './hooks/useJWTAuth';
+import EditProfilePage from '@/pages/customer/EditProfilePage';
 
 // Customer pages
 import BookingSelectionPage from './pages/customer/BookingSelectionPage';
@@ -148,47 +148,16 @@ function App() {
                 </JWTProtectedRoute>
               } />
 
-              {/* Customer Routes */}
-              <Route path="/customer/booking-selection" element={
-                <JWTProtectedRoute allowedRoles={['pelanggan']}>
-                  <BookingSelectionPage />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/customer/regular-packages" element={
-                <JWTProtectedRoute allowedRoles={['pelanggan']}>
-                  <RegularPackagesPage />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/customer/self-photo-packages" element={
-                <JWTProtectedRoute allowedRoles={['pelanggan']}>
-                  <SelfPhotoPackagesPage />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/customer/regular-schedule" element={
-                <JWTProtectedRoute allowedRoles={['pelanggan']}>
-                  <RegularSchedulePage />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/customer/self-photo-schedule" element={
-                <JWTProtectedRoute allowedRoles={['pelanggan']}>
-                  <SelfPhotoSchedulePage />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/customer/regular-checkout" element={
-                <JWTProtectedRoute allowedRoles={['pelanggan']}>
-                  <RegularCheckoutPage />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/customer/self-photo-checkout" element={
-                <JWTProtectedRoute allowedRoles={['pelanggan']}>
-                  <SelfPhotoCheckoutPage />
-                </JWTProtectedRoute>
-              } />
-              <Route path="/customer/order-history" element={
-                <JWTProtectedRoute allowedRoles={['pelanggan']}>
-                  <OrderHistoryPage />
-                </JWTProtectedRoute>
-              } />
+              {/* Customer Routes - Protected by JWT */}
+              <Route path="/customer/self-photo-packages" element={<JWTProtectedRoute><SelfPhotoPackagesPage /></JWTProtectedRoute>} />
+              <Route path="/customer/self-photo-schedule" element={<JWTProtectedRoute><SelfPhotoSchedulePage /></JWTProtectedRoute>} />
+              <Route path="/customer/self-photo-checkout" element={<JWTProtectedRoute><SelfPhotoCheckoutPage /></JWTProtectedRoute>} />
+              <Route path="/customer/regular-packages" element={<JWTProtectedRoute><RegularPackagesPage /></JWTProtectedRoute>} />
+              <Route path="/customer/regular-schedule" element={<JWTProtectedRoute><RegularSchedulePage /></JWTProtectedRoute>} />
+              <Route path="/customer/regular-checkout" element={<JWTProtectedRoute><RegularCheckoutPage /></JWTProtectedRoute>} />
+              <Route path="/customer/booking-selection" element={<JWTProtectedRoute><BookingSelectionPage /></JWTProtectedRoute>} />
+              <Route path="/customer/order-history" element={<JWTProtectedRoute><OrderHistoryPage /></JWTProtectedRoute>} />
+              <Route path="/customer/profile" element={<JWTProtectedRoute><EditProfilePage /></JWTProtectedRoute>} />
 
               {/* Other Routes */}
               <Route path="/payment-gateway" element={
