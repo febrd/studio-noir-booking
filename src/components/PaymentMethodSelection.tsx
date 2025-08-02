@@ -213,7 +213,7 @@ const PaymentMethodSelection = ({
                       <RadioGroupItem value="50" id="installment" />
                       <Label htmlFor="installment" className="flex items-center gap-2 cursor-pointer">
                         <Wallet className="w-4 h-4" />
-                        <span>50% (Cicilan)</span>
+                        <span>50% (Cicilan/DP)</span>
                       </Label>
                     </div>
                     <span className="text-sm font-semibold">
@@ -245,8 +245,8 @@ const PaymentMethodSelection = ({
                 {autoPaymentOption === '50' && (
                   <div className="mt-3 p-3 bg-blue-50 rounded-lg">
                     <p className="text-xs text-blue-700">
-                      <strong>Catatan:</strong> Dengan memilih cicilan, Anda tidak dapat membatalkan pesanan. 
-                      Sisa pembayaran dapat dilakukan melalui halaman riwayat pesanan.
+                      <strong>Catatan:</strong> Dengan memilih cicilan/DP, Anda tidak dapat membatalkan pesanan. 
+                      Sisa pembayaran dapat dilakukan secara langsung ketika anda mengunjungi Masuk Studio.
                     </p>
                   </div>
                 )}
