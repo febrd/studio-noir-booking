@@ -33,7 +33,6 @@ export interface InvoiceResponse {
 export class InvoiceService {
   static async createInvoice(requestData: InvoiceRequest): Promise<InvoiceResponse> {
     try {
-      console.log('🚀 Creating invoice with data:', requestData);
 
       // Validate required parameter
       if (!requestData.performed_by) {
@@ -45,7 +44,6 @@ export class InvoiceService {
       }
 
       // Check if performed_by exists in users table
-      console.log('👤 Validating user:', requestData.performed_by);
       const { data: user, error: userError } = await supabase
         .from('users')
         .select('id, name, email, role')
@@ -61,10 +59,8 @@ export class InvoiceService {
         };
       }
 
-      console.log('✅ User validated:', user.name);
 
       // Get active payment provider (production first, then any active)
-      console.log('🔍 Fetching active Xendit payment provider...');
       let { data: paymentProvider, error: dbError } = await supabase
         .from('payment_providers')
         .select('*')
@@ -76,7 +72,6 @@ export class InvoiceService {
 
       // If no production provider, try any active provider
       if (dbError || !paymentProvider) {
-        console.log('🔍 No production provider found, trying any active provider...');
         const { data: anyProvider, error: anyError } = await supabase
           .from('payment_providers')
           .select('*')
@@ -106,7 +101,6 @@ export class InvoiceService {
         };
       }
 
-      console.log('✅ Using payment provider:', paymentProvider.name, '(' + paymentProvider.environment + ')');
 
       // Validate required invoice fields
       if (!requestData.external_id || !requestData.amount) {
@@ -133,7 +127,6 @@ export class InvoiceService {
         ...requestData,
       };
 
-      console.log('📝 Final invoice data:', finalInvoiceData);
 
       // Initialize Xendit Auth with provider data
       const xenditAuth = new XenditAuthClient(
@@ -142,11 +135,9 @@ export class InvoiceService {
       );
 
       // Create the invoice
-      console.log('🔄 Calling Xendit API...');
       const invoiceResult = await xenditAuth.createInvoice(finalInvoiceData);
 
       if (invoiceResult.success) {
-        console.log('✅ Invoice created successfully');
         
         return {
           success: true,
@@ -188,7 +179,6 @@ export class InvoiceService {
 
   static async getInvoice(requestData: GetInvoiceRequest): Promise<InvoiceResponse> {
     try {
-      console.log('🔍 Getting invoice with data:', requestData);
 
       // Validate required parameter
       if (!requestData.performed_by) {
@@ -209,7 +199,6 @@ export class InvoiceService {
       }
 
       // Check if performed_by exists in users table
-      console.log('👤 Validating user:', requestData.performed_by);
       const { data: user, error: userError } = await supabase
         .from('users')
         .select('id, name, email, role')
@@ -225,10 +214,8 @@ export class InvoiceService {
         };
       }
 
-      console.log('✅ User validated:', user.name);
 
       // Get active payment provider (production first, then any active)
-      console.log('🔍 Fetching active Xendit payment provider...');
       let { data: paymentProvider, error: dbError } = await supabase
         .from('payment_providers')
         .select('*')
@@ -240,7 +227,6 @@ export class InvoiceService {
 
       // If no production provider, try any active provider
       if (dbError || !paymentProvider) {
-        console.log('🔍 No production provider found, trying any active provider...');
         const { data: anyProvider, error: anyError } = await supabase
           .from('payment_providers')
           .select('*')
@@ -270,7 +256,6 @@ export class InvoiceService {
         };
       }
 
-      console.log('✅ Using payment provider:', paymentProvider.name, '(' + paymentProvider.environment + ')');
 
       // Initialize Xendit Auth with provider data
       const xenditAuth = new XenditAuthClient(
@@ -279,11 +264,9 @@ export class InvoiceService {
       );
 
       // Get the invoice
-      console.log('🔄 Calling Xendit API to get invoice...');
       const invoiceResult = await xenditAuth.getInvoice(requestData.invoice_id, requestData.external_id);
 
       if (invoiceResult.success) {
-        console.log('✅ Invoice retrieved successfully');
         
         return {
           success: true,
