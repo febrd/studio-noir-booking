@@ -34,7 +34,7 @@ const bookingSchema = z.object({
   booking_date: z.date(),
   start_time: z.string().min(1, 'Waktu mulai wajib diisi'),
   payment_method: z.enum(['online', 'offline']),
-  status: z.enum(['pending', 'confirmed', 'completed', 'cancelled']),
+  status: z.enum(['pending', 'confirmed', 'completed', 'installment', 'cancelled', 'paid', 'expired']),
   notes: z.string().optional(),
   additional_services: z.array(z.string()).optional()
 }).refine((data) => {
@@ -985,8 +985,11 @@ const BookingForm = ({ booking, onSuccess }: BookingFormProps) => {
                   <SelectContent>
                     <SelectItem value="pending">Pending</SelectItem>
                     <SelectItem value="confirmed">Confirmed</SelectItem>
+                    <SelectItem value="installment">Cicilan/DP</SelectItem>
                     <SelectItem value="completed">Completed</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="expired">Expired</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
