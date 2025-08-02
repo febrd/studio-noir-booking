@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import DynamicPaymentButton from '@/components/DynamicPaymentButton';
 import { formatDateTimeWITA } from '@/utils/timezoneUtils';
+import { MobileFooterNav } from './MobileFooterNav';
 
 const PelangganDashboard = () => {
   const { userProfile } = useJWTAuth();
@@ -155,237 +156,104 @@ const PelangganDashboard = () => {
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 rounded-xl p-6">
-        <h1 className="text-2xl md:text-3xl font-peace-sans font-black text-gray-900 mb-2">
-          Selamat Datang, {userProfile?.name}! 👋
-        </h1>
-        <p className="text-gray-600 font-inter">
-          Kelola booking Anda dan temukan paket foto terbaik di Masuk Studio.
-        </p>
-      </div>
+    <>
+      <div className="space-y-6 p-4 md:p-6 pb-20 md:pb-6">
+        {/* Welcome Section */}
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100 rounded-xl p-6">
+          <h1 className="text-2xl md:text-3xl font-peace-sans font-black text-gray-900 mb-2">
+            Selamat Datang, {userProfile?.name}! 👋
+          </h1>
+          <p className="text-gray-600 font-inter">
+            Kelola booking Anda dan temukan paket foto terbaik di Masuk Studio.
+          </p>
+        </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border border-gray-100 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-inter text-gray-600">Total Booking</p>
-                <p className="text-2xl font-peace-sans font-black text-gray-900">{stats.totalBookings}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center">
-                <CalendarDays className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-gray-100 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-inter text-gray-600">Total Pengeluaran</p>
-                <p className="text-xl md:text-2xl font-peace-sans font-black text-gray-900">
-                  {stats.totalSpending.toLocaleString('id-ID', { 
-                    style: 'currency', 
-                    currency: 'IDR', 
-                    minimumFractionDigits: 0 
-                  })}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
-                <Package className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-gray-100 shadow-sm">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-inter text-gray-600">Booking Pending</p>
-                <p className="text-2xl font-peace-sans font-black text-gray-900">{stats.pendingBookings}</p>
-              </div>
-              <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center">
-                <Clock className="w-6 h-6 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
-      <Card className="border border-gray-100 shadow-sm">
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="font-peace-sans font-black text-gray-900">Aksi Cepat</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 md:p-6 pt-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Link to="/customer/booking-selection">
-              <Button className="w-full bg-black text-white hover:bg-gray-800 font-peace-sans font-bold py-6">
-                <Camera className="w-5 h-5 mr-2" />
-                Booking Baru
-              </Button>
-            </Link>
-            <Link to="/customer/order-history">
-              <Button variant="outline" className="w-full border-gray-200 text-gray-700 hover:bg-gray-50 font-peace-sans font-bold py-6">
-                <CalendarDays className="w-5 h-5 mr-2" />
-                Riwayat Pesanan
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Pending Payments Section - Updated dengan Dynamic Button */}
-      {pendingBookings.length > 0 && (
-        <Card className="border border-orange-200 shadow-sm bg-orange-50">
-          <CardHeader className="p-4 md:p-6">
-            <CardTitle className="font-peace-sans font-black text-orange-900">
-              Booking Menunggu Pembayaran
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 md:p-6 pt-0">
-            <div className="space-y-3">
-              {pendingBookings.map((booking) => (
-                <div key={booking.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white rounded-lg gap-3 border border-orange-200">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-peace-sans font-bold text-gray-900 truncate">
-                      {booking.studio_packages?.title}
-                    </h3>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1 text-sm text-gray-600">
-                      <div className="flex items-center gap-1">
-                        <MapPin className="w-4 h-4" />
-                        <span className="truncate">{booking.studios?.name}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <CalendarDays className="w-4 h-4" />
-                        <span>{formatDateTimeWITA(booking.start_time || booking.created_at)}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <p className="text-sm font-peace-sans font-bold text-gray-900 whitespace-nowrap">
-                      {(booking.total_amount || 0).toLocaleString('id-ID', { 
-                        style: 'currency', 
-                        currency: 'IDR', 
-                        minimumFractionDigits: 0 
-                      })}
-                    </p>
-                    <DynamicPaymentButton 
-                      booking={booking}
-                      qrisImageUrl={qrisImageUrl}
-                      onPaymentUpdate={handlePaymentUpdate}
-                    />
-                  </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="border border-gray-100 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-inter text-gray-600">Total Booking</p>
+                  <p className="text-2xl font-peace-sans font-black text-gray-900">{stats.totalBookings}</p>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Chart and Recent Bookings Side by Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Spending Chart - Updated to Bar Chart */}
-        <Card className="border border-gray-100 shadow-sm">
-          <CardHeader className="p-4 md:p-6">
-            <CardTitle className="font-peace-sans font-black text-gray-900">
-              Grafik Pengeluaran
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 md:p-6 pt-0">
-            {spendingData.length > 0 ? (
-              <div className="w-full h-[250px] md:h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={spendingData}
-                    margin={{
-                      top: 10,
-                      right: 10,
-                      left: 10,
-                      bottom: 40,
-                    }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="month" 
-                      stroke="#666"
-                      fontSize={10}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                      interval={0}
-                    />
-                    <YAxis 
-                      stroke="#666"
-                      fontSize={10}
-                      tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
-                      width={40}
-                    />
-                    <Tooltip
-                      formatter={(value: number) => [
-                        value.toLocaleString('id-ID', { 
-                          style: 'currency', 
-                          currency: 'IDR', 
-                          minimumFractionDigits: 0 
-                        }),
-                        'Pengeluaran'
-                      ]}
-                      labelStyle={{ fontSize: '11px' }}
-                      contentStyle={{ 
-                        fontSize: '11px', 
-                        maxWidth: '180px',
-                        backgroundColor: 'white',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px'
-                      }}
-                    />
-                    <Bar
-                      dataKey="amount"
-                      radius={[4, 4, 0, 0]}
-                      name="Pengeluaran"
-                    >
-                      {spendingData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={getBarColor(index, spendingData.length)} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-[250px] md:h-[300px] text-gray-500">
-                <div className="text-center">
-                  <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm font-inter">Belum ada data pengeluaran</p>
+                <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center">
+                  <CalendarDays className="w-6 h-6 text-blue-600" />
                 </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Recent Bookings - Updated dengan Dynamic Button */}
+          <Card className="border border-gray-100 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-inter text-gray-600">Total Pengeluaran</p>
+                  <p className="text-xl md:text-2xl font-peace-sans font-black text-gray-900">
+                    {stats.totalSpending.toLocaleString('id-ID', { 
+                      style: 'currency', 
+                      currency: 'IDR', 
+                      minimumFractionDigits: 0 
+                    })}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
+                  <Package className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-gray-100 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-inter text-gray-600">Booking Pending</p>
+                  <p className="text-2xl font-peace-sans font-black text-gray-900">{stats.pendingBookings}</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-orange-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
         <Card className="border border-gray-100 shadow-sm">
           <CardHeader className="p-4 md:p-6">
-            <div className="flex items-center justify-between">
-              <CardTitle className="font-peace-sans font-black text-gray-900">
-                Booking Terbaru
-              </CardTitle>
+            <CardTitle className="font-peace-sans font-black text-gray-900">Aksi Cepat</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Link to="/customer/booking-selection">
+                <Button className="w-full bg-black text-white hover:bg-gray-800 font-peace-sans font-bold py-6">
+                  <Camera className="w-5 h-5 mr-2" />
+                  Booking Baru
+                </Button>
+              </Link>
               <Link to="/customer/order-history">
-                <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 font-inter">
-                  Lihat Semua
+                <Button variant="outline" className="w-full border-gray-200 text-gray-700 hover:bg-gray-50 font-peace-sans font-bold py-6">
+                  <CalendarDays className="w-5 h-5 mr-2" />
+                  Riwayat Pesanan
                 </Button>
               </Link>
             </div>
-          </CardHeader>
-          <CardContent className="p-4 md:p-6 pt-0">
-            {recentBookings.length > 0 ? (
-              <div className="space-y-4">
-                {recentBookings.map((booking) => (
-                  <div key={booking.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 rounded-lg gap-3">
+          </CardContent>
+        </Card>
+
+        {/* Pending Payments Section - Updated dengan Dynamic Button */}
+        {pendingBookings.length > 0 && (
+          <Card className="border border-orange-200 shadow-sm bg-orange-50">
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="font-peace-sans font-black text-orange-900">
+                Booking Menunggu Pembayaran
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0">
+              <div className="space-y-3">
+                {pendingBookings.map((booking) => (
+                  <div key={booking.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white rounded-lg gap-3 border border-orange-200">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-peace-sans font-bold text-gray-900 truncate">
                         {booking.studio_packages?.title}
@@ -400,20 +268,8 @@ const PelangganDashboard = () => {
                           <span>{formatDateTimeWITA(booking.start_time || booking.created_at)}</span>
                         </div>
                       </div>
-                      
-                      {/* Show installment info if available */}
-                      {booking.installments && booking.installments.length > 0 && (
-                        <div className="mt-2">
-                          <Badge className="bg-purple-100 text-purple-800 border-purple-300 text-xs">
-                            Cicilan: {booking.installments.length}x pembayaran
-                          </Badge>
-                        </div>
-                      )}
                     </div>
-                    <div className="flex items-center justify-between md:justify-end gap-3">
-                      <Badge className={`${getStatusBadgeStyle(booking.status)} border font-peace-sans font-bold whitespace-nowrap`}>
-                        {getStatusText(booking.status)}
-                      </Badge>
+                    <div className="flex items-center gap-3">
                       <p className="text-sm font-peace-sans font-bold text-gray-900 whitespace-nowrap">
                         {(booking.total_amount || 0).toLocaleString('id-ID', { 
                           style: 'currency', 
@@ -421,45 +277,194 @@ const PelangganDashboard = () => {
                           minimumFractionDigits: 0 
                         })}
                       </p>
-                      
-                      
+                      <DynamicPaymentButton 
+                        booking={booking}
+                        qrisImageUrl={qrisImageUrl}
+                        onPaymentUpdate={handlePaymentUpdate}
+                      />
                     </div>
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="flex items-center justify-center h-[250px] md:h-[300px] text-gray-500">
-                <div className="text-center">
-                  <Camera className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm font-inter">Belum ada booking terbaru</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Empty State */}
-      {bookings.length === 0 && (
-        <Card className="border border-gray-100 shadow-sm">
-          <CardContent className="p-8 text-center">
-            <Camera className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-peace-sans font-black text-gray-900 mb-2">
-              Belum Ada Booking
-            </h3>
-            <p className="text-gray-500 font-inter mb-6">
-              Mulai booking session foto pertama Anda di Studio Noir!
-            </p>
-            <Link to="/customer/booking-selection">
-              <Button className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold">
-                <Camera className="w-5 h-5 mr-2" />
-                Booking Sekarang
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+        {/* Chart and Recent Bookings Side by Side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Spending Chart - Updated to Bar Chart */}
+          <Card className="border border-gray-100 shadow-sm">
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="font-peace-sans font-black text-gray-900">
+                Grafik Pengeluaran
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0">
+              {spendingData.length > 0 ? (
+                <div className="w-full h-[250px] md:h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={spendingData}
+                      margin={{
+                        top: 10,
+                        right: 10,
+                        left: 10,
+                        bottom: 40,
+                      }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="month" 
+                        stroke="#666"
+                        fontSize={10}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                        interval={0}
+                      />
+                      <YAxis 
+                        stroke="#666"
+                        fontSize={10}
+                        tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
+                        width={40}
+                      />
+                      <Tooltip
+                        formatter={(value: number) => [
+                          value.toLocaleString('id-ID', { 
+                            style: 'currency', 
+                            currency: 'IDR', 
+                            minimumFractionDigits: 0 
+                          }),
+                          'Pengeluaran'
+                        ]}
+                        labelStyle={{ fontSize: '11px' }}
+                        contentStyle={{ 
+                          fontSize: '11px', 
+                          maxWidth: '180px',
+                          backgroundColor: 'white',
+                          border: '1px solid #ccc',
+                          borderRadius: '4px'
+                        }}
+                      />
+                      <Bar
+                        dataKey="amount"
+                        radius={[4, 4, 0, 0]}
+                        name="Pengeluaran"
+                      >
+                        {spendingData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={getBarColor(index, spendingData.length)} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[250px] md:h-[300px] text-gray-500">
+                  <div className="text-center">
+                    <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p className="text-sm font-inter">Belum ada data pengeluaran</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Bookings - Updated dengan Dynamic Button */}
+          <Card className="border border-gray-100 shadow-sm">
+            <CardHeader className="p-4 md:p-6">
+              <div className="flex items-center justify-between">
+                <CardTitle className="font-peace-sans font-black text-gray-900">
+                  Booking Terbaru
+                </CardTitle>
+                <Link to="/customer/order-history">
+                  <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 font-inter">
+                    Lihat Semua
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0">
+              {recentBookings.length > 0 ? (
+                <div className="space-y-4">
+                  {recentBookings.map((booking) => (
+                    <div key={booking.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 rounded-lg gap-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-peace-sans font-bold text-gray-900 truncate">
+                          {booking.studio_packages?.title}
+                        </h3>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1 text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <MapPin className="w-4 h-4" />
+                            <span className="truncate">{booking.studios?.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <CalendarDays className="w-4 h-4" />
+                            <span>{formatDateTimeWITA(booking.start_time || booking.created_at)}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Show installment info if available */}
+                        {booking.installments && booking.installments.length > 0 && (
+                          <div className="mt-2">
+                            <Badge className="bg-purple-100 text-purple-800 border-purple-300 text-xs">
+                              Cicilan: {booking.installments.length}x pembayaran
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between md:justify-end gap-3">
+                        <Badge className={`${getStatusBadgeStyle(booking.status)} border font-peace-sans font-bold whitespace-nowrap`}>
+                          {getStatusText(booking.status)}
+                        </Badge>
+                        <p className="text-sm font-peace-sans font-bold text-gray-900 whitespace-nowrap">
+                          {(booking.total_amount || 0).toLocaleString('id-ID', { 
+                            style: 'currency', 
+                            currency: 'IDR', 
+                            minimumFractionDigits: 0 
+                          })}
+                        </p>
+                        
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[250px] md:h-[300px] text-gray-500">
+                  <div className="text-center">
+                    <Camera className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                    <p className="text-sm font-inter">Belum ada booking terbaru</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Empty State */}
+        {bookings.length === 0 && (
+          <Card className="border border-gray-100 shadow-sm">
+            <CardContent className="p-8 text-center">
+              <Camera className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-peace-sans font-black text-gray-900 mb-2">
+                Belum Ada Booking
+              </h3>
+              <p className="text-gray-500 font-inter mb-6">
+                Mulai booking session foto pertama Anda di Studio Noir!
+              </p>
+              <Link to="/customer/booking-selection">
+                <Button className="bg-black text-white hover:bg-gray-800 font-peace-sans font-bold">
+                  <Camera className="w-5 h-5 mr-2" />
+                  Booking Sekarang
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+      
+      {/* Mobile Footer Navigation */}
+      <MobileFooterNav />
+    </>
   );
 };
 
