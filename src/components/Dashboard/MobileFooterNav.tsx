@@ -1,63 +1,58 @@
 
-import { Calendar, Camera, CameraIcon, History, User } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { Camera, CalendarDays, History, Package } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-export const MobileFooterNav = () => {
-  const location = useLocation();
-
-  const navItems = [
+export function MobileFooterNav() {
+  const navigationItems = [
     {
       name: 'Self Photo',
-      href: '/customer/self-photo/packages',
+      href: '/customer/self-photo-packages',
       icon: Camera,
+      color: 'text-purple-600'
     },
     {
       name: 'Regular',
-      href: '/customer/regular/packages',
-      icon: CameraIcon,
+      href: '/customer/regular-packages',
+      icon: Package,
+      color: 'text-blue-600'
     },
     {
       name: 'Booking',
       href: '/customer/booking-selection',
-      icon: Calendar,
+      icon: CalendarDays,
+      color: 'text-green-600'
     },
     {
       name: 'History',
       href: '/customer/order-history',
       icon: History,
-    },
-    {
-      name: 'Profile',
-      href: '/customer/profile',
-      icon: User,
-    },
+      color: 'text-orange-600'
+    }
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 md:hidden z-50">
-      <div className="grid grid-cols-5 py-2">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.href;
-          const Icon = item.icon;
-          
-          return (
-            <Link
-              key={item.name}
-              to={item.href}
-              className={`flex flex-col items-center justify-center py-2 px-1 text-xs transition-colors ${
-                isActive 
-                  ? 'text-blue-600' 
-                  : 'text-gray-600 hover:text-blue-500'
-              }`}
-            >
-              <Icon size={20} className="mb-1" />
-              <span className="font-medium truncate w-full text-center">
-                {item.name}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg md:hidden">
+      <nav className="grid grid-cols-4 py-2">
+        {navigationItems.map((item) => (
+          <Link
+            key={item.href}
+            to={item.href}
+            className="flex flex-col items-center gap-1 px-2 py-2 transition-all duration-200 hover:bg-gray-50 active:bg-gray-100"
+          >
+            <div className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+              "bg-gray-50 hover:bg-gray-100"
+            )}>
+              <item.icon className={cn("w-4 h-4", item.color)} />
+            </div>
+            <span className="text-xs font-medium text-gray-700 text-center leading-3">
+              {item.name}
+            </span>
+          </Link>
+        ))}
+      </nav>
+    </div>
   );
-};
+}
