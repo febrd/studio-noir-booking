@@ -99,7 +99,7 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
       return (
         <>
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          Mengecek Status...
+          Checking...
         </>
       );
     }
@@ -109,14 +109,14 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
         return (
           <>
             <CreditCard className="w-4 h-4 mr-2" />
-            Sudah Dibayar
+            Settled
           </>
         );
       } else if (xenditStatus === 'EXPIRED') {
         return (
           <>
             <CreditCard className="w-4 h-4 mr-2" />
-            Link Expired - Hubungi Admin
+            Expired
           </>
         );
       } else if (invoice_url || booking.payment_link) {
