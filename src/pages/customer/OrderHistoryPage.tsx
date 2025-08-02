@@ -94,6 +94,7 @@ const OrderHistoryPage = () => {
       case 'installment': return 'bg-purple-50 text-purple-600 border-purple-200';
       case 'completed': return 'bg-blue-50 text-blue-600 border-blue-200';
       case 'cancelled': return 'bg-red-50 text-red-600 border-red-200';
+      case 'expired': return 'bg-red-50 text-red-600 border-red-200';
       case 'paid': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
       default: return 'bg-gray-50 text-gray-600 border-gray-200';
     }
@@ -102,10 +103,11 @@ const OrderHistoryPage = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'confirmed': return 'Dikonfirmasi';
-      case 'pending': return 'Pending';
+      case 'pending': return 'Menunggu Pembayaran';
       case 'installment': return 'Cicilan/DP';
       case 'completed': return 'Selesai';
       case 'cancelled': return 'Cancelled';
+      case 'expired': return 'Expired';
       case 'paid': return 'Dibayar';
       default: return status;
     }
@@ -173,6 +175,7 @@ const OrderHistoryPage = () => {
                   <SelectItem value="confirmed">Dikonfirmasi</SelectItem>
                   <SelectItem value="completed">Selesai</SelectItem>
                   <SelectItem value="cancelled">Dibatalkan</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
                   <SelectItem value="paid">Dibayar</SelectItem>
                 </SelectContent>
               </Select>
@@ -202,17 +205,23 @@ const OrderHistoryPage = () => {
                             </p>
                             <div className="flex items-center gap-4 text-sm text-gray-400 font-inter">
                               <span className="flex items-center">
+                                <Camera className="h-4 w-4 mr-1" />
+                                {getTypeText(booking.studios?.type)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-gray-400 font-inter">
+                              <span className="flex items-center">
                                 <Calendar className="h-4 w-4 mr-1" />
                                 {formatDateTimeWITA(booking.start_time || booking.created_at)}
                               </span>
-                              <span className="flex items-center">
+                             
+                           
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-gray-400 font-inter">
+                            <span className="flex items-center">
                                 <Clock className="h-4 w-4 mr-1" />
                                 {booking.studio_packages?.base_time_minutes} menit
-                                {booking.additional_time_minutes > 0 && ` + ${booking.additional_time_minutes} menit`}
-                              </span>
-                              <span className="flex items-center">
-                                <Camera className="h-4 w-4 mr-1" />
-                                {getTypeText(booking.studios?.type)}
+                                {booking.additional_time_minutes > 0 && ` + ${booking.additional_time_minutes} menit (Additional)`}
                               </span>
                             </div>
                           </div>

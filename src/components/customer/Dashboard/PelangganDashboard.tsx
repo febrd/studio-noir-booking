@@ -114,6 +114,8 @@ const PelangganDashboard = () => {
         return 'bg-blue-50 text-blue-600 border-blue-200';
       case 'cancelled':
         return 'bg-red-50 text-red-600 border-red-200';
+      case 'expired':
+        return 'bg-red-50 text-red-600 border-red-200';
       case 'paid':
         return 'bg-emerald-900 text-emerald-100 border-emerald-700';
       default:
@@ -128,6 +130,7 @@ const PelangganDashboard = () => {
       case 'installment': return 'Cicilan/DP';
       case 'completed': return 'Selesai';
       case 'cancelled': return 'Dibatalkan';
+      case 'expired': return 'Kadaluarsa';
       case 'paid': return 'Dibayar';
       default: return status;
     }
