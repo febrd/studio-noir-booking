@@ -22,7 +22,6 @@ export const JWTProtectedRoute = ({ children, allowedRoles = ['owner', 'admin', 
   }
 
   if (!isAuthenticated || !userProfile) {
-    console.log('JWTProtectedRoute - Redirecting to auth - not authenticated');
     return <Navigate to="/auth" replace state={{ from: location }} />;
   }
 
@@ -39,7 +38,6 @@ export const JWTProtectedRoute = ({ children, allowedRoles = ['owner', 'admin', 
   }
 
   if (!allowedRoles.includes(userProfile.role)) {
-    console.log('JWTProtectedRoute - Role not allowed:', userProfile.role, 'Allowed:', allowedRoles);
     
     // If user is pelanggan but route doesn't allow pelanggan, redirect to customer dashboard
     if (userProfile.role === 'pelanggan') {
@@ -56,6 +54,5 @@ export const JWTProtectedRoute = ({ children, allowedRoles = ['owner', 'admin', 
     );
   }
 
-  console.log('JWTProtectedRoute - Access granted for role:', userProfile.role);
   return <>{children}</>;
 };

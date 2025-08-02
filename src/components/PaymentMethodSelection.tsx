@@ -92,7 +92,6 @@ const PaymentMethodSelection = ({
         description += ` | Layanan tambahan: ${additionalServices.join(', ')}`;
       }
       
-      console.log('🚀 Creating invoice for booking:', booking.id);
       
       // Create invoice
       const invoiceResult = await createInvoice({
@@ -110,11 +109,9 @@ const PaymentMethodSelection = ({
         invoice_duration: 86400 // 24 hours
       });
 
-      console.log('📊 Invoice creation result:', invoiceResult);
 
       if (invoiceResult.success && invoiceResult.data?.invoice?.invoice_url) {
         const checkoutUrl = invoiceResult.data.invoice.invoice_url;
-        console.log('💳 Checkout URL created:', checkoutUrl);
         
         // Update booking status and payment method, SAVE PAYMENT LINK
         // Status remains 'pending' - webhook will update when paid
@@ -131,16 +128,13 @@ const PaymentMethodSelection = ({
           throw new Error('Gagal menyimpan link pembayaran');
         }
 
-        console.log('✅ Payment link saved to database:', checkoutUrl);
 
         // DO NOT CREATE INSTALLMENT OR TRANSACTION RECORDS
         // These will be handled by the webhook callback
-        console.log('🔄 Skipping transaction/installment creation - will be handled by webhook');
 
         toast.success('Invoice berhasil dibuat! Anda akan diarahkan ke halaman pembayaran.');
         
         // Redirect to Xendit checkout
-        console.log('🔗 Opening checkout URL:', checkoutUrl);
         window.open(checkoutUrl, '_blank');
         
         onPaymentSuccess();

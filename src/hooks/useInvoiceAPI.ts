@@ -9,7 +9,6 @@ export const useInvoiceAPI = () => {
     setLoading(true);
     
     try {
-      console.log('🚀 Creating invoice with data:', invoiceData);
       
       // Validate required fields before sending
       if (!invoiceData.performed_by) {
@@ -57,11 +56,9 @@ export const useInvoiceAPI = () => {
         })
       };
 
-      console.log('🧹 Cleaned invoice data:', cleanInvoiceData);
       
       // Ensure proper JSON serialization
       const requestBody = JSON.stringify(cleanInvoiceData);
-      console.log('📦 Request body to send:', requestBody);
       
       const response = await fetch('/v1/create/invoice', {
         method: 'POST',
@@ -71,11 +68,8 @@ export const useInvoiceAPI = () => {
         body: requestBody,
       });
 
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response ok:', response.ok);
-
+    
       const result: InvoiceResponse = await response.json();
-      console.log('📥 Invoice API Response:', result);
       
       if (!response.ok) {
         console.error('❌ HTTP Error:', response.status, result);
@@ -98,7 +92,6 @@ export const useInvoiceAPI = () => {
     setLoading(true);
     
     try {
-      console.log('Getting invoice with data:', invoiceData);
       
       const response = await fetch('/v1/get/invoice', {
         method: 'POST',
@@ -109,7 +102,6 @@ export const useInvoiceAPI = () => {
       });
 
       const result: InvoiceResponse = await response.json();
-      console.log('Get Invoice API Response:', result);
       
       return result;
     } catch (error) {

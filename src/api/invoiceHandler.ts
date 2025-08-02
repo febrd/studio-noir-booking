@@ -40,7 +40,6 @@ export class InvoiceAPIHandler {
     try {
       // Parse JSON body
       const requestData: InvoiceRequest = await request.json();
-      console.log('Received invoice request:', requestData);
 
       // Create invoice using service
       const result: InvoiceResponse = await InvoiceService.createInvoice(requestData);
@@ -121,7 +120,6 @@ export class InvoiceAPIHandler {
     try {
       // Parse JSON body
       const requestData: GetInvoiceRequest = await request.json();
-      console.log('Received get invoice request:', requestData);
 
       // Get invoice using service
       const result: InvoiceResponse = await InvoiceService.getInvoice(requestData);

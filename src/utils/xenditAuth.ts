@@ -28,7 +28,6 @@ export class XenditAuthClient {
     const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     const url = `${this.apiUrl}${normalizedEndpoint}`;
     
-    console.log('🌐 Making request to:', url);
     
     const defaultHeaders = {
       'Authorization': this.getAuthHeader(),
@@ -47,7 +46,6 @@ export class XenditAuthClient {
   // Test connection to Xendit API
   async testConnection(): Promise<XenditTestResult> {
     try {
-      console.log('🧪 Testing Xendit connection to:', this.apiUrl);
       
       const response = await this.makeRequest('invoices?limit=1', {
         method: 'GET',
@@ -55,9 +53,7 @@ export class XenditAuthClient {
       
       const responseData = await response.json();
 
-      console.log('📊 Xendit API Response Status:', response.status);
-      console.log('📋 Xendit API Response:', responseData);
-
+   
       if (response.ok) {
         return {
           success: true,
@@ -86,7 +82,6 @@ export class XenditAuthClient {
   // Create invoice
   async createInvoice(invoiceData: any): Promise<XenditTestResult> {
     try {
-      console.log('📝 Creating invoice with data:', invoiceData);
       
       const response = await this.makeRequest('invoices', {
         method: 'POST',
@@ -94,9 +89,7 @@ export class XenditAuthClient {
       });
 
       const responseData = await response.json();
-      console.log('📊 Xendit Create Invoice Response Status:', response.status);
-      console.log('📋 Xendit Create Invoice Response:', responseData);
-
+    
       if (response.ok) {
         return {
           success: true,
@@ -140,10 +133,8 @@ export class XenditAuthClient {
       
       if (invoiceId) {
         endpoint = `invoices/${invoiceId}`;
-        console.log('🔍 Getting invoice by ID:', invoiceId);
       } else if (externalId) {
         endpoint = `invoices?external_id=${encodeURIComponent(externalId)}`;
-        console.log('🔍 Getting invoice by external_id:', externalId);
       } else {
         return {
           success: false,
@@ -156,9 +147,7 @@ export class XenditAuthClient {
       });
 
       const responseData = await response.json();
-      console.log('📊 Xendit Get Invoice Response Status:', response.status);
-      console.log('📋 Xendit Get Invoice Response:', responseData);
-
+      
       if (response.ok) {
         // Handle array response when querying by external_id
         let invoiceData = responseData;

@@ -17,16 +17,13 @@ export const InvoiceTestPanel = () => {
   const handleTest = async (testType: 'basic' | 'withCustomer') => {
     try {
       const data = sampleInvoiceData[testType];
-      console.log('🧪 Testing from UI:', testType, data);
       
       const result = await createInvoice(data);
       
       if (result.success) {
         toast.success('Invoice created successfully! Check console for details.');
-        console.log('✅ UI Test Success:', result);
       } else {
         toast.error(`Failed: ${result.error}`);
-        console.log('❌ UI Test Failed:', result);
       }
     } catch (error) {
       toast.error('Test failed - check console');

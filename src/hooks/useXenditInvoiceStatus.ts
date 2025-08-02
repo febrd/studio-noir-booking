@@ -32,7 +32,6 @@ export const useXenditInvoiceStatus = (
     setError(null);
 
     try {
-      console.log('🔍 Checking Xendit invoice status for booking:', bookingId);
 
       const result = await getInvoice({
         performed_by: userProfile.id,
@@ -41,14 +40,12 @@ export const useXenditInvoiceStatus = (
 
       if (result.success && result.data) {
         const invoice = result.data.invoice;
-        console.log('📊 Xendit invoice data:', invoice);
 
         setInvoiceId(invoice.id || null);
         setStatus(invoice.status);
         setInvoiceUrl(invoice.invoice_url);
         setPaidAmount(invoice.amount || null);
       } else {
-        console.log('❌ Failed to get invoice status:', result.error);
         setError(result.error || 'Gagal mengecek status pembayaran');
       }
     } catch (err) {

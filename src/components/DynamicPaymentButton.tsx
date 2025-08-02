@@ -23,15 +23,15 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
     shouldCheckXendit
   );
 
-  console.log('🔄 Dynamic Payment Button:', {
-    bookingId: booking.id,
-    paymentMethod: booking.payment_method,
-    bookingStatus: booking.status,
-    xenditStatus,
-    invoice_url,
-    bookingPaymentLink: booking.payment_link,
-    shouldCheckXendit
-  });
+  // console.log('🔄 Dynamic Payment Button:', {
+  //   bookingId: booking.id,
+  //   paymentMethod: booking.payment_method,
+  //   bookingStatus: booking.status,
+  //   xenditStatus,
+  //   invoice_url,
+  //   bookingPaymentLink: booking.payment_link,
+  //   shouldCheckXendit
+  // });
 
   // Jangan tampilkan tombol jika sudah lunas
   if (booking.status === 'paid' || booking.status === 'completed') {
@@ -52,11 +52,9 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
   }
 
   const handlePayment = async () => {
-    console.log('🎯 Handle Payment - Method:', booking.payment_method);
     
     // Jika payment method online
     if (booking.payment_method === 'online') {
-      console.log('💳 Online payment - checking invoice...');
       
       // Cek status terbaru dulu
       await checkInvoice();
@@ -77,25 +75,22 @@ const DynamicPaymentButton = ({ booking, qrisImageUrl, onPaymentUpdate }: Dynami
       // PRIORITAS: gunakan invoice_url dari Xendit API, jika tidak ada gunakan dari booking.payment_link
       const paymentUrl = invoice_url || booking.payment_link;
       
-      console.log('🔗 Available payment URLs:', {
-        invoice_url_from_xendit: invoice_url,
-        payment_link_from_db: booking.payment_link,
-        final_url: paymentUrl
-      });
+      // console.log('🔗 Available payment URLs:', {
+      //   invoice_url_from_xendit: invoice_url,
+      //   payment_link_from_db: booking.payment_link,
+      //   final_url: paymentUrl
+      // });
       
       if (paymentUrl) {
-        console.log('🔗 Opening payment URL:', paymentUrl);
         window.open(paymentUrl, '_blank');
         return;
       } else {
-        console.log('❌ No payment URL available');
         toast.error('Link pembayaran tidak tersedia. Silakan hubungi admin.');
         return;
       }
     }
     
     // Jika offline/manual, tampilkan QRIS
-    console.log('📱 Manual payment - showing QRIS');
     setShowQRIS(true);
   };
 
