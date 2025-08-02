@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import DynamicPaymentButton from '@/components/DynamicPaymentButton';
 import { formatDateTimeWITA } from '@/utils/timezoneUtils';
 
@@ -53,7 +53,7 @@ const PelangganDashboard = () => {
     enabled: !!userProfile?.id
   });
 
-  // Calculate spending data for chart
+  // Calculate spending data for chart - Updated for bar chart
   const spendingData = React.useMemo(() => {
     if (!bookings.length) return [];
 
@@ -147,6 +147,12 @@ const PelangganDashboard = () => {
   }
 
   console.log('Rendering dashboard - bookings:', bookings.length, 'spendingData:', spendingData);
+
+  // Bar chart colors - gradient from light to dark blue
+  const getBarColor = (index: number, total: number) => {
+    const intensity = Math.round(300 + (index / (total - 1)) * 400); // 300 to 700
+    return `hsl(220, 100%, ${Math.max(25, 85 - (index * 15))}%)`;
+  };
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -284,7 +290,7 @@ const PelangganDashboard = () => {
 
       {/* Chart and Recent Bookings Side by Side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Spending Chart */}
+        {/* Spending Chart - Updated to Bar Chart */}
         <Card className="border border-gray-100 shadow-sm">
           <CardHeader className="p-4 md:p-6">
             <CardTitle className="font-peace-sans font-black text-gray-900">
@@ -295,7 +301,7 @@ const PelangganDashboard = () => {
             {spendingData.length > 0 ? (
               <div className="w-full h-[250px] md:h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
+                  <BarChart
                     data={spendingData}
                     margin={{
                       top: 10,
@@ -338,17 +344,16 @@ const PelangganDashboard = () => {
                         borderRadius: '4px'
                       }}
                     />
-                    <Legend wrapperStyle={{ fontSize: '11px' }} />
-                    <Line
-                      type="monotone"
+                    <Bar
                       dataKey="amount"
-                      stroke="#3b82f6"
-                      strokeWidth={2}
-                      dot={{ fill: '#3b82f6', strokeWidth: 1, r: 3 }}
+                      radius={[4, 4, 0, 0]}
                       name="Pengeluaran"
-                      connectNulls={false}
-                    />
-                  </LineChart>
+                    >
+                      {spendingData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={getBarColor(index, spendingData.length)} />
+                      ))}
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             ) : (
