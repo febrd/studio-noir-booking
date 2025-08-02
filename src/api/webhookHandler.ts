@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { XenditAuthClient } from '@/utils/xenditAuth';
 
@@ -364,21 +363,21 @@ export class WebhookHandler {
   private static async handleExpiredStatus(payload: XenditWebhookPayload, booking: any, xenditInvoice: any) {
     console.log('⏰ Processing EXPIRED status for booking:', booking.id);
 
-    // Update booking status to expired
+    // Update booking status to cancelled (not expired)
     const { error: updateError } = await supabase
       .from('bookings')
       .update({ 
-        status: 'expired' as const,
+        status: 'cancelled' as const,
         updated_at: new Date().toISOString()
       })
       .eq('id', booking.id);
 
     if (updateError) {
-      console.error('❌ Error updating booking to expired:', updateError);
+      console.error('❌ Error updating booking to cancelled:', updateError);
       return;
     }
 
-    console.log('✅ Booking marked as expired');
+    console.log('✅ Booking marked as cancelled due to payment expiration');
 
     // Log booking activity with verified data
     const { error: logError } = await supabase
@@ -388,15 +387,15 @@ export class WebhookHandler {
         action_type: 'payment_expired',
         performed_by: booking.user_id,
         new_data: JSON.parse(JSON.stringify(xenditInvoice)) as any,
-        note: `Invoice expiration verified from Xendit API. Invoice ID: ${xenditInvoice.id}`
+        note: `Booking cancelled due to invoice expiration verified from Xendit API. Invoice ID: ${xenditInvoice.id}`
       });
 
     if (logError) {
       console.error('❌ Error logging expired activity:', logError);
     } else {
-      console.log('✅ Expiration activity logged successfully');
+      console.log('✅ Booking cancellation activity logged successfully');
     }
 
-    console.log('✅ Booking expiration processing completed');
+    console.log('✅ Booking cancellation processing completed');
   }
 }
