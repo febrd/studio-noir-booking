@@ -10,7 +10,7 @@ export default function EditProfilePage() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-md mx-auto px-4 py-4 flex items-center gap-3">
-          <Link to="/jwt-dashboard">
+          <Link to="/dashboard">
             <Button variant="ghost" size="sm" className="p-0 h-auto">
               <ArrowLeft className="w-5 h-5" />
             </Button>
