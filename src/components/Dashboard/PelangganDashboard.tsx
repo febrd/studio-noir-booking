@@ -124,7 +124,7 @@ const PelangganDashboard = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'confirmed': return 'Dikonfirmasi';
-      case 'pending': return 'Menunggu Pembayaran';
+      case 'pending': return 'Menunggu';
       case 'installment': return 'Cicilan/DP';
       case 'completed': return 'Selesai';
       case 'cancelled': return 'Dibatalkan';
