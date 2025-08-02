@@ -12,10 +12,7 @@ export const ProtectedRoute = ({ children, allowedRoles = ['owner', 'admin', 'ke
   const { userProfile, loading } = useAuth();
   const location = useLocation();
 
-  console.log('ProtectedRoute - User Profile:', userProfile);
-  console.log('ProtectedRoute - Current Path:', location.pathname);
-  console.log('ProtectedRoute - Allowed Roles:', allowedRoles);
-
+ 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -25,12 +22,10 @@ export const ProtectedRoute = ({ children, allowedRoles = ['owner', 'admin', 'ke
   }
 
   if (!userProfile) {
-    console.log('ProtectedRoute - No user profile, redirecting to auth');
     return <Navigate to="/auth" replace state={{ from: location }} />;
   }
 
   if (!allowedRoles.includes(userProfile.role as any)) {
-    console.log('ProtectedRoute - Role not allowed:', userProfile.role, 'Allowed:', allowedRoles);
     
     // If user is pelanggan but route doesn't allow pelanggan, redirect to customer dashboard
     if (userProfile.role === 'pelanggan') {
@@ -40,6 +35,5 @@ export const ProtectedRoute = ({ children, allowedRoles = ['owner', 'admin', 'ke
     return <Navigate to="/unauthorized" replace />;
   }
 
-  console.log('ProtectedRoute - Access granted for role:', userProfile.role);
   return <>{children}</>;
 };

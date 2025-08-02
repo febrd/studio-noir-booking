@@ -41,7 +41,6 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
     onError(''); // Clear previous errors
 
     try {
-      console.log('Starting login process...');
       const result = await signIn(loginForm.email, loginForm.password);
       
       if (!result.success) {
@@ -50,7 +49,6 @@ export const LoginForm = ({ onError }: LoginFormProps) => {
         // Reset captcha on failed login
         setCaptchaReset(!captchaReset);
       } else {
-        console.log('Login successful, redirecting...');
         // Force page reload to ensure clean state
         window.location.href = '/dashboard';
       }

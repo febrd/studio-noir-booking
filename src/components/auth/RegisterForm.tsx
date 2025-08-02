@@ -51,7 +51,6 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
     onError(''); // Clear previous errors
 
     try {
-      console.log('Starting registration process with password hashing...');
       const result = await signUp(registerForm.email, registerForm.password, registerForm.name);
       
       if (!result.success) {
@@ -60,7 +59,6 @@ export const RegisterForm = ({ onError, onSuccess }: RegisterFormProps) => {
         // Reset captcha on failed registration
         setCaptchaReset(!captchaReset);
       } else {
-        console.log('Registration successful with proper password hashing');
         onSuccess('Registrasi berhasil! Password telah di-hash dengan aman. Silakan login dengan akun baru Anda.');
         setRegisterForm({ email: '', password: '', confirmPassword: '', name: '' });
         

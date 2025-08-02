@@ -12,12 +12,7 @@ export const JWTProtectedRoute = ({ children, allowedRoles = ['owner', 'admin', 
   const { userProfile, loading, isAuthenticated } = useJWTAuth();
   const location = useLocation();
 
-  console.log('JWTProtectedRoute - User Profile:', userProfile);
-  console.log('JWTProtectedRoute - Loading:', loading);
-  console.log('JWTProtectedRoute - Is Authenticated:', isAuthenticated);
-  console.log('JWTProtectedRoute - Current Path:', location.pathname);
-  console.log('JWTProtectedRoute - Allowed Roles:', allowedRoles);
-
+ 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
