@@ -27,19 +27,14 @@ const BookingSelectionPage = () => {
   const navigate = useNavigate();
   const { userProfile, isAuthenticated } = useJWTAuth();
 
-  console.log('BookingSelectionPage - User Profile:', userProfile);
-  console.log('BookingSelectionPage - Is Authenticated:', isAuthenticated);
-
   // Redirect if not authenticated or not a customer
   useEffect(() => {
     if (!isAuthenticated) {
-      console.log('BookingSelectionPage - Not authenticated, redirecting to auth');
       navigate('/auth');
       return;
     }
     
     if (userProfile && userProfile.role !== 'pelanggan') {
-      console.log('BookingSelectionPage - Not a customer, redirecting to dashboard');
       navigate('/dashboard');
       return;
     }

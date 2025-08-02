@@ -37,13 +37,11 @@ const SelfPhotoPackagesPage = () => {
   // Redirect if not authenticated or not a customer
   useEffect(() => {
     if (!isAuthenticated) {
-      console.log('SelfPhotoPackagesPage - Not authenticated, redirecting to auth');
       navigate('/auth');
       return;
     }
     
     if (userProfile && userProfile.role !== 'pelanggan') {
-      console.log('SelfPhotoPackagesPage - Not a customer, redirecting to dashboard');
       navigate('/dashboard');
       return;
     }
@@ -53,7 +51,6 @@ const SelfPhotoPackagesPage = () => {
   const { data: packages = [], isLoading, error } = useQuery({
     queryKey: ['self-photo-packages'],
     queryFn: async () => {
-      console.log('Fetching self photo packages...');
       const { data, error } = await supabase
         .from('studio_packages')
         .select(`
@@ -74,7 +71,6 @@ const SelfPhotoPackagesPage = () => {
         throw error;
       }
 
-      console.log('Fetched self photo packages:', data);
       return data as Package[];
     },
     enabled: isAuthenticated && userProfile?.role === 'pelanggan'

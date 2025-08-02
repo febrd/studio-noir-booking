@@ -43,7 +43,6 @@ const RegularPackagesPage = () => {
   const { data: packages = [], isLoading, error } = useQuery({
     queryKey: ['regular-packages'],
     queryFn: async () => {
-      console.log('Fetching regular packages...');
       const { data, error } = await supabase
         .from('studio_packages')
         .select(`
@@ -64,7 +63,6 @@ const RegularPackagesPage = () => {
         throw error;
       }
 
-      console.log('Fetched packages:', data);
       return data as Package[];
     },
   });

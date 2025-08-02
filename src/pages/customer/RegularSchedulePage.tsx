@@ -104,7 +104,6 @@ const RegularSchedulePage: React.FC = () => {
 
   const fetchBookedSlots = async () => {
     try {
-      console.log('Fetching booked slots for regular type...');
       
       const { data, error } = await supabase
         .from('bookings')
@@ -118,7 +117,6 @@ const RegularSchedulePage: React.FC = () => {
         throw error;
       }
 
-      console.log('Fetched regular bookings:', data);
 
       // Group bookings by date (convert UTC to WITA for date comparison)
       const groupedBookings: {[key: string]: BookedSlot[]} = {};
@@ -146,7 +144,6 @@ const RegularSchedulePage: React.FC = () => {
         }
       });
 
-      console.log('Grouped regular bookings by date:', groupedBookings);
       setBookedSlots(groupedBookings);
     } catch (error) {
       console.error('Error fetching booked slots:', error);
@@ -160,7 +157,6 @@ const RegularSchedulePage: React.FC = () => {
     const dayBookings = bookedSlots[dateKey] || [];
     const slots: TimeSlot[] = [];
 
-    console.log(`Generating dynamic time slots for regular booking ${dateKey}:`, dayBookings);
 
     // Convert all booking times to WITA for easier comparison
     const witaBookings = dayBookings.map(booking => {
@@ -207,10 +203,10 @@ const RegularSchedulePage: React.FC = () => {
         const conflict = booking.startWITA < slotEnd && booking.endWITA > currentTime;
         
         if (conflict) {
-          console.log(`Slot ${format(currentTime, 'HH:mm')}-${format(slotEnd, 'HH:mm')} conflicts with booking:`, {
-            bookingStart: format(booking.startWITA, 'HH:mm'),
-            bookingEnd: format(booking.endWITA, 'HH:mm')
-          });
+      //    console.log(`Slot ${format(currentTime, 'HH:mm')}-${format(slotEnd, 'HH:mm')} conflicts with booking:`, {
+        //    bookingStart: format(booking.startWITA, 'HH:mm'),
+          //  bookingEnd: format(booking.endWITA, 'HH:mm')
+          // });
         }
         
         return conflict;
@@ -225,7 +221,6 @@ const RegularSchedulePage: React.FC = () => {
           available: true
         });
 
-        console.log(`Added available regular slot: ${format(currentTime, 'HH:mm')} - ${format(slotEnd, 'HH:mm')}`);
       }
 
       // Move to next slot time (current slot end + 10 minutes gap)
@@ -233,9 +228,8 @@ const RegularSchedulePage: React.FC = () => {
       slotCounter++;
     }
 
-    console.log(`Generated ${slots.length} available dynamic regular slots with ${slotDuration}-minute duration and ${slotGap}-minute gap (10:00-20:30 WITA):`);
     slots.forEach(slot => {
-      console.log(`- ${slot.startTime} to ${slot.endTime}`);
+     // console.log(`- ${slot.startTime} to ${slot.endTime}`);
     });
 
     setTimeSlots(slots);
@@ -276,12 +270,12 @@ const RegularSchedulePage: React.FC = () => {
       const endDateTimeUTC = new Date(endDateTimeWITA);
       endDateTimeUTC.setHours(endDateTimeUTC.getHours() - 8);
 
-      console.log('Creating regular booking with times:', {
-        startWITA: startDateTimeWITA,
-        endWITA: endDateTimeWITA,
-        startUTC: startDateTimeUTC.toISOString(),
-        endUTC: endDateTimeUTC.toISOString()
-      });
+//      console.log('Creating regular booking with times:', {
+  //      startWITA: startDateTimeWITA,
+    //    endWITA: endDateTimeWITA,
+      //  startUTC: startDateTimeUTC.toISOString(),
+        // endUTC: endDateTimeUTC.toISOString()
+         // });
 
       const { data, error } = await supabase
         .from('bookings')

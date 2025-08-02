@@ -55,7 +55,6 @@ const SelfPhotoCheckoutPage = () => {
   const packageId = searchParams.get('package');
   const { userProfile } = useJWTAuth();
   
-  console.log('Self Photo Package ID from URL:', packageId);
   
   // Package quantity is now dynamic instead of fixed
   const [packageQuantity, setPackageQuantity] = useState(1);
@@ -121,7 +120,6 @@ const SelfPhotoCheckoutPage = () => {
         throw new Error('Package ID is missing');
       }
       
-      console.log('Fetching self photo package with ID:', packageId);
       
       const { data, error } = await supabase
         .from('studio_packages')
@@ -142,7 +140,6 @@ const SelfPhotoCheckoutPage = () => {
         throw error;
       }
       
-      console.log('Fetched self photo package data:', data);
       return data as Package;
     },
     enabled: !!packageId,
@@ -199,7 +196,6 @@ const SelfPhotoCheckoutPage = () => {
 
   const fetchBookedSlots = async () => {
     try {
-      console.log('Fetching booked slots for self_photo type...');
       
       const { data, error } = await supabase
         .from('bookings')
@@ -213,7 +209,6 @@ const SelfPhotoCheckoutPage = () => {
         throw error;
       }
 
-      console.log('Fetched bookings:', data);
 
       // Group bookings by date (convert UTC to WITA for date comparison)
       const groupedBookings: {[key: string]: BookedSlot[]} = {};
@@ -235,7 +230,6 @@ const SelfPhotoCheckoutPage = () => {
         }
       });
 
-      console.log('Grouped bookings by date:', groupedBookings);
       setBookedSlots(groupedBookings);
     } catch (error) {
       console.error('Error fetching booked slots:', error);
@@ -249,7 +243,6 @@ const SelfPhotoCheckoutPage = () => {
     const dayBookings = bookedSlots[dateKey] || [];
     const slots: TimeSlot[] = [];
 
-    console.log(`Generating dynamic time slots for ${dateKey}:`, dayBookings);
 
     // Convert all booking times to WITA for easier comparison
     const witaBookings = dayBookings.map(booking => {
@@ -298,10 +291,10 @@ const SelfPhotoCheckoutPage = () => {
         const conflict = booking.startWITA < slotEnd && booking.endWITA > currentTime;
         
         if (conflict) {
-          console.log(`Slot ${format(currentTime, 'HH:mm')}-${format(slotEnd, 'HH:mm')} conflicts with booking:`, {
-            bookingStart: format(booking.startWITA, 'HH:mm'),
-            bookingEnd: format(booking.endWITA, 'HH:mm')
-          });
+      //    console.log(`Slot ${format(currentTime, 'HH:mm')}-${format(slotEnd, 'HH:mm')} conflicts with booking:`, {
+     //       bookingStart: format(booking.startWITA, 'HH:mm'),
+     //       bookingEnd: format(booking.endWITA, 'HH:mm')
+     //     });
         }
         
         return conflict;
@@ -316,7 +309,6 @@ const SelfPhotoCheckoutPage = () => {
           available: true
         });
 
-        console.log(`Added available slot: ${format(currentTime, 'HH:mm')} - ${format(slotEnd, 'HH:mm')}`);
       }
 
       // Move to next slot time (current slot end + 5 minutes gap)
@@ -324,9 +316,8 @@ const SelfPhotoCheckoutPage = () => {
       slotCounter++;
     }
 
-    console.log(`Generated ${slots.length} available dynamic slots with ${slotDuration}-minute duration and ${slotGap}-minute gap (10:00-20:30 WITA):`);
     slots.forEach(slot => {
-      console.log(`- ${slot.startTime} to ${slot.endTime}`);
+   //   console.log(`- ${slot.startTime} to ${slot.endTime}`);
     });
 
     setTimeSlots(slots);
@@ -482,12 +473,12 @@ const SelfPhotoCheckoutPage = () => {
       const endDateTimeUTC = parseWITAToUTC(endDateTimeWITA);
       const totalAmount = calculateTotal();
 
-      console.log('Creating self photo booking with times:', {
-        startWITA: startDateTimeWITA,
-        endWITA: endDateTimeWITA,
-        startUTC: startDateTimeUTC.toISOString(),
-        endUTC: endDateTimeUTC.toISOString()
-      });
+     // console.log('Creating self photo booking with times:', {
+   //     startWITA: startDateTimeWITA,
+     //   endWITA: endDateTimeWITA,
+   //     startUTC: startDateTimeUTC.toISOString(),
+     //   endUTC: endDateTimeUTC.toISOString()
+      // });
 
       const { data, error } = await supabase
         .from('bookings')
@@ -531,7 +522,6 @@ const SelfPhotoCheckoutPage = () => {
 
       // DO NOT CREATE TRANSACTION OR INSTALLMENT RECORDS
       // These will be handled by webhook callback
-      console.log('🔄 Skipping transaction creation for self photo booking - will be handled by webhook');
 
       // Set current booking and show payment method selection
       setCurrentBooking(data);

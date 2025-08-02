@@ -1,7 +1,7 @@
 
 import { ModernLayout } from '@/components/Layout/ModernLayout';
-import { StatsCards } from '@/components/Dashboard/StatsCards';
-import { RecentBookings } from '@/components/Dashboard/RecentBookings';
+import { StatsCards } from '@/components/customer/Dashboard/StatsCards';
+import { RecentBookings } from '@/components/customer/Dashboard/RecentBookings';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const StudioDashboard = () => {

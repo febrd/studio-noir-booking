@@ -1,9 +1,9 @@
 import { useJWTAuth } from '@/hooks/useJWTAuth';
 import { ModernLayout } from '@/components/Layout/ModernLayout';
-import { OwnerDashboard } from '@/components/Dashboard/OwnerDashboard';
-import { AdminDashboard } from '@/components/Dashboard/AdminDashboard';
-import { KeuanganDashboard } from '@/components/Dashboard/KeuanganDashboard';
-import PelangganDashboard from '@/components/Dashboard/PelangganDashboard';
+import { OwnerDashboard } from '@/components/customer/Dashboard/OwnerDashboard';
+import { AdminDashboard } from '@/components/customer/Dashboard/AdminDashboard';
+import { KeuanganDashboard } from '@/components/customer/Dashboard/KeuanganDashboard';
+import PelangganDashboard from '@/components/customer/Dashboard/PelangganDashboard';
 import { Loader2 } from 'lucide-react';
 import { InvoiceTestPanel } from '@/components/InvoiceTestPanel';
 
