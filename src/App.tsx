@@ -190,7 +190,7 @@ function App() {
                   <OrderHistoryPage />
                 </JWTProtectedRoute>
               } />
-              <Route path="/customer/order-history" element={
+              <Route path="/customer/profile" element={
                 <JWTProtectedRoute allowedRoles={['pelanggan']}>
                   <EditProfilePage />
                 </JWTProtectedRoute>
